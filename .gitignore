@@ -1,0 +1,24 @@
+# build related files/dirs
+build
+build-*
+prefix
+prefix-*
+cmake-build-*
+compile_commands.json
+*.o
+*.a
+*.so
+*.lib
+*.dll
+*.exe
+
+# third party sdks
+third_party/*
+
+# IDE/Desktop related files
+.idea
+.vs
+.kdev4
+.cache
+*.kate-swp
+*.kdev4

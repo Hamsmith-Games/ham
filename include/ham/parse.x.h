@@ -1,0 +1,74 @@
+#ifndef HAM_PARSE_X_H
+#define HAM_PARSE_X_H 1
+
+#ifndef HAM_PARSE_X_UTF
+#	error "HAM_PARSE_X_UTF not defined before including parse.x.h"
+#endif
+
+#ifdef HAM_PARSE_X_STR
+#	undef HAM_PARSE_X_STR
+#endif
+
+#ifdef HAM_PARSE_X_TOKEN
+#	undef HAM_PARSE_X_TOKEN
+#endif
+
+#ifdef HAM_PARSE_X_PARSE_CONTEXT
+#	undef HAM_PARSE_X_PARSE_CONTEXT
+#endif
+
+#ifdef HAM_PARSE_X_EXPR_U
+#	undef HAM_PARSE_X_EXPR_U
+#endif
+
+#ifdef HAM_PARSE_X_EXPR_BASE
+#	undef HAM_PARSE_X_EXPR_BASE
+#endif
+
+#ifdef HAM_PARSE_X_EXPR_BINDING
+#	undef HAM_PARSE_X_EXPR_BINDING
+#endif
+
+#ifdef HAM_PARSE_X_EXPR_REF
+#	undef HAM_PARSE_X_EXPR_REF
+#endif
+
+#define HAM_PARSE_X_STR HAM_STR_UTF(HAM_PARSE_X_UTF)
+#define HAM_PARSE_X_TOKEN HAM_TOKEN_UTF(HAM_PARSE_X_UTF)
+
+#define HAM_PARSE_X_PARSE_CONTEXT HAM_PARSE_CONTEXT_UTF(HAM_PARSE_X_UTF)
+
+#define HAM_PARSE_X_EXPR_U HAM_EXPR_UTF(HAM_PARSE_X_UTF, u)
+#define HAM_PARSE_X_EXPR_BASE HAM_EXPR_UTF(HAM_PARSE_X_UTF, base)
+#define HAM_PARSE_X_EXPR_BINDING HAM_EXPR_UTF(HAM_PARSE_X_UTF, binding)
+#define HAM_PARSE_X_EXPR_REF HAM_EXPR_UTF(HAM_PARSE_X_UTF, ref)
+
+typedef struct HAM_PARSE_X_PARSE_CONTEXT HAM_PARSE_X_PARSE_CONTEXT;
+
+typedef struct HAM_PARSE_X_EXPR_BASE{
+	ham_expr_kind kind;
+	const HAM_PARSE_X_TOKEN *tok_beg, *tok_end;
+} HAM_PARSE_X_EXPR_BASE;
+
+typedef struct HAM_PARSE_X_EXPR_BINDING{
+	HAM_PARSE_X_EXPR_BASE super;
+	HAM_PARSE_X_STR name;
+	const HAM_PARSE_X_EXPR_BASE *value;
+} HAM_PARSE_X_EXPR_BINDING;
+
+typedef struct HAM_PARSE_X_EXPR_REF{
+	HAM_PARSE_X_EXPR_BASE super;
+	const HAM_PARSE_X_EXPR_BINDING *refed;
+} HAM_PARSE_X_EXPR_REF;
+
+typedef union HAM_PARSE_X_EXPR_U{
+	ham_expr_kind kind;
+	HAM_PARSE_X_EXPR_BASE base;
+	HAM_PARSE_X_EXPR_BINDING binding;
+	HAM_PARSE_X_EXPR_REF ref;
+} HAM_PARSE_X_EXPR_U;
+
+#undef HAM_PARSE_X_UTF
+#undef HAM_PARSE_X_H
+
+#endif // !HAM_PARSE_X_H
