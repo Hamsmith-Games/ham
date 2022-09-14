@@ -5,34 +5,6 @@
 #	error "HAM_PARSE_X_UTF not defined before including parse.x.h"
 #endif
 
-#ifdef HAM_PARSE_X_STR
-#	undef HAM_PARSE_X_STR
-#endif
-
-#ifdef HAM_PARSE_X_TOKEN
-#	undef HAM_PARSE_X_TOKEN
-#endif
-
-#ifdef HAM_PARSE_X_PARSE_CONTEXT
-#	undef HAM_PARSE_X_PARSE_CONTEXT
-#endif
-
-#ifdef HAM_PARSE_X_EXPR_U
-#	undef HAM_PARSE_X_EXPR_U
-#endif
-
-#ifdef HAM_PARSE_X_EXPR_BASE
-#	undef HAM_PARSE_X_EXPR_BASE
-#endif
-
-#ifdef HAM_PARSE_X_EXPR_BINDING
-#	undef HAM_PARSE_X_EXPR_BINDING
-#endif
-
-#ifdef HAM_PARSE_X_EXPR_REF
-#	undef HAM_PARSE_X_EXPR_REF
-#endif
-
 #define HAM_PARSE_X_STR HAM_STR_UTF(HAM_PARSE_X_UTF)
 #define HAM_PARSE_X_TOKEN HAM_TOKEN_UTF(HAM_PARSE_X_UTF)
 
@@ -40,8 +12,14 @@
 
 #define HAM_PARSE_X_EXPR_U HAM_EXPR_UTF(HAM_PARSE_X_UTF, u)
 #define HAM_PARSE_X_EXPR_BASE HAM_EXPR_UTF(HAM_PARSE_X_UTF, base)
+#define HAM_PARSE_X_EXPR_ERROR HAM_EXPR_UTF(HAM_PARSE_X_UTF, error)
 #define HAM_PARSE_X_EXPR_BINDING HAM_EXPR_UTF(HAM_PARSE_X_UTF, binding)
 #define HAM_PARSE_X_EXPR_REF HAM_EXPR_UTF(HAM_PARSE_X_UTF, ref)
+#define HAM_PARSE_X_EXPR_UNRESOLVED HAM_EXPR_UTF(HAM_PARSE_X_UTF, unresolved)
+
+#define HAM_PARSE_X_EXPR_LIT_INT HAM_EXPR_UTF(HAM_PARSE_X_UTF, lit_int)
+#define HAM_PARSE_X_EXPR_LIT_REAL HAM_EXPR_UTF(HAM_PARSE_X_UTF, lit_real)
+#define HAM_PARSE_X_EXPR_LIT_STR HAM_EXPR_UTF(HAM_PARSE_X_UTF, lit_str)
 
 typedef struct HAM_PARSE_X_PARSE_CONTEXT HAM_PARSE_X_PARSE_CONTEXT;
 
@@ -49,6 +27,11 @@ typedef struct HAM_PARSE_X_EXPR_BASE{
 	ham_expr_kind kind;
 	const HAM_PARSE_X_TOKEN *tok_beg, *tok_end;
 } HAM_PARSE_X_EXPR_BASE;
+
+typedef struct HAM_PARSE_X_EXPR_ERROR{
+	HAM_PARSE_X_EXPR_BASE super;
+	ham_str8 message; // all parser error messages in utf-8
+} HAM_PARSE_X_EXPR_ERROR;
 
 typedef struct HAM_PARSE_X_EXPR_BINDING{
 	HAM_PARSE_X_EXPR_BASE super;
@@ -61,13 +44,49 @@ typedef struct HAM_PARSE_X_EXPR_REF{
 	const HAM_PARSE_X_EXPR_BINDING *refed;
 } HAM_PARSE_X_EXPR_REF;
 
+typedef struct HAM_PARSE_X_EXPR_UNRESOLVED{
+	HAM_PARSE_X_EXPR_BASE super;
+	HAM_PARSE_X_STR id;
+} HAM_PARSE_X_EXPR_UNRESOLVED;
+
+typedef struct HAM_PARSE_X_EXPR_LIT_INT{
+	HAM_PARSE_X_EXPR_BASE super;
+	ham_aint value;
+} HAM_PARSE_X_EXPR_LIT_INT;
+
+typedef struct HAM_PARSE_X_EXPR_LIT_REAL{
+	HAM_PARSE_X_EXPR_BASE super;
+	ham_areal value;
+} HAM_PARSE_X_EXPR_LIT_REAL;
+
+typedef struct HAM_PARSE_X_EXPR_LIT_STR{
+	HAM_PARSE_X_EXPR_BASE super;
+	HAM_PARSE_X_STR value;
+} HAM_PARSE_X_EXPR_LIT_STR;
+
 typedef union HAM_PARSE_X_EXPR_U{
 	ham_expr_kind kind;
 	HAM_PARSE_X_EXPR_BASE base;
+	HAM_PARSE_X_EXPR_ERROR error;
 	HAM_PARSE_X_EXPR_BINDING binding;
 	HAM_PARSE_X_EXPR_REF ref;
+	HAM_PARSE_X_EXPR_UNRESOLVED unresolved;
+	HAM_PARSE_X_EXPR_LIT_INT lit_int;
+	HAM_PARSE_X_EXPR_LIT_REAL lit_real;
+	HAM_PARSE_X_EXPR_LIT_STR lit_str;
 } HAM_PARSE_X_EXPR_U;
 
+#undef HAM_PARSE_X_STR
+#undef HAM_PARSE_X_TOKEN
+#undef HAM_PARSE_X_PARSE_CONTEXT
+#undef HAM_PARSE_X_EXPR_U
+#undef HAM_PARSE_X_EXPR_BASE
+#undef HAM_PARSE_X_EXPR_BINDING
+#undef HAM_PARSE_X_EXPR_REF
+#undef HAM_PARSE_X_EXPR_UNRESOLVED
+#undef HAM_PARSE_X_EXPR_LIT_INT
+#undef HAM_PARSE_X_EXPR_LIT_REAL
+#undef HAM_PARSE_X_EXPR_LIT_STR
 #undef HAM_PARSE_X_UTF
 #undef HAM_PARSE_X_H
 

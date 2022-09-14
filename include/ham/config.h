@@ -23,6 +23,7 @@
 #	define HAM_C_API_BEGIN extern "C" {
 #	define HAM_C_API_END }
 #	define ham_constexpr constexpr
+#	define ham_thread_local thread_local
 #else
 #	define HAM_C_API_BEGIN
 #	define HAM_C_API_END
@@ -40,6 +41,11 @@
 #ifdef __GNUC__
 #	define ham_public __attribute__((visibility("default")))
 #	define ham_private __attribute__((visibility("hidden")))
+
+#	ifndef ham_thread_local
+#		define ham_thread_local __thread
+#	endif
+
 #else
 #	define ham_public
 #	define ham_private

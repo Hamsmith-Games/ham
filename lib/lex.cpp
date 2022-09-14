@@ -1,7 +1,5 @@
 #include "ham/lex.h"
 
-#include <string.h>
-
 #define U_CHARSET_IS_UTF8 1
 #define U_NO_DEFAULT_INCLUDE_UTF_HEADERS 1
 #include "unicode/uchar.h"
@@ -16,27 +14,35 @@ constexpr static inline bool ham_u_isbracket(UChar32 cp) noexcept{
 		case U')':
 			return true;
 
-		default:
-			return false;
+		default: return false;
 	}
 }
 
 constexpr static inline bool ham_u_isop(UChar32 cp) noexcept{
 	switch(cp){
-		case '+':
-		case '-':
-		case '*':
-		case '/':
-		case '=':
-		case '<':
-		case '>':
-		case '%':
-		case '^':
-		case '~':
+		case U'+':
+		case U'-':
+		case U'*':
+		case U'/':
+		case U'=':
+		case U'<':
+		case U'>':
+		case U'%':
+		case U'^':
+		case U'~':
 			return true;
 
-		default:
-			return false;
+		default: return false;
+	}
+}
+
+constexpr static inline bool ham_is_quote(UChar32 cp) noexcept{
+	switch(cp){
+		case U'\'':
+		case U'"':
+			return true;
+
+		default: return false;
 	}
 }
 
