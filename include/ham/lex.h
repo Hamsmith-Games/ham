@@ -33,6 +33,13 @@ typedef enum ham_token_kind{
 #define HAM_SOURCE_LOCATION_UTF(n) HAM_CONCAT(ham_source_location_utf, n)
 #define HAM_TOKEN_UTF(n) HAM_CONCAT(ham_token_utf, n)
 #define HAM_TOKEN_KIND_STR_UTF(n) HAM_CONCAT(ham_token_kind_str_utf, n)
+#define HAM_TOKEN_RANGE_UTF(n) HAM_CONCAT(ham_token_range_utf, n)
+
+#define HAM_EMPTY_TOKEN_RANGE_UTF(n) ((HAM_CONCAT(ham_token_range_utf, n)){ ham_null, ham_null })
+
+#define HAM_EMPTY_TOKEN_RANGE_UTF8  HAM_EMPTY_TOKEN_RANGE_UTF(8)
+#define HAM_EMPTY_TOKEN_RANGE_UTF16 HAM_EMPTY_TOKEN_RANGE_UTF(16)
+#define HAM_EMPTY_TOKEN_RANGE_UTF32 HAM_EMPTY_TOKEN_RANGE_UTF(32)
 
 #define HAM_LEX_X_UTF 8
 #include "lex.x.h"
@@ -43,11 +50,13 @@ typedef enum ham_token_kind{
 #define HAM_LEX_X_UTF 32
 #include "lex.x.h"
 
-#define HAM_LEX_UTF(n) HAM_CONCAT(ham_lex_utf, n)
-
 ham_api bool ham_lex_utf8 (ham_source_location_utf8  *loc, ham_str8  src, ham_token_utf8  *ret);
 ham_api bool ham_lex_utf16(ham_source_location_utf16 *loc, ham_str16 src, ham_token_utf16 *ret);
 ham_api bool ham_lex_utf32(ham_source_location_utf32 *loc, ham_str32 src, ham_token_utf32 *ret);
+
+#define HAM_LEX_UTF(n) HAM_CONCAT(ham_lex_utf, n)
+
+#define HAM_EMPTY_TOKEN_RANGE HAM_EMPTY_TOKEN_RANGE(HAM_UTF)
 
 typedef HAM_SOURCE_LOCATION_UTF(HAM_UTF) ham_source_location;
 typedef HAM_TOKEN_UTF(HAM_UTF)           ham_token;

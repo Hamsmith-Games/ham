@@ -1,6 +1,9 @@
+find_package(PkgConfig REQUIRED)
+
+pkg_check_modules(GMP REQUIRED gmp)
+pkg_check_modules(MPFR REQUIRED mpfr)
+
 find_package(ICU REQUIRED COMPONENTS uc)
-find_package(GMP REQUIRED)
-find_package(MPFR REQUIRED)
 
 set(
 	HAM_SOURCES
@@ -20,7 +23,9 @@ target_include_directories(
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-target_link_libraries(ham PUBLIC gmp::gmp mpfr::mpfr)
+target_link_libraries(ham PUBLIC ${GMP_LIBRARIES} ${MPFR_LIBRARIES})
+target_include_directories(ham PUBLIC ${GMP_INCLUDE_DIRS} ${MPFR_INCLUDE_DIRS})
+
 target_link_libraries(ham PRIVATE ICU::uc robin_hood::robin_hood)
 
 add_library(ham::ham ALIAS ham)

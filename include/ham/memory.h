@@ -106,11 +106,13 @@ namespace ham{
 				ptr->~U();
 			}
 
-			pointer allocate(size_type n = 1) const{
-				return (pointer)ham_allocator_alloc(m_handle, alignof(T), sizeof(T) * n);
+			template<typename U = T>
+			U *allocate(size_type n = 1) const{
+				return (U*)ham_allocator_alloc(m_handle, alignof(U), sizeof(U) * n);
 			}
 
-			void deallocate(pointer p, usize n = 1) const{
+			template<typename U = T>
+			void deallocate(U *p, usize n = 1) const{
 				(void)n;
 				ham_allocator_free(m_handle, p);
 			}

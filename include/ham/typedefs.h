@@ -59,11 +59,112 @@ typedef ham_uptr ham_usize;
 
 typedef ham_u32 ham_utf_cp;
 
+typedef ham_char8  ham_name_buffer_utf8[HAM_NAME_BUFFER_SIZE];
+typedef ham_char16 ham_name_buffer_utf16[HAM_NAME_BUFFER_SIZE];
+typedef ham_char32 ham_name_buffer_utf32[HAM_NAME_BUFFER_SIZE];
+
+typedef ham_char8  ham_path_buffer_utf8[HAM_PATH_BUFFER_SIZE];
+typedef ham_char16 ham_path_buffer_utf16[HAM_PATH_BUFFER_SIZE];
+typedef ham_char32 ham_path_buffer_utf32[HAM_PATH_BUFFER_SIZE];
+
+typedef ham_char8  ham_message_buffer_utf8[HAM_MESSAGE_BUFFER_SIZE];
+typedef ham_char16 ham_message_buffer_utf16[HAM_MESSAGE_BUFFER_SIZE];
+typedef ham_char32 ham_message_buffer_utf32[HAM_MESSAGE_BUFFER_SIZE];
+
+#define HAM_NAME_BUFFER_UTF(n) HAM_CONCAT(ham_name_buffer_utf, n)
+#define HAM_PATH_BUFFER_UTF(n) HAM_CONCAT(ham_path_buffer_utf, n)
+#define HAM_MESSAGE_BUFFER_UTF(n) HAM_CONCAT(ham_message_buffer_utf, n)
+
 HAM_C_API_BEGIN
 
 typedef struct ham_str8 { const ham_char8  *ptr; ham_uptr len; } ham_str8;
 typedef struct ham_str16{ const ham_char16 *ptr; ham_uptr len; } ham_str16;
 typedef struct ham_str32{ const ham_char32 *ptr; ham_uptr len; } ham_str32;
+
+//! @cond ignore
+
+#ifdef __GNUC__
+
+#	define HAM_IMPL_STR_CMP(a, b) \
+		({	const ham_auto a_ = (a); const ham_auto b_ = (b);\
+			const ham_usize max_len_ = a_.len > b_.len ? b_.len : a_.len; \
+			ham_usize i_ = 0; \
+			int res_ = 0; \
+			for(; i_ < max_len_; i_++){ \
+				res_ = a_.ptr[i_] - b_.ptr[i_]; \
+				if(res_ != 0) break;\
+			} \
+			if(res_ != 0){ \
+				res_ = (max_len_ == a_.len) ? b_.ptr[max_len_] : a_.ptr[max_len_]; \
+			} \
+			res_; })
+
+#	define HAM_IMPL_STR_EQ(a, b) \
+		({	const ham_auto a_ = (a); const ham_auto b_ = (b); \
+			if(a_.len != b_.len) return false; \
+			bool res_ = true; \
+			for(ham_usize i_ = 0; i_ < a_.len; i_++){ \
+				if(a_.ptr[i_] != b_.ptr[i_]){ \
+					res_ = false; \
+					break; \
+				} \
+			} \
+			res_; })
+
+#	define HAM_IMPL_STR_NEQ(a, b) \
+		({	const ham_auto a__ = (a); const ham_auto b__ = (b); \
+			(a__.len == b__.len) ? false : HAM_IMPL_STR_CMP(a__, b__) != 0; })
+
+#else // __cplusplus
+
+#	define HAM_IMPL_STR_CMP(a, b) \
+		([](const auto a_, const auto b_) constexpr{ \
+			const ham_usize max_len_ = a_.len > b_.len ? b_.len : a_.len; \
+			for(ham_usize i_ = 0; i_ < max_len_; i_++){ \
+				const int res_ = a_.ptr[i_] - b_.ptr[i_]; \
+				if(res_ != 0) return res_;\
+			} \
+			if(a_.len == b_.len) return 0; \
+			else return (max_len_ == a_.len) ? b_.ptr[max_len_] : a_.ptr[max_len_]; \
+		}((a), (b)))
+
+#	define HAM_IMPL_STR_EQ(a, b) \
+		([](const auto a_, const auto b_) constexpr{ \
+			if(a_.len != b_.len) return false; \
+			for(ham_usize i_ = 0; i_ < max_len_; i_++){ \
+				if(a_.ptr[i_] != b_.ptr[i_]) return false;\
+			} \
+			return true; \
+		}((a), (b)))
+
+#	define HAM_IMPL_STR_NEQ(a, b) \
+		([](const auto a__, const auto b__) constexpr{ \
+			return (a__.len == b__.len) ? false : HAM_IMPL_STR_CMP(a__, b__) != 0; \
+		}((a), (b)))
+
+#endif // __GNUC__
+
+//! @endcond
+
+ham_constexpr static inline int  ham_str_cmp_utf8(ham_str8 a, ham_str8 b){ return HAM_IMPL_STR_CMP(a, b); }
+ham_constexpr static inline bool  ham_str_eq_utf8(ham_str8 a, ham_str8 b){ return HAM_IMPL_STR_EQ(a, b); }
+ham_constexpr static inline bool ham_str_neq_utf8(ham_str8 a, ham_str8 b){ return HAM_IMPL_STR_NEQ(a, b); }
+
+ham_constexpr static inline int  ham_str_cmp_utf16(ham_str16 a, ham_str16 b){ return HAM_IMPL_STR_CMP(a, b); }
+ham_constexpr static inline bool  ham_str_eq_utf16(ham_str16 a, ham_str16 b){ return HAM_IMPL_STR_EQ(a, b); }
+ham_constexpr static inline bool ham_str_neq_utf16(ham_str16 a, ham_str16 b){ return HAM_IMPL_STR_NEQ(a, b); }
+
+ham_constexpr static inline int  ham_str_cmp_utf32(ham_str32 a, ham_str32 b){ return HAM_IMPL_STR_CMP(a, b); }
+ham_constexpr static inline bool  ham_str_eq_utf32(ham_str32 a, ham_str32 b){ return HAM_IMPL_STR_EQ(a, b); }
+ham_constexpr static inline bool ham_str_neq_utf32(ham_str32 a, ham_str32 b){ return HAM_IMPL_STR_NEQ(a, b); }
+
+#define HAM_STR_CMP_UTF(n) HAM_CONCAT(ham_str_cmp_utf, n)
+#define HAM_STR_EQ_UTF(n) HAM_CONCAT(ham_str_eq_utf, n)
+#define HAM_STR_NEQ_UTF(n) HAM_CONCAT(ham_str_neq_utf, n)
+
+#define ham_str_cmp HAM_STR_CMP_UTF(HAM_UTF)
+#define ham_str_eq HAM_STR_EQ_UTF(HAM_UTF)
+#define ham_str_neq HAM_STR_NEQ_UTF(HAM_UTF)
 
 HAM_C_API_END
 
@@ -72,6 +173,12 @@ HAM_C_API_END
 
 #define HAM_STR_UTF_(n) ham_str##n
 #define HAM_STR_UTF(n) HAM_STR_UTF_(n)
+
+#define HAM_EMPTY_STR_UTF(n) ((HAM_CONCAT(ham_str, n)){ ham_null, 0 })
+
+#define HAM_EMPTY_STR8  HAM_EMPTY_STR_UTF(8)
+#define HAM_EMPTY_STR16 HAM_EMPTY_STR_UTF(16)
+#define HAM_EMPTY_STR32 HAM_EMPTY_STR_UTF(32)
 
 #define HAM_LIT_C_UTF8(lit) (lit)
 #define HAM_LIT_C_UTF16(lit) (HAM_CONCAT_(u, lit))
@@ -91,8 +198,14 @@ HAM_C_API_END
 #define HAM_LIT_C(lit) HAM_LIT_C_UTF(HAM_UTF, lit)
 #define HAM_LIT(lit) HAM_LIT_UTF(HAM_UTF, lit)
 
+#define HAM_EMPTY_STR HAM_EMPTY_STR_UTF(HAM_UTF)
+
 typedef HAM_CHAR_UTF(HAM_UTF) ham_uchar;
-typedef HAM_STR_UTF(HAM_UTF) ham_str;
+typedef HAM_STR_UTF(HAM_UTF)  ham_str;
+
+typedef HAM_NAME_BUFFER_UTF(HAM_UTF)    ham_name_buffer;
+typedef HAM_PATH_BUFFER_UTF(HAM_UTF)    ham_path_buffer;
+typedef HAM_MESSAGE_BUFFER_UTF(HAM_UTF) ham_message_buffer;
 
 #ifdef __cplusplus
 
@@ -137,6 +250,18 @@ namespace ham{
 
 		template<typename Char>
 		using str_ctype_t = typename str_ctype<Char>::type;
+
+		constexpr inline int cstr_cmp(const ham_str8 &a, const ham_str8 &b){ return ham_str_cmp_utf8(a, b); }
+		constexpr inline int cstr_eq (const ham_str8 &a, const ham_str8 &b){ return  ham_str_eq_utf8(a, b); }
+		constexpr inline int cstr_neq(const ham_str8 &a, const ham_str8 &b){ return ham_str_neq_utf8(a, b); }
+
+		constexpr inline int cstr_cmp(const ham_str16 &a, const ham_str16 &b){ return ham_str_cmp_utf16(a, b); }
+		constexpr inline int cstr_eq (const ham_str16 &a, const ham_str16 &b){ return  ham_str_eq_utf16(a, b); }
+		constexpr inline int cstr_neq(const ham_str16 &a, const ham_str16 &b){ return ham_str_neq_utf16(a, b); }
+
+		constexpr inline int cstr_cmp(const ham_str32 &a, const ham_str32 &b){ return ham_str_cmp_utf32(a, b); }
+		constexpr inline int cstr_eq (const ham_str32 &a, const ham_str32 &b){ return  ham_str_eq_utf32(a, b); }
+		constexpr inline int cstr_neq(const ham_str32 &a, const ham_str32 &b){ return ham_str_neq_utf32(a, b); }
 	}
 
 	template<typename>
@@ -168,10 +293,10 @@ namespace ham{
 
 			constexpr basic_str &operator=(const basic_str&) noexcept = default;
 
-			constexpr int compare(const basic_str &other) const noexcept{ return ham_str_cmp(m_val, other.m_val); }
+			constexpr int compare(const basic_str &other) const noexcept{ return detail::cstr_cmp(m_val, other.m_val); }
 
-			constexpr bool operator==(const basic_str &other) const noexcept{ return ham_str_eq (m_val, other.m_val); }
-			constexpr bool operator!=(const basic_str &other) const noexcept{ return ham_str_neq(m_val, other.m_val); }
+			constexpr bool operator==(const basic_str &other) const noexcept{ return detail::cstr_eq (m_val, other.m_val); }
+			constexpr bool operator!=(const basic_str &other) const noexcept{ return detail::cstr_neq(m_val, other.m_val); }
 			constexpr bool operator< (const basic_str &other) const noexcept{ return compare(other) <  0; }
 			constexpr bool operator<=(const basic_str &other) const noexcept{ return compare(other) <= 0; }
 			constexpr bool operator> (const basic_str &other) const noexcept{ return compare(other) >  0; }
@@ -188,8 +313,8 @@ namespace ham{
 			constexpr iterator end() const noexcept{ return ptr() + len(); }
 
 			constexpr basic_str substr(usize req_from, usize req_len = HAM_USIZE_MAX) const noexcept{
-				const usize actual_from = gpwe_min(req_from, len());
-				const usize actual_len = gpwe_min(req_len, len() - actual_from);
+				const usize actual_from = ham_min(req_from, len());
+				const usize actual_len = ham_min(req_len, len() - actual_from);
 				return basic_str(ptr() + actual_from, actual_len);
 			}
 

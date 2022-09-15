@@ -5,6 +5,8 @@
 
 #include "robin_hood.h"
 
+#include <uchar.h>
+
 #define HAM_PARSE_IMPL_X_UTF 8
 #include "parse-impl.x.h"
 
