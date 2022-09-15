@@ -36,7 +36,7 @@ constexpr static inline bool ham_u_isop(UChar32 cp) noexcept{
 	}
 }
 
-constexpr static inline bool ham_is_quote(UChar32 cp) noexcept{
+constexpr static inline bool ham_u_isquote(UChar32 cp) noexcept{
 	switch(cp){
 		case U'\'':
 		case U'"':

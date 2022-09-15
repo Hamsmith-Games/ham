@@ -12,6 +12,8 @@
 #define HAM_PARSE_IMPL_X_TOKEN HAM_TOKEN_UTF(HAM_PARSE_IMPL_X_UTF)
 #define HAM_PARSE_IMPL_X_TOKEN_RANGE HAM_TOKEN_RANGE_UTF(HAM_PARSE_IMPL_X_UTF)
 
+#define HAM_PARSE_IMPL_X_STR_HASH HAM_STR_HASH_UTF(HAM_PARSE_IMPL_X_UTF)
+
 #define HAM_PARSE_IMPL_X_EMPTY_STR HAM_EMPTY_STR_UTF(HAM_PARSE_IMPL_X_UTF)
 
 #define HAM_PARSE_IMPL_X_PARSE_CONTEXT HAM_PARSE_CONTEXT_UTF(HAM_PARSE_IMPL_X_UTF)
@@ -54,6 +56,7 @@ struct HAM_PARSE_IMPL_X_PARSE_SCOPE{
 
 struct HAM_PARSE_IMPL_X_PARSE_CONTEXT{
 	ham::std_vector<HAM_PARSE_IMPL_X_EXPR_BASE*> exprs; // use allocator from here
+	ham::std_vector<ham::str_buffer_utf8> error_messages;
 	HAM_PARSE_IMPL_X_PARSE_SCOPE root_scope;
 };
 
@@ -106,13 +109,51 @@ HAM_PARSE_IMPL_X_EXPR_BASE *HAM_PARSE_IMPL_X_PARSE_CONTEXT_NEW_EXPR(
 	return ret;
 }
 
+const HAM_PARSE_IMPL_X_EXPR_ERROR *HAM_PARSE_IMPL_X_PARSE_CONTEXT_NEW_ERROR(
+	HAM_PARSE_IMPL_X_PARSE_CONTEXT *ctx,
+	HAM_PARSE_IMPL_X_TOKEN_RANGE tokens,
+	const char *fmt_str,
+	...
+){
+	ham::str_buffer_utf8 u8_buf(ctx->exprs.get_allocator());
+
+	va_list va0;
+	va_start(va0, fmt_str);
+
+	va_list va1;
+	va_copy(va1, va0);
+	int req_len = vsnprintf(nullptr, 0, fmt_str, va1);
+	va_end(va1);
+
+	if(req_len < 0){
+		va_end(va0);
+		return nullptr;
+	}
+
+	u8_buf.resize(req_len);
+
+	vsnprintf(u8_buf.ptr(), req_len, fmt_str, va0);
+
+	va_end(va0);
+
+	const auto ret = (HAM_PARSE_IMPL_X_EXPR_ERROR*)HAM_PARSE_IMPL_X_PARSE_CONTEXT_NEW_EXPR(ctx, HAM_EXPR_ERROR, tokens);
+
+	ret->message = u8_buf.get();
+
+	ctx->error_messages.emplace_back(std::move(u8_buf));
+
+	return ret;
+}
+
 HAM_C_API_END
 
 namespace ham{
-	const HAM_PARSE_IMPL_X_EXPR_BINDING *scope_resolve(const HAM_PARSE_IMPL_X_PARSE_SCOPE *scope, HAM_PARSE_IMPL_X_STR name){
-		const auto res = scope->bindings.find(name);
-		if(res != scope->bindings.end()) return res->second.back();
-		else return scope->parent ? scope_resolve(scope->parent, name) : nullptr;
+	static inline bool scope_bind(HAM_PARSE_IMPL_X_PARSE_SCOPE *scope, const HAM_PARSE_IMPL_X_EXPR_BINDING *binding){
+		return HAM_PARSE_IMPL_X_PARSE_SCOPE_BIND(scope, binding);
+	}
+
+	static inline const HAM_PARSE_IMPL_X_EXPR_BINDING *scope_resolve(const HAM_PARSE_IMPL_X_PARSE_SCOPE *scope, const ham::basic_str<HAM_PARSE_IMPL_X_CHAR> &name){
+		return HAM_PARSE_IMPL_X_PARSE_SCOPE_RESOLVE(scope, name);
 	}
 
 // 	const HAM_PARSE_IMPL_X_EXPR_BASE *parse_id(
@@ -124,21 +165,32 @@ namespace ham{
 //
 // 	}
 
-	static const HAM_PARSE_IMPL_X_EXPR_BASE *parse_leading(
+	static inline const HAM_PARSE_IMPL_X_EXPR_BASE *parse_root(
+		HAM_PARSE_IMPL_X_PARSE_SCOPE *scope,
+		const HAM_PARSE_IMPL_X_TOKEN *it,
+		HAM_PARSE_IMPL_X_TOKEN_RANGE tail
+	);
+
+	static inline const HAM_PARSE_IMPL_X_EXPR_BASE *parse_leading(
 		HAM_PARSE_IMPL_X_PARSE_SCOPE *scope,
 		const HAM_PARSE_IMPL_X_EXPR_BASE *value,
 		HAM_PARSE_IMPL_X_TOKEN_RANGE tail
 	);
 
-	static const HAM_PARSE_IMPL_X_EXPR_BASE *parse_id(
+	static inline const HAM_PARSE_IMPL_X_EXPR_BASE *parse_id(
 		HAM_PARSE_IMPL_X_PARSE_SCOPE *scope,
 		const HAM_PARSE_IMPL_X_TOKEN *it,
 		HAM_PARSE_IMPL_X_TOKEN_RANGE tail
 	){
 		if(it->kind != HAM_TOKEN_ID) return nullptr;
 
-		const HAM_PARSE_IMPL_X_EXPR_BASE *ref = (const HAM_PARSE_IMPL_X_EXPR_BASE*)scope_resolve(scope, it->str);
-		if(!ref){
+		const HAM_PARSE_IMPL_X_EXPR_BASE *ref;
+
+		const auto resolved = scope_resolve(scope, it->str);
+		if(resolved){
+			ref = &resolved->super;
+		}
+		else{
 			const auto unresolved = context_new<HAM_PARSE_IMPL_X_EXPR_UNRESOLVED>(scope->ctx);
 			unresolved->super.kind = HAM_EXPR_UNRESOLVED;
 			unresolved->super.tokens = { it, tail.beg };
@@ -150,7 +202,7 @@ namespace ham{
 		return parse_leading(scope, ref, tail);
 	}
 
-	static const HAM_PARSE_IMPL_X_EXPR_BASE *parse_nat(
+	static inline const HAM_PARSE_IMPL_X_EXPR_BASE *parse_nat(
 		HAM_PARSE_IMPL_X_PARSE_SCOPE *scope,
 		const HAM_PARSE_IMPL_X_TOKEN *it,
 		HAM_PARSE_IMPL_X_TOKEN_RANGE tail
@@ -170,7 +222,7 @@ namespace ham{
 		return parse_leading(scope, &lit_int->super, tail);
 	}
 
-	static const HAM_PARSE_IMPL_X_EXPR_BASE *parse_str(
+	static inline const HAM_PARSE_IMPL_X_EXPR_BASE *parse_str(
 		HAM_PARSE_IMPL_X_PARSE_SCOPE *scope,
 		const HAM_PARSE_IMPL_X_TOKEN *it,
 		HAM_PARSE_IMPL_X_TOKEN_RANGE tail
@@ -187,7 +239,7 @@ namespace ham{
 		return parse_leading(scope, &lit_str->super, tail);
 	}
 
-	static const HAM_PARSE_IMPL_X_EXPR_BASE *parse_leading(
+	static inline const HAM_PARSE_IMPL_X_EXPR_BASE *parse_leading(
 		HAM_PARSE_IMPL_X_PARSE_SCOPE *scope,
 		const HAM_PARSE_IMPL_X_EXPR_BASE *value,
 		HAM_PARSE_IMPL_X_TOKEN_RANGE tail
@@ -195,6 +247,76 @@ namespace ham{
 		if(tail.beg == tail.end) return value;
 
 		return nullptr;
+	}
+
+	static inline const HAM_PARSE_IMPL_X_EXPR_BASE *parse_root(
+		HAM_PARSE_IMPL_X_PARSE_SCOPE *scope,
+		const HAM_PARSE_IMPL_X_TOKEN *it,
+		HAM_PARSE_IMPL_X_TOKEN_RANGE tail
+	){
+		if(it == tail.end) return nullptr;
+
+		auto new_scope = scope;
+
+		if(it->kind == HAM_TOKEN_SPACE){
+			const auto space_head = it;
+
+			HAM_PARSE_IMPL_X_STR space_str = it->str;
+
+			++it;
+			while(it != tail.end && it->kind == HAM_TOKEN_STR){
+				space_str.len += it->str.len;
+				++it;
+			}
+
+			if(it != tail.end && it->kind == HAM_TOKEN_NEWLINE){
+				++it;
+				return parse_root(scope, it, { (it == tail.end ? tail.end : it), tail.end });
+			}
+
+			if(scope->indent.len()){
+				// check indent matches current expected
+				if(
+					(it->str.len < scope->indent.len()) ||
+					(ham::basic_str(it->str).substr(scope->indent.len()) != it->str)
+				){
+					const auto expr_err = ham::detail::parse_context_ctype_new_error<HAM_PARSE_IMPL_X_CHAR>(
+						scope->ctx,
+						(HAM_PARSE_IMPL_X_TOKEN_RANGE){ space_head, it },
+						"mismatched indentation"
+					);
+
+					return (const HAM_PARSE_IMPL_X_EXPR_BASE*)expr_err;
+				}
+			}
+
+			if(ham::basic_str(space_str) != scope->indent){
+				new_scope = ham::detail::parse_scope_ctype_create<HAM_PARSE_IMPL_X_CHAR>(scope->ctx, scope);
+				new_scope->indent = space_str;
+			}
+		}
+
+		const HAM_PARSE_IMPL_X_EXPR_BASE *ret;
+
+		if(
+			!(ret = ham::parse_id (new_scope, it, tail)) &&
+			!(ret = ham::parse_nat(new_scope, it, tail)) &&
+			!(ret = ham::parse_str(new_scope, it, tail))
+		){
+			const auto expr_err = ham::detail::parse_context_ctype_new_error<HAM_PARSE_IMPL_X_CHAR>(
+				scope->ctx,
+				(HAM_PARSE_IMPL_X_TOKEN_RANGE){ it, tail.end },
+				"unrecognized expression"
+			);
+
+			ret = (const HAM_PARSE_IMPL_X_EXPR_BASE*)expr_err;
+		}
+
+		if(new_scope != scope){
+			ham::detail::parse_scope_ctype_destroy<HAM_PARSE_IMPL_X_CHAR>(new_scope);
+		}
+
+		return ret;
 	}
 }
 
@@ -220,6 +342,10 @@ HAM_PARSE_IMPL_X_PARSE_SCOPE *HAM_PARSE_IMPL_X_PARSE_SCOPE_CREATE(
 	ptr->ctx = ctx;
 	ptr->parent = parent;
 
+	if(parent){
+		ptr->indent = parent->indent;
+	}
+
 	return ptr;
 }
 
@@ -236,6 +362,8 @@ bool HAM_PARSE_IMPL_X_PARSE_SCOPE_BIND(
 	HAM_PARSE_IMPL_X_PARSE_SCOPE *scope,
 	const HAM_PARSE_IMPL_X_EXPR_BINDING *binding
 ){
+	if(!scope || !binding || !binding->name.ptr || !binding->name.len) return false;
+
 	const auto find_res = scope->bindings.find(binding->name);
 	if(find_res != scope->bindings.end()){
 		find_res->second.emplace_back(binding);
@@ -251,7 +379,7 @@ const HAM_PARSE_IMPL_X_EXPR_BINDING *HAM_PARSE_IMPL_X_PARSE_SCOPE_RESOLVE(
 	const HAM_PARSE_IMPL_X_PARSE_SCOPE *scope,
 	HAM_PARSE_IMPL_X_STR name
 ){
-	if(!scope) return nullptr;
+	if(!scope || !name.ptr || !name.len) return nullptr;
 
 	const auto res = scope->bindings.find(name);
 	return (res != scope->bindings.end()) ? res->second.back() : HAM_PARSE_IMPL_X_PARSE_SCOPE_RESOLVE(scope->parent, name);
@@ -339,6 +467,7 @@ HAM_C_API_END
 #undef HAM_PARSE_IMPL_X_TOKEN
 #undef HAM_PARSE_IMPL_X_TOKEN_RANGE
 
+#undef HAM_PARSE_IMPL_X_STR_HASH
 #undef HAM_PARSE_IMPL_X_EMPTY_STR
 
 #undef HAM_PARSE_IMPL_X_EXPR_BASE

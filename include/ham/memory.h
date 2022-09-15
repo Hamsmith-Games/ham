@@ -35,13 +35,13 @@ ham_api extern ham_thread_local const ham_allocator *ham_impl_thread_allocator;
 ham_api extern ham_thread_local const ham_allocator *const *ham_impl_current_allocator_ptr;
 //! @endcond
 
-static inline const ham_allocator *ham_current_allocator(){ return *ham_impl_current_allocator_ptr; }
+ham_nothrow static inline const ham_allocator *ham_current_allocator(){ return *ham_impl_current_allocator_ptr; }
 
-static inline void ham_set_global_allocator(const ham_allocator *allocator){
+ham_nothrow static inline void ham_set_global_allocator(const ham_allocator *allocator){
 	ham_impl_global_allocator = allocator ? allocator : &ham_impl_default_allocator;
 }
 
-static inline void ham_set_current_allocator(const ham_allocator *allocator){
+ham_nothrow static inline void ham_set_current_allocator(const ham_allocator *allocator){
 	ham_impl_thread_allocator = allocator;
 	ham_impl_current_allocator_ptr = allocator ? &ham_impl_thread_allocator : &ham_impl_global_allocator;
 }
@@ -86,6 +86,8 @@ namespace ham{
 				return *this;
 			}
 
+			operator const ham_allocator*() const noexcept{ return m_handle; }
+
 			template<typename U>
 			bool operator==(const allocator<U> &other) const noexcept{
 				return m_handle == other.m_handle;
@@ -122,6 +124,29 @@ namespace ham{
 
 			template<typename U>
 			friend class allocator;
+	};
+
+	class scoped_allocator{
+		public:
+			scoped_allocator(const ham_allocator *allocator_) noexcept
+				: m_old_allocator_ptr(ham_impl_current_allocator_ptr)
+				, m_old_allocator(*ham_impl_current_allocator_ptr)
+			{
+				ham_set_current_allocator(allocator_);
+			}
+
+			~scoped_allocator(){
+				if(m_old_allocator_ptr == &ham_impl_global_allocator){
+					ham_set_current_allocator(nullptr);
+				}
+				else{
+					ham_set_current_allocator(m_old_allocator);
+				}
+			}
+
+		private:
+			const ham_allocator *const *m_old_allocator_ptr;
+			const ham_allocator *m_old_allocator;
 	};
 
 	template<typename T>

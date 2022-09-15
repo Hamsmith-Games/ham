@@ -36,7 +36,7 @@ static thread_local HAM_LEX_IMPL_X_H_CHAR HAM_LEX_IMPL_X_H_ERROR_BUF[HAM_LEX_ERR
 
 HAM_C_API_BEGIN
 
-constexpr static inline HAM_LEX_IMPL_X_H_CHAR HAM_LEX_IMPL_X_H_ESCAPE_CHAR(UChar32 cp){
+constexpr static inline HAM_LEX_IMPL_X_H_CHAR HAM_LEX_IMPL_X_H_ESCAPE_CHAR(UChar32 cp) noexcept{
 	switch(cp){
 	#define HAM_CASE(val) case (U##val): return HAM_LIT_C_UTF(HAM_LEX_IMPL_X_H_UTF, val);
 
@@ -49,8 +49,8 @@ constexpr static inline HAM_LEX_IMPL_X_H_CHAR HAM_LEX_IMPL_X_H_ESCAPE_CHAR(UChar
 		HAM_CASE('v')
 		HAM_CASE('\\')
 		HAM_CASE('\'')
-		HAM_CASE('\"')
-		HAM_CASE('\?')
+		HAM_CASE('"')
+		HAM_CASE('?')
 
 	#undef HAM_CASE
 
@@ -58,7 +58,7 @@ constexpr static inline HAM_LEX_IMPL_X_H_CHAR HAM_LEX_IMPL_X_H_ESCAPE_CHAR(UChar
 	}
 }
 
-bool HAM_LEX_IMPL_X_H_LEX(HAM_LEX_IMPL_X_H_SOURCE_LOCATION *loc, HAM_LEX_IMPL_X_H_STR src, HAM_LEX_IMPL_X_H_TOKEN *ret){
+ham_nothrow bool HAM_LEX_IMPL_X_H_LEX(HAM_LEX_IMPL_X_H_SOURCE_LOCATION *loc, HAM_LEX_IMPL_X_H_STR src, HAM_LEX_IMPL_X_H_TOKEN *ret){
 	using namespace ham::typedefs;
 
 	using source_location = HAM_LEX_IMPL_X_H_SOURCE_LOCATION;
@@ -144,7 +144,7 @@ bool HAM_LEX_IMPL_X_H_LEX(HAM_LEX_IMPL_X_H_SOURCE_LOCATION *loc, HAM_LEX_IMPL_X_
 	};
 
 	constexpr auto lex_str = [](source_location *loc, UChar32 head_cp, const src_iter tail_beg, const src_iter tail_end) -> src_iter{
-		if(head_cp != '"' && head_cp != '\''){
+		if(!ham_u_isquote(head_cp)){
 			return nullptr;
 		}
 		else if(tail_beg == tail_end){

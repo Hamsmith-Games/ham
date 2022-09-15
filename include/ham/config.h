@@ -52,6 +52,10 @@
 #ifdef _WIN32
 #	define ham_import __declspec(dllimport)
 #	define ham_export __declspec(dllexport)
+#	define ham_nothrow __declspec(nothrow)
+#	define ham_popcnt16 __popcnt16
+#	define ham_popcnt32 __popcnt
+#	define ham_popcnt64 __popcnt64
 #else
 #	define ham_import
 #	define ham_export
@@ -62,12 +66,28 @@
 #	define ham_public __attribute__((visibility("default")))
 #	define ham_private __attribute__((visibility("hidden")))
 
+#	ifndef ham_nothrow
+#		define ham_nothrow __attribute__((nothrow))
+#	endif
+
 #	ifndef ham_auto
 #		define ham_auto __auto_type
 #	endif
 
 #	ifndef ham_thread_local
 #		define ham_thread_local __thread
+#	endif
+
+#	ifndef ham_popcnt16
+#		define ham_popcnt16 __builtin_popcount
+#	endif
+
+#	ifndef ham_popcnt32
+#		define ham_popcnt32 __builtin_popcount
+#	endif
+
+#	ifndef ham_popcnt64
+#		define ham_popcnt64 __builtin_popcountl
 #	endif
 
 #	define ham_min(a, b) \
@@ -95,11 +115,14 @@
 
 #endif // __GNUC__
 
+#define ham_popcnt ham_popcnt32
+
 #ifdef HAM_LIB_IMPLEMENTATION
 #	define ham_api ham_public ham_export
 #else
 #	define ham_api ham_public ham_import
 #endif
+
 
 /**
  * @}

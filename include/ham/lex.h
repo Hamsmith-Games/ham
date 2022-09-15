@@ -50,9 +50,9 @@ typedef enum ham_token_kind{
 #define HAM_LEX_X_UTF 32
 #include "lex.x.h"
 
-ham_api bool ham_lex_utf8 (ham_source_location_utf8  *loc, ham_str8  src, ham_token_utf8  *ret);
-ham_api bool ham_lex_utf16(ham_source_location_utf16 *loc, ham_str16 src, ham_token_utf16 *ret);
-ham_api bool ham_lex_utf32(ham_source_location_utf32 *loc, ham_str32 src, ham_token_utf32 *ret);
+ham_api ham_nothrow bool ham_lex_utf8 (ham_source_location_utf8  *loc, ham_str8  src, ham_token_utf8  *ret);
+ham_api ham_nothrow bool ham_lex_utf16(ham_source_location_utf16 *loc, ham_str16 src, ham_token_utf16 *ret);
+ham_api ham_nothrow bool ham_lex_utf32(ham_source_location_utf32 *loc, ham_str32 src, ham_token_utf32 *ret);
 
 #define HAM_LEX_UTF(n) HAM_CONCAT(ham_lex_utf, n)
 
@@ -70,21 +70,29 @@ HAM_C_API_END
 
 namespace ham{
 	namespace detail{
-		template<typename Char> struct csource_location;
-		template<> struct csource_location<char8>:  id<ham_source_location_utf8>{};
-		template<> struct csource_location<char16>: id<ham_source_location_utf16>{};
-		template<> struct csource_location<char32>: id<ham_source_location_utf32>{};
-
-		template<typename Char> struct ctoken;
-		template<> struct ctoken<char8>:  id<ham_token_utf8>{};
-		template<> struct ctoken<char16>: id<ham_token_utf16>{};
-		template<> struct ctoken<char32>: id<ham_token_utf32>{};
+		template<typename Char>
+		using csource_location_t = utf_conditional_t<
+			Char,
+			ham_source_location_utf8,
+			ham_source_location_utf16,
+			ham_source_location_utf32
+		>;
 
 		template<typename Char>
-		using csource_location_t = typename csource_location<Char>::type;
+		using ctoken_t = utf_conditional_t<
+			Char,
+			ham_token_utf8,
+			ham_token_utf16,
+			ham_token_utf32
+		>;
 
 		template<typename Char>
-		using ctoken_t = typename ctoken<Char>::type;
+		using ctoken_range_t = utf_conditional_t<
+			Char,
+			ham_token_range_utf8,
+			ham_token_range_utf16,
+			ham_token_range_utf32
+		>;
 	}
 
 	template<typename Char>
@@ -205,7 +213,7 @@ namespace ham{
 	}
 
 	template<typename Char>
-	class alignas(detail::ctoken_t<Char>) basic_token{
+	class basic_token{
 		public:
 			using ctype = detail::ctoken_t<Char>;
 
@@ -259,20 +267,68 @@ namespace ham{
 			ctype m_val;
 	};
 
+	template<typename Char>
+	class basic_token_range{
+		public:
+			using ctype = detail::ctoken_range_t<Char>;
+			using ctoken_type = detail::ctoken_t<Char>;
+
+			using iterator = const ctoken_type*;
+
+			constexpr basic_token_range() noexcept
+				: m_val{ nullptr, nullptr }{}
+
+			constexpr basic_token_range(iterator beg_, iterator end_) noexcept
+				: m_val{ beg_, end_ }{}
+
+			constexpr basic_token_range(const ctype &val_) noexcept
+				: m_val(val_){}
+
+			constexpr basic_token_range(const basic_token_range&) noexcept = default;
+
+			constexpr operator const ctype&() const noexcept{ return m_val; }
+
+			constexpr basic_token_range &operator=(const basic_token_range&) = default;
+
+			constexpr bool operator==(const basic_token_range &other) const noexcept{
+				return (m_val.beg == other.m_val.beg) && (m_val.end == other.m_val.end);
+			}
+
+			constexpr bool operator!=(const basic_token_range &other) const noexcept{
+				return (m_val.beg != other.m_val.beg) || (m_val.end != other.m_val.end);
+			}
+
+			constexpr bool contains(iterator it) const noexcept{
+				return (it >= m_val.beg) && (it < m_val.end);
+			}
+
+			constexpr iterator begin() const noexcept{ return m_val.beg; }
+			constexpr iterator end()   const noexcept{ return m_val.end; }
+
+		private:
+			ctype m_val;
+	};
+
 	using source_location_utf8  = basic_source_location<char8>;
 	using source_location_utf16 = basic_source_location<char16>;
 	using source_location_utf32 = basic_source_location<char32>;
 
-	using source_location = basic_source_location<ham_uchar>;
+	using source_location = basic_source_location<uchar>;
 
 	using token_utf8  = basic_token<char8>;
 	using token_utf16 = basic_token<char16>;
 	using token_utf32 = basic_token<char32>;
 
-	using token = basic_token<ham_uchar>;
+	using token = basic_token<uchar>;
+
+	using token_range_utf8  = basic_token_range<char8>;
+	using token_range_utf16 = basic_token_range<char16>;
+	using token_range_utf32 = basic_token_range<char32>;
+
+	using token_range = basic_token_range<uchar>;
 
 	template<typename Char>
-	bool lex(basic_source_location<Char> &loc, const basic_str<Char> &str, basic_token<Char> &ret){
+	bool lex(basic_source_location<Char> &loc, const basic_str<Char> &str, basic_token<Char> &ret) noexcept{
 		if constexpr(std::is_same_v<Char, char32>){
 			return ham_lex_utf32(&loc.cvalue(), str, &ret.cvalue());
 		}

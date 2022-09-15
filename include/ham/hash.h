@@ -17,6 +17,10 @@ HAM_C_API_BEGIN
 #define HAM_FNV1A_PRIME_32 0x01000193
 #define HAM_FNV1A_PRIME_64 0x811c9dc5
 
+//
+// Byte hashing functions
+//
+
 ham_constexpr static inline ham_u32 ham_hash_fnv1a_32(const char *bytes, ham_usize len){
 	ham_u32 hash = HAM_FNV1A_OFFSET_BIAS_32;
 
@@ -39,16 +43,108 @@ ham_constexpr static inline ham_u64 ham_hash_fnv1a_64(const char *bytes, ham_usi
 	return hash;
 }
 
+//
+// String hashing functions
+//
+
+ham_constexpr static inline ham_u32 ham_str_hash32_utf8(ham_str8 str){
+	return ham_hash_fnv1a_32(str.ptr, str.len);
+}
+
+ham_constexpr static inline ham_u32 ham_str_hash32_utf16(ham_str16 str){
+	ham_u32 hash = HAM_FNV1A_OFFSET_BIAS_32;
+
+	for(ham_usize i = 0 ; i < str.len; i++){
+		const ham_char16 c = str.ptr[i];
+		const char cs[2] = {
+			(char)(c),
+			(char)(c >> 8),
+		};
+
+		for(ham_usize j = 0; j < 2; j++){
+			hash ^= cs[j];
+			hash *= HAM_FNV1A_PRIME_32;
+		}
+	}
+
+	return hash;
+}
+
+ham_constexpr static inline ham_u32 ham_str_hash32_utf32(ham_str32 str){
+	ham_u32 hash = HAM_FNV1A_OFFSET_BIAS_32;
+
+	for(ham_usize i = 0 ; i < str.len; i++){
+		const ham_char32 c = str.ptr[i];
+		const char cs[4] = {
+			(char)(c),
+			(char)(c >> 8),
+			(char)(c >> 16),
+			(char)(c >> 24),
+		};
+
+		for(ham_usize j = 0; j < 4; j++){
+			hash ^= cs[j];
+			hash *= HAM_FNV1A_PRIME_32;
+		}
+	}
+
+	return hash;
+}
+
+ham_constexpr static inline ham_u64 ham_str_hash64_utf8(ham_str8 str){
+	return ham_hash_fnv1a_64(str.ptr, str.len);
+}
+
+ham_constexpr static inline ham_u64 ham_str_hash64_utf16(ham_str16 str){
+	ham_u64 hash = HAM_FNV1A_OFFSET_BIAS_64;
+
+	for(ham_usize i = 0 ; i < str.len; i++){
+		const ham_char16 c = str.ptr[i];
+		const char cs[2] = {
+			(char)(c),
+			(char)(c >> 8),
+		};
+
+		for(ham_usize j = 0; j < 2; j++){
+			hash ^= cs[j];
+			hash *= HAM_FNV1A_PRIME_64;
+		}
+	}
+
+	return hash;
+}
+
+ham_constexpr static inline ham_u64 ham_str_hash64_utf32(ham_str32 str){
+	ham_u64 hash = HAM_FNV1A_OFFSET_BIAS_64;
+
+	for(ham_usize i = 0 ; i < str.len; i++){
+		const ham_char32 c = str.ptr[i];
+		const char cs[4] = {
+			(char)(c),
+			(char)(c >> 8),
+			(char)(c >> 16),
+			(char)(c >> 24),
+		};
+
+		for(ham_usize j = 0; j < 4; j++){
+			hash ^= cs[j];
+			hash *= HAM_FNV1A_PRIME_64;
+		}
+	}
+
+	return hash;
+}
+
 #define ham_hash32 ham_hash_fnv1a_32
 #define ham_hash64 ham_hash_fnv1a_64
 
 #define ham_hash ham_hash64
 
-ham_constexpr static inline ham_uptr ham_str_hash_utf8(ham_str8 str){ return ham_hash(str.ptr, str.len); }
-static inline ham_uptr ham_str_hash_utf16(ham_str16 str){ return ham_hash((const char*)str.ptr, str.len * sizeof(ham_char16)); }
-static inline ham_uptr ham_str_hash_utf32(ham_str32 str){ return ham_hash((const char*)str.ptr, str.len * sizeof(ham_char32)); }
+#define HAM_STR_HASH_UTF(n) HAM_CONCAT(ham_str_hash64_utf, n)
 
-#define HAM_STR_HASH_UTF(n) HAM_CONCAT(ham_str_hash_utf, n)
+#define ham_str_hash_utf8  HAM_STR_HASH_UTF(8)
+#define ham_str_hash_utf16 HAM_STR_HASH_UTF(16)
+#define ham_str_hash_utf32 HAM_STR_HASH_UTF(32)
 
 #define ham_str_hash HAM_STR_HASH_UTF(HAM_UTF)
 
@@ -64,11 +160,11 @@ namespace ham{
 			return ham_str_hash_utf8((ham_str8){ ptr, len });
 		}
 
-		static inline uptr operator""_hash(const char16 *ptr, uptr len) noexcept{
+		constexpr static inline uptr operator""_hash(const char16 *ptr, uptr len) noexcept{
 			return ham_str_hash_utf16((ham_str16){ ptr, len });
 		}
 
-		static inline uptr operator""_hash(const char32 *ptr, uptr len) noexcept{
+		constexpr static inline uptr operator""_hash(const char32 *ptr, uptr len) noexcept{
 			return ham_str_hash_utf32((ham_str32){ ptr, len });
 		}
 	}
@@ -87,14 +183,14 @@ namespace ham{
 
 	template<>
 	struct hash_functor<str16>{
-		ham_uptr operator()(const str16 &s) const noexcept{
+		constexpr ham_uptr operator()(const str16 &s) const noexcept{
 			return ham_str_hash_utf16(s);
 		}
 	};
 
 	template<>
 	struct hash_functor<str32>{
-		ham_uptr operator()(const str32 &s) const noexcept{
+		constexpr ham_uptr operator()(const str32 &s) const noexcept{
 			return ham_str_hash_utf32(s);
 		}
 	};
@@ -111,19 +207,22 @@ namespace ham{
 }
 
 template<>
-struct std::hash<ham::str8>{
-	constexpr auto operator()(ham::str8 s) const noexcept{ return ham::hash(s); }
-};
+struct std::hash<ham::str8>: ham::hash_functor<ham::str8>{};
 
 template<>
-struct std::hash<ham::str16>{
-	auto operator()(ham::str16 s) const noexcept{ return ham::hash(s); }
-};
+struct std::hash<ham::str16>: ham::hash_functor<ham::str16>{};
 
 template<>
-struct std::hash<ham::str32>{
-	auto operator()(ham::str32 s) const noexcept{ return ham::hash(s); }
-};
+struct std::hash<ham::str32>: ham::hash_functor<ham::str32>{};
+
+template<>
+struct std::hash<ham_str8>: ham::hash_functor<ham_str8>{};
+
+template<>
+struct std::hash<ham_str16>: ham::hash_functor<ham_str16>{};
+
+template<>
+struct std::hash<ham_str32>: ham::hash_functor<ham_str32>{};
 
 #endif
 
