@@ -83,7 +83,9 @@ typedef double ham_f64;
 #define HAM_USIZE_MIN            0
 #define HAM_USIZE_MAX HAM_UPTR_MAX
 
-typedef ham_u32 ham_utf_cp;
+//
+// Buffer types
+//
 
 typedef ham_char8  ham_name_buffer_utf8[HAM_NAME_BUFFER_SIZE];
 typedef ham_char16 ham_name_buffer_utf16[HAM_NAME_BUFFER_SIZE];
@@ -100,6 +102,113 @@ typedef ham_char32 ham_message_buffer_utf32[HAM_MESSAGE_BUFFER_SIZE];
 #define HAM_NAME_BUFFER_UTF(n) HAM_CONCAT(ham_name_buffer_utf, n)
 #define HAM_PATH_BUFFER_UTF(n) HAM_CONCAT(ham_path_buffer_utf, n)
 #define HAM_MESSAGE_BUFFER_UTF(n) HAM_CONCAT(ham_message_buffer_utf, n)
+
+/**
+ * @defgroup HAM_UTF_CP UTF Codepoints
+ * @{
+ */
+
+typedef ham_u32 ham_utf_cp;
+
+/**
+ * Check for unicode property ``White_Space``.
+ */
+ham_constexpr ham_nothrow static inline bool ham_utf_is_whitespace(ham_utf_cp cp){
+	return
+		(cp > 0x8 && cp < 0xE) || // basic latin spaces
+		(cp == 0x20) || // SPACE
+		(cp == 0x85) || // NEXT LINE
+		(cp == 0xA0) || // NO-BREAK SPACE
+		(cp == 0x1680) || // OGHAM SPACE MARK
+		(cp > 0x2000 && cp < 0x200A) || // WHOLE BUNCH OF WEIRD SPACES
+		(cp == 0x2028) || // LINE SEPARATOR
+		(cp == 0x2029) || // PARAGRAPH SEPARATOR
+		(cp == 0x202F) || // NARROW NO-BREAK SPACE
+		(cp == 0x205F) || // MEDIUM MATHEMATICAL SPACE
+		(cp == 0x3000) // IDEOGRAPHIC SPACE
+	;
+}
+
+/**
+ * Check for numeric digit codepoints.
+ * @note currently only supports ASCII subset
+ */
+ham_constexpr ham_nothrow static inline bool ham_utf_is_digit(ham_utf_cp cp){
+	return
+		(cp > 0x2F && cp < 0x3A) // ASCII
+	;
+}
+
+/**
+ * Check for quote codepoints.
+ * @note currently only supports ASCII subset
+ */
+ham_constexpr ham_nothrow static inline bool ham_utf_is_quote(ham_utf_cp cp){
+	switch(cp){
+		case U'\'':
+		case U'"':
+			return true;
+
+		default: return false;
+	}
+}
+
+/**
+ * Check for alphabetic codepoints.
+ * @note currently only supports ASCII subset
+ */
+ham_constexpr ham_nothrow static inline bool ham_utf_is_alpha(ham_utf_cp cp){
+	return
+		(cp > 0x40 && cp < 0x5B) || (cp > 0x60 && cp < 0x7B) // ASCII
+	;
+}
+
+/**
+ * Check whether a codepoint is considered an "operator" codepoint
+ * @note currently only supports ASCII subset
+ */
+ham_constexpr ham_nothrow static inline bool ham_utf_is_op(ham_utf_cp cp){
+	switch(cp){
+		case U'!':
+		case U'%':
+		case U'&':
+		case U'*':
+		case U'+':
+		case U'-':
+		case U'/':
+		case U'<':
+		case U'=':
+		case U'>':
+		case U'~':
+		case U'^':
+		case U'|':
+			return true;
+
+		default: return false;
+	}
+}
+
+/**
+ * Check whether a codepoint is considered a bracket
+ * @note currently only supports ASCII subset
+ */
+ham_constexpr ham_nothrow static inline bool ham_utf_is_bracket(ham_utf_cp cp){
+	switch(cp){
+		case U'(':
+		case U')':
+		case U'[':
+		case U']':
+		case U'{':
+		case U'}':
+			return true;
+
+		default: return false;
+	}
+}
+
+/**
+ * @}
+ */
 
 HAM_C_API_BEGIN
 
@@ -172,17 +281,23 @@ typedef struct ham_str32{ const ham_char32 *ptr; ham_uptr len; } ham_str32;
 
 //! @endcond
 
+#define HAM_UTF8_NON_ASCII_BIT 0x80
 #define HAM_UTF8_BYTE_MASK 0xF0
 #define HAM_UTF16_SURROGATE_HIGH_MIN 0xD800
 #define HAM_UTF16_SURROGATE_HIGH_MAX 0xDBFF
 
 ham_constexpr static inline ham_usize ham_codepoint_num_chars_utf8(const ham_char8 *cp, ham_usize max_len){
-	if(!cp || max_len == 0) return 0;
-
-	const ham_u32 byte_mask = (ham_u32)*cp & (ham_u32)HAM_UTF8_BYTE_MASK;
-	const ham_u32 count = ham_popcnt32(byte_mask);
-	if(max_len < count) return (ham_usize)-1;
-	return count;
+	if(!cp || max_len == 0){
+		return 0;
+	}
+	else if(*cp & HAM_UTF8_NON_ASCII_BIT){
+		const ham_u32 byte_mask = (ham_u8)*cp & (ham_u8)HAM_UTF8_BYTE_MASK;
+		const ham_u32 count = ham_popcnt32(byte_mask);
+		return (max_len < count) ? (ham_usize)-1 : count;
+	}
+	else{
+		return 1;
+	}
 }
 
 ham_constexpr static inline ham_usize ham_codepoint_num_chars_utf16(const ham_char16 *cp, ham_usize max_len){
@@ -197,6 +312,112 @@ ham_constexpr static inline ham_usize ham_codepoint_num_chars_utf16(const ham_ch
 	else{
 		return 1;
 	}
+}
+
+ham_constexpr static inline ham_usize ham_codepoint_num_chars_utf32(const ham_char32 *cp, ham_usize max_len){
+	return (!cp || max_len == 0) ? 0 : 1;
+}
+
+ham_constexpr static inline ham_usize ham_str_next_codepoint_utf8(ham_utf_cp *cp, const ham_char8 *str, ham_usize max_chars){
+	const ham_usize req_chars = ham_codepoint_num_chars_utf8(str, max_chars);
+	if(req_chars == (ham_usize)-1) return req_chars;
+
+	if(!cp || max_chars < req_chars) return (ham_usize)-1;
+
+	switch(req_chars){
+		case 1:{
+			if(str[0] < 0) return (ham_usize)-1;
+
+			*cp = str[0];
+			break;
+		}
+
+		case 2:{
+			if(((ham_u8)str[0] == 0xED) && (((ham_u8)str[1] & 0xA0) == 0xA0)){
+				// invalid character in range 0xD800 -> 0xDFFF
+				return (ham_usize)-1;
+			}
+
+			*cp = (str[0]-192)*64 + (str[1]-128);
+			break;
+		}
+
+		case 3:{
+			if(((ham_u8)str[0] == 0xED) && (((ham_u8)str[1] & 0xA0) == 0xA0)){
+				// invalid character in range 0xD800 -> 0xDFFF
+				return (ham_usize)-1;
+			}
+
+			*cp = (str[0]-224)*4096 + (str[1]-128)*64 + (str[2]-128);
+			break;
+		}
+
+		case 4:{
+			if(((ham_u8)str[0] == 0xED) && (((ham_u8)str[1] & 0xA0) == 0xA0)){
+				// invalid character in range 0xD800 -> 0xDFFF
+				return (ham_usize)-1;
+			}
+
+			*cp = (str[0]-240)*262144 + (str[1]-128)*4096 + (str[2]-128)*64 + (str[3]-128);
+			break;
+		}
+
+		default: return (ham_usize)-1;
+	}
+
+	return req_chars;
+}
+
+ham_constexpr static inline ham_usize ham_str_next_codepoint_utf16(ham_utf_cp *cp, const ham_char16 *str, ham_usize max_chars){
+	const ham_usize req_chars = ham_codepoint_num_chars_utf16(str, max_chars);
+	if(req_chars == (ham_usize)-1) return req_chars;
+
+	if(!cp || max_chars < req_chars) return (ham_usize)-1;
+
+	switch(req_chars){
+		case 0:{
+			*cp = '\0';
+			break;
+		}
+
+		case 1:{
+			if(str[0] < 0) return (ham_usize)-1;
+			*cp = str[0];
+			break;
+		}
+
+		case 2:{
+			const auto hi = str[0];
+			const auto lo = str[1];
+			*cp = (hi << 10) + (lo - 0x35fdc00);
+			break;
+		}
+
+		default: return (ham_usize)-1;
+	}
+
+	return req_chars;
+}
+
+ham_constexpr static inline ham_usize ham_str_next_codepoint_utf32(ham_utf_cp *cp, const ham_char32 *str, ham_usize max_chars){
+	const ham_usize req_chars = ham_codepoint_num_chars_utf32(str, max_chars);
+	if(req_chars == (ham_usize)-1) return req_chars;
+
+	switch(req_chars){
+		case 0:{
+			*cp = '\0';
+			break;
+		}
+
+		case 1:{
+			*cp = str[0];
+			break;
+		}
+
+		default: return (ham_usize)-1;
+	}
+
+	return req_chars;
 }
 
 ham_constexpr static inline ham_usize ham_str_num_codepoints_utf8(ham_str8 str){
@@ -518,6 +739,22 @@ namespace ham{
 		>{};
 
 		template<typename Char>
+		constexpr inline auto cstr_next_codepoint = utf_conditional_t<
+			Char,
+			static_fn<ham_str_next_codepoint_utf8>,
+			static_fn<ham_str_next_codepoint_utf16>,
+			static_fn<ham_str_next_codepoint_utf32>
+		>{};
+
+		template<typename Char>
+		constexpr inline auto ccodepoint_num_chars = utf_conditional_t<
+			Char,
+			static_fn<ham_codepoint_num_chars_utf8>,
+			static_fn<ham_codepoint_num_chars_utf16>,
+			static_fn<ham_codepoint_num_chars_utf32>
+		>{};
+
+		template<typename Char>
 		constexpr inline auto cstr_num_codepoints = utf_conditional_t<
 			Char,
 			static_fn<ham_str_num_codepoints_utf8>,
@@ -533,6 +770,16 @@ namespace ham{
 			return count;
 		}
 	}
+
+	template<typename T, typename U>
+	struct layout_is_same: std::bool_constant<
+		(std::is_standard_layout_v<T> && std::is_standard_layout_v<U>) &&
+		(alignof(T) == alignof(U)) &&
+		(sizeof(T) == sizeof(U))
+	>{};
+
+	template<typename T, typename U>
+	constexpr inline bool layout_is_same_v = layout_is_same<T, U>::value;
 
 	template<typename...>
 	struct type_tag{};
@@ -609,6 +856,10 @@ namespace ham{
 	using str8  = basic_str<char8>;
 	using str16 = basic_str<char16>;
 	using str32 = basic_str<char32>;
+
+	static_assert(layout_is_same_v<str8,  ham_str8>);
+	static_assert(layout_is_same_v<str16, ham_str16>);
+	static_assert(layout_is_same_v<str32, ham_str32>);
 
 	using str = basic_str<uchar>;
 }

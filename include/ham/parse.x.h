@@ -33,6 +33,7 @@ typedef struct HAM_PARSE_X_EXPR_BASE{
 
 typedef struct HAM_PARSE_X_EXPR_ERROR{
 	HAM_PARSE_X_EXPR_BASE super;
+	const HAM_PARSE_X_EXPR_BASE *prev;
 	ham_str8 message; // all parser error messages in utf-8
 } HAM_PARSE_X_EXPR_ERROR;
 

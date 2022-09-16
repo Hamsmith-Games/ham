@@ -1,56 +1,9 @@
 #include "ham/lex.h"
 
-#define U_CHARSET_IS_UTF8 1
-#define U_NO_DEFAULT_INCLUDE_UTF_HEADERS 1
-#include "unicode/uchar.h"
+HAM_C_API_BEGIN
 
-constexpr static inline bool ham_u_isbracket(UChar32 cp) noexcept{
-	switch(cp){
-		case U'{':
-		case U'}':
-		case U'[':
-		case U']':
-		case U'(':
-		case U')':
-			return true;
+ham_nothrow bool ham_lex_utf8 (ham_source_location_utf8  *loc, ham_str8  src, ham_token_utf8  *ret){ return ham::detail::constexpr_lex_utf<ham_char8> (loc, src, ret); }
+ham_nothrow bool ham_lex_utf16(ham_source_location_utf16 *loc, ham_str16 src, ham_token_utf16 *ret){ return ham::detail::constexpr_lex_utf<ham_char16>(loc, src, ret); }
+ham_nothrow bool ham_lex_utf32(ham_source_location_utf32 *loc, ham_str32 src, ham_token_utf32 *ret){ return ham::detail::constexpr_lex_utf<ham_char32>(loc, src, ret); }
 
-		default: return false;
-	}
-}
-
-constexpr static inline bool ham_u_isop(UChar32 cp) noexcept{
-	switch(cp){
-		case U'+':
-		case U'-':
-		case U'*':
-		case U'/':
-		case U'=':
-		case U'<':
-		case U'>':
-		case U'%':
-		case U'^':
-		case U'~':
-			return true;
-
-		default: return false;
-	}
-}
-
-constexpr static inline bool ham_u_isquote(UChar32 cp) noexcept{
-	switch(cp){
-		case U'\'':
-		case U'"':
-			return true;
-
-		default: return false;
-	}
-}
-
-#define HAM_LEX_IMPL_X_H_UTF 8
-#include "lex-impl.x.h"
-
-#define HAM_LEX_IMPL_X_H_UTF 16
-#include "lex-impl.x.h"
-
-#define HAM_LEX_IMPL_X_H_UTF 32
-#include "lex-impl.x.h"
+HAM_C_API_END
