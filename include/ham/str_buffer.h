@@ -171,6 +171,10 @@ namespace ham{
 				return *this;
 			}
 
+			operator basic_str<Char>() const& noexcept{ return get(); }
+
+			operator basic_str<Char>() const&& = delete;
+
 			bool reserve(usize req_capacity){
 				return detail::str_buffer_ctype_reserve<Char>(m_handle.get(), req_capacity);
 			}

@@ -11,6 +11,10 @@
 
 namespace ham{
 	namespace detail{
+		//
+		// Scope implementation
+		//
+
 		template<typename Char>
 		static inline parse_scope_ctype_t<Char> *impl_parse_scope_create(parse_context_ctype_t<Char> *ctx, const parse_scope_ctype_t<Char> *parent){
 			if(!ctx) return nullptr;
@@ -93,6 +97,163 @@ namespace ham{
 			binding_vec.emplace_back(binding);
 			return true;
 		}
+
+		//
+		// Context implementation
+		//
+
+		template<typename Char>
+		static inline expr_base_ctype_t<Char> *impl_parse_context_new_expr(
+			basic_parse_context_view<Char> ctx,
+			expr_kind kind,
+			basic_token_range<Char> tokens
+		){
+			if(!ctx || static_cast<ham_expr_kind>(kind) >= HAM_EXPR_KIND_COUNT){
+				return nullptr;
+			}
+
+			const auto allocator = ctx.handle()->exprs.get_allocator();
+
+			switch(kind){
+			#define HAM_CASE(kind_, t_) \
+				case (kind_):{ \
+					const auto mem = allocator.template allocate<t_>(); \
+					if(!mem) return nullptr; \
+					const auto ptr = allocator.construct(mem); \
+					if(!ptr){ \
+						allocator.deallocate(mem); \
+						return nullptr; \
+					} \
+					ptr->super.kind = static_cast<ham_expr_kind>(kind); \
+					return &ptr->super; \
+					break; \
+				}
+
+				HAM_CASE(expr_kind::error,      expr_error_ctype_t<Char>)
+				HAM_CASE(expr_kind::binding,    expr_binding_ctype_t<Char>)
+				HAM_CASE(expr_kind::ref,        expr_ref_ctype_t<Char>)
+				HAM_CASE(expr_kind::unresolved, expr_unresolved_ctype_t<Char>)
+
+				HAM_CASE(expr_kind::lit_int, expr_lit_int_ctype_t<Char>)
+				HAM_CASE(expr_kind::lit_real, expr_lit_real_ctype_t<Char>)
+				HAM_CASE(expr_kind::lit_str, expr_lit_str_ctype_t<Char>)
+
+			#undef HAM_CASE
+
+				default: return nullptr;
+			}
+		}
+
+		template<typename Char>
+		static inline const expr_error_ctype_t<Char> *impl_parse_context_new_error(
+			basic_parse_context_view<Char> ctx,
+			basic_token_range<Char> tokens,
+			basic_expr<Char, expr_kind::base> prev,
+			const char *fmt_str,
+			va_list va
+		){
+			va_list va1;
+			va_copy(va1, va);
+			int req_len = vsnprintf(nullptr, 0, fmt_str, va1);
+			va_end(va1);
+
+			if(req_len <= 0) return nullptr;
+
+			ham::str_buffer_utf8 msg_buf;
+			msg_buf.resize(req_len);
+
+			vsnprintf(msg_buf.ptr(), req_len, fmt_str, va);
+
+			const auto new_err = (expr_error_ctype_t<Char>*)impl_parse_context_new_expr(ctx, expr_kind::error, tokens);
+			if(!new_err) return nullptr;
+
+			new_err->message = msg_buf.get();
+
+			ctx.handle()->error_messages.emplace_back(std::move(msg_buf));
+
+			return new_err;
+		}
+
+		template<typename Char>
+		static inline const expr_binding_ctype_t<Char> *impl_parse_context_new_binding(
+			basic_parse_context_view<Char> ctx,
+			basic_token_range<Char> tokens,
+			basic_str<Char> name,
+			basic_expr<Char, expr_kind::base> type,
+			basic_expr<Char, expr_kind::base> value
+		){
+			const auto new_expr = (expr_binding_ctype_t<Char>*)impl_parse_context_new_expr<Char>(ctx, expr_kind::binding, tokens);
+			if(!new_expr) return nullptr;
+
+			new_expr->name = name;
+			new_expr->type = type;
+			new_expr->value = value;
+			return new_expr;
+		}
+
+		template<typename Char>
+		static inline const expr_ref_ctype_t<Char> *impl_parse_context_new_ref(
+			basic_parse_context_view<Char> ctx,
+			basic_token_range<Char> tokens,
+			basic_expr<Char, expr_kind::binding> refed
+		){
+			const auto new_expr = (expr_ref_ctype_t<Char>*)impl_parse_context_new_expr<Char>(ctx, expr_kind::ref, tokens);
+			if(!new_expr) return nullptr;
+
+			new_expr->refed = refed;
+			return new_expr;
+		}
+
+		template<typename Char>
+		static inline const expr_unresolved_ctype_t<Char> *impl_parse_context_new_unresolved(
+			basic_parse_context_view<Char> ctx,
+			basic_token_range<Char> tokens,
+			basic_str<Char> id
+		){
+			const auto new_expr = (expr_unresolved_ctype_t<Char>*)impl_parse_context_new_expr<Char>(ctx, expr_kind::unresolved, tokens);
+			if(!new_expr) return nullptr;
+
+			new_expr->id = id;
+			return new_expr;
+		}
+
+		template<typename Char>
+		static inline const expr_lit_int_ctype_t<Char> *impl_parse_context_new_lit_int(
+			basic_parse_context_view<Char> ctx,
+			basic_token_range<Char> tokens,
+			basic_str<Char> value
+		){
+			const auto new_expr = (expr_lit_int_ctype_t<Char>*)impl_parse_context_new_expr<Char>(ctx, expr_kind::unresolved, tokens);
+			if(!new_expr) return nullptr;
+
+			if(!aint_ctype_init_str<Char>(&new_expr->value, value, 10)){
+				// TODO: return error
+				return nullptr;
+			}
+
+			return new_expr;
+		}
+
+		template<typename Char>
+		static inline const expr_lit_real_ctype_t<Char> *impl_parse_context_new_lit_real(
+			basic_parse_context_view<Char> ctx,
+			basic_token_range<Char> tokens,
+			basic_str<Char> value
+		){
+			const auto new_expr = (expr_lit_real_ctype_t<Char>*)impl_parse_context_new_expr<Char>(ctx, expr_kind::unresolved, tokens);
+			if(!new_expr) return nullptr;
+
+			if(!areal_ctype_init_str<Char>(&new_expr->value, value, 10)){
+				// TODO: return error
+				return nullptr;
+			}
+
+			return new_expr;
+		}
+
+		//
+		// Parsing implementation
+		//
 
 		template<typename Char>
 		static inline basic_expr<Char, expr_kind::base> impl_parse_root(
@@ -288,6 +449,86 @@ bool ham_parse_scope_bind_utf32(ham_parse_scope_utf32 *scope, const ham_expr_bin
 //
 // Parse contexts
 //
+
+// generic expression creation
+
+ham_expr_base_utf8 *ham_parse_context_new_expr_utf8(ham_parse_context_utf8 *ctx, ham_expr_kind kind, ham_token_range_utf8 tokens){
+	return ham::detail::impl_parse_context_new_expr<ham_char8>(ctx, static_cast<ham::expr_kind>(kind), tokens);
+}
+
+ham_expr_base_utf16 *ham_parse_context_new_expr_utf16(ham_parse_context_utf16 *ctx, ham_expr_kind kind, ham_token_range_utf16 tokens){
+	return ham::detail::impl_parse_context_new_expr<ham_char16>(ctx, static_cast<ham::expr_kind>(kind), tokens);
+}
+
+ham_expr_base_utf32 *ham_parse_context_new_expr_utf32(ham_parse_context_utf32 *ctx, ham_expr_kind kind, ham_token_range_utf32 tokens){
+	return ham::detail::impl_parse_context_new_expr<ham_char32>(ctx, static_cast<ham::expr_kind>(kind), tokens);
+}
+
+// errors
+
+const ham_expr_error_utf8 *ham_parse_context_new_error_utf8(ham_parse_context_utf8 *ctx, ham_token_range_utf8 tokens, const ham_expr_base_utf8 *prev, const char *fmt_str, ...){
+	va_list va;
+	va_start(va, fmt_str);
+	const auto ret = ham::detail::impl_parse_context_new_error<ham_char8>(ctx, tokens, prev, fmt_str, va);
+	va_end(va);
+	return ret;
+}
+
+const ham_expr_error_utf16 *ham_parse_context_new_error_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, const ham_expr_base_utf16 *prev, const char *fmt_str, ...){
+	va_list va;
+	va_start(va, fmt_str);
+	const auto ret = ham::detail::impl_parse_context_new_error<ham_char16>(ctx, tokens, prev, fmt_str, va);
+	va_end(va);
+	return ret;
+}
+
+const ham_expr_error_utf32 *ham_parse_context_new_error_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, const ham_expr_base_utf32 *prev, const char *fmt_str, ...){
+	va_list va;
+	va_start(va, fmt_str);
+	const auto ret = ham::detail::impl_parse_context_new_error<ham_char32>(ctx, tokens, prev, fmt_str, va);
+	va_end(va);
+	return ret;
+}
+
+// bindings
+
+const ham_expr_binding_utf8  *ham_parse_context_new_binding_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_str8  name, const ham_expr_base_utf8  *type, const ham_expr_base_utf8  *value){
+	return ham::detail::impl_parse_context_new_binding<ham_char8>(ctx, tokens, name, type, value);
+}
+
+const ham_expr_binding_utf16 *ham_parse_context_new_binding_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_str16 name, const ham_expr_base_utf16 *type, const ham_expr_base_utf16 *value){
+	return ham::detail::impl_parse_context_new_binding<ham_char16>(ctx, tokens, name, type, value);
+}
+
+const ham_expr_binding_utf32 *ham_parse_context_new_binding_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_str32 name, const ham_expr_base_utf32 *type, const ham_expr_base_utf32 *value){
+	return ham::detail::impl_parse_context_new_binding<ham_char32>(ctx, tokens, name, type, value);
+}
+
+// refs
+
+const ham_expr_ref_utf8  *ham_parse_context_new_ref_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, const ham_expr_binding_utf8  *refed){ return ham::detail::impl_parse_context_new_ref<ham_char8> (ctx, tokens, refed); }
+const ham_expr_ref_utf16 *ham_parse_context_new_ref_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, const ham_expr_binding_utf16 *refed){ return ham::detail::impl_parse_context_new_ref<ham_char16>(ctx, tokens, refed); }
+const ham_expr_ref_utf32 *ham_parse_context_new_ref_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, const ham_expr_binding_utf32 *refed){ return ham::detail::impl_parse_context_new_ref<ham_char32>(ctx, tokens, refed); }
+
+// unresolved refs
+
+const ham_expr_unresolved_utf8  *ham_parse_context_new_unresolved_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_str8  id){ return ham::detail::impl_parse_context_new_unresolved<ham_char8> (ctx, tokens, id); }
+const ham_expr_unresolved_utf16 *ham_parse_context_new_unresolved_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_str16 id){ return ham::detail::impl_parse_context_new_unresolved<ham_char16>(ctx, tokens, id); }
+const ham_expr_unresolved_utf32 *ham_parse_context_new_unresolved_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_str32 id){ return ham::detail::impl_parse_context_new_unresolved<ham_char32>(ctx, tokens, id); }
+
+// literal ints
+
+const ham_expr_lit_int_utf8  *ham_parse_context_new_lit_int_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_str8  value){ return ham::detail::impl_parse_context_new_lit_int<ham_char8> (ctx, tokens, value); }
+const ham_expr_lit_int_utf16 *ham_parse_context_new_lit_int_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_str16 value){ return ham::detail::impl_parse_context_new_lit_int<ham_char16>(ctx, tokens, value); }
+const ham_expr_lit_int_utf32 *ham_parse_context_new_lit_int_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_str32 value){ return ham::detail::impl_parse_context_new_lit_int<ham_char32>(ctx, tokens, value); }
+
+// literal reals
+
+const ham_expr_lit_real_utf8  *ham_parse_context_new_lit_real_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_str8  value){ return ham::detail::impl_parse_context_new_lit_real<ham_char8> (ctx, tokens, value); }
+const ham_expr_lit_real_utf16 *ham_parse_context_new_lit_real_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_str16 value){ return ham::detail::impl_parse_context_new_lit_real<ham_char16>(ctx, tokens, value); }
+const ham_expr_lit_real_utf32 *ham_parse_context_new_lit_real_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_str32 value){ return ham::detail::impl_parse_context_new_lit_real<ham_char32>(ctx, tokens, value); }
+
+// parsing
 
 const ham_expr_base_utf8  *ham_parse_utf8 (ham_parse_context_utf8  *ctx, ham_parse_scope_utf8  *scope, ham_token_range_utf8  tokens){
 	return ham::detail::impl_parse_root<ham_char8>(scope, tokens.beg, ham::basic_token_range{ (tokens.beg == tokens.end ? tokens.end : tokens.beg + 1), tokens.end });

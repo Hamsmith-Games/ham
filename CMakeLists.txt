@@ -27,11 +27,14 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/config.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/typedefs.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/math.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/str_buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/hash.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/lex.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/parse.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/memory.h
 
+	${HAM_SOURCE_INCLUDE_DIR}/ham/meta.hpp
 	${HAM_SOURCE_INCLUDE_DIR}/ham/std_vector.hpp
 )
 

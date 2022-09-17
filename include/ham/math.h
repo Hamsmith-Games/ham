@@ -7,13 +7,12 @@
  * #{
  */
 
-#include "config.h"
+#include "typedefs.h"
 
 #include "gmp.h"
 #include "mpfr.h"
 
 #include <string.h>
-#include <uchar.h>
 
 HAM_C_API_BEGIN
 
@@ -199,6 +198,30 @@ ham_nothrow static inline bool ham_areal_init_str_utf32(ham_areal *areal, ham_st
  */
 
 HAM_C_API_END
+
+#ifdef __cplusplus
+
+namespace ham{
+	namespace detail{
+		template<typename Char>
+		constexpr inline auto aint_ctype_init_str = utf_conditional_t<
+			Char,
+			static_fn<ham_aint_init_str_utf8>,
+			static_fn<ham_aint_init_str_utf16>,
+			static_fn<ham_aint_init_str_utf32>
+		>{};
+
+		template<typename Char>
+		constexpr inline auto areal_ctype_init_str = utf_conditional_t<
+			Char,
+			static_fn<ham_areal_init_str_utf8>,
+			static_fn<ham_areal_init_str_utf16>,
+			static_fn<ham_areal_init_str_utf32>
+		>{};
+	}
+}
+
+#endif // __cplusplus
 
 /**
  * @}

@@ -8,7 +8,7 @@ set(
 	memory.cpp
 	str_buffer.cpp
 	lex.cpp
-	#parse.cpp
+	parse.cpp
 )
 
 add_library(ham SHARED ${HAM_SOURCES})

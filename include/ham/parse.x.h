@@ -40,7 +40,7 @@ typedef struct HAM_PARSE_X_EXPR_ERROR{
 typedef struct HAM_PARSE_X_EXPR_BINDING{
 	HAM_PARSE_X_EXPR_BASE super;
 	HAM_PARSE_X_STR name;
-	const HAM_PARSE_X_EXPR_BASE *value;
+	const HAM_PARSE_X_EXPR_BASE *type, *value;
 } HAM_PARSE_X_EXPR_BINDING;
 
 typedef struct HAM_PARSE_X_EXPR_REF{
