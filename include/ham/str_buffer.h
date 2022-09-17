@@ -179,6 +179,13 @@ namespace ham{
 			basic_str_buffer(const str_type &str_ = {}, const ham_allocator *allocator_ = ham_current_allocator())
 				: m_handle(detail::str_buffer_ctype_create_allocator<Char>(allocator_, str_)){}
 
+			template<usize N>
+			basic_str_buffer(const Char(&arr)[N], const ham_allocator *allocator_ = ham_current_allocator())
+				: basic_str_buffer(str_type(arr, arr + (N-1)), allocator_){}
+
+			basic_str_buffer(const Char *c_str_, const ham_allocator *allocator_ = ham_current_allocator())
+				: basic_str_buffer(str_type(c_str_, detail::strlen_utf(c_str_)), allocator_){}
+
 			basic_str_buffer(basic_str_buffer&&) noexcept = default;
 
 			basic_str_buffer &operator=(basic_str_buffer&&) noexcept = default;

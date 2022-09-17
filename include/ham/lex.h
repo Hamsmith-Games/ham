@@ -25,7 +25,6 @@
  * @{
  */
 
-#include "config.h"
 #include "typedefs.h"
 
 HAM_C_API_BEGIN

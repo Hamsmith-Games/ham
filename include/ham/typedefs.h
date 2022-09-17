@@ -25,7 +25,7 @@
  * @{
  */
 
-#include "config.h"
+#include "ham/config.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -33,8 +33,15 @@
 #include <string.h>
 #include <uchar.h>
 
-static_assert(sizeof(float) == 4,  "Ham expects 32-bit floats");
+HAM_C_API_BEGIN
+
+static_assert(sizeof(float)  == 4,  "Ham expects 32-bit floats");
 static_assert(sizeof(double) == 8, "Ham expects 64-bit doubles");
+
+typedef struct alignas(char) { char _pad; } ham_unit;
+
+static_assert(sizeof (ham_unit) == 1, "ham_unit is improperly sized.");
+static_assert(alignof(ham_unit) == 1, "ham_unit is improperly aligned.");
 
 typedef     char ham_char8;
 typedef char16_t ham_char16;
@@ -257,8 +264,6 @@ ham_constexpr ham_nothrow static inline bool ham_utf_is_bracket(ham_utf_cp cp){
 /**
  * @}
  */
-
-HAM_C_API_BEGIN
 
 typedef struct ham_str8 { const ham_char8  *ptr; ham_uptr len; } ham_str8;
 typedef struct ham_str16{ const ham_char16 *ptr; ham_uptr len; } ham_str16;
@@ -650,6 +655,8 @@ HAM_C_API_END
 
 namespace ham{
 	namespace typedefs{
+		using unit = ham_unit;
+
 		using char8  = ham_char8;
 		using char16 = ham_char16;
 		using char32 = ham_char32;
@@ -860,7 +867,7 @@ namespace ham{
 			constexpr bool operator> (const uuid &other) const noexcept{ return ham_uuid_gt (m_val, other.m_val); }
 			constexpr bool operator>=(const uuid &other) const noexcept{ return ham_uuid_gte(m_val, other.m_val); }
 
-		private:
+		//private:
 			ham_uuid m_val;
 	};
 
@@ -947,7 +954,7 @@ namespace ham{
 				return basic_str(ptr() + actual_from, actual_len);
 			}
 
-		private:
+		//private:
 			ctype m_val;
 	};
 
@@ -970,6 +977,18 @@ namespace ham{
 	static_assert(layout_is_same_v<str32, ham_str32>);
 
 	using str = basic_str<uchar>;
+
+	namespace str_literals{
+		constexpr inline auto operator""_str(const char8  *ptr, usize len){ return str8 (ptr, len); }
+		constexpr inline auto operator""_str(const char16 *ptr, usize len){ return str16(ptr, len); }
+		constexpr inline auto operator""_str(const char32 *ptr, usize len){ return str32(ptr, len); }
+	}
+
+	namespace literals{
+		using namespace str_literals;
+	}
+
+	using namespace literals;
 }
 
 template<typename Char>

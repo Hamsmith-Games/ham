@@ -23,7 +23,7 @@
 cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
 project(
-	ham-lang
+	ham
 	VERSION 0.0.1
 	DESCRIPTION "The Ham Programming Language"
 	LANGUAGES C CXX
@@ -38,22 +38,44 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 include(GNUInstallDirs)
 include(FetchContent)
 
+set(HAM_VERSION_MAJOR ${ham_VERSION_MAJOR})
+set(HAM_VERSION_MINOR ${ham_VERSION_MINOR})
+set(HAM_VERSION_PATCH ${ham_VERSION_PATCH})
+set(HAM_VERSION ${ham_VERSION})
+
 set(HAM_SOURCE_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
+set(HAM_BINARY_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
+
+configure_file(
+	${HAM_SOURCE_INCLUDE_DIR}/ham/config.h.in
+	${HAM_BINARY_INCLUDE_DIR}/ham/config.h
+	@ONLY
+	NEWLINE_STYLE UNIX
+)
 
 set(
 	HAM_HEADERS
+	${HAM_BINARY_INCLUDE_DIR}/ham/config.h
+
 	${HAM_SOURCE_INCLUDE_DIR}/ham.h
-	${HAM_SOURCE_INCLUDE_DIR}/ham/config.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/typedefs.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/math.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/str_buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/hash.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/fs.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/lex.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/parse.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/memory.h
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/meta.hpp
 	${HAM_SOURCE_INCLUDE_DIR}/ham/std_vector.hpp
+)
+
+set(
+	HAM_INCLUDE_DIRS
+	$<BUILD_INTERFACE:${HAM_SOURCE_INCLUDE_DIR}>
+	$<BUILD_INTERFACE:${HAM_BINARY_INCLUDE_DIR}>
+	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 option(HAM_BUILD_TESTS "Whether to build library tests" ${PROJECT_IS_TOP_LEVEL})
@@ -101,6 +123,9 @@ install(
 install(
 	DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/include/gpwe
 	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+	FILES_MATCHING
+	    PATTERN "*.h"
+		PATTERN "*.hpp"
 )
 
 install(

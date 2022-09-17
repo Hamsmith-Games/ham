@@ -187,7 +187,9 @@ namespace ham{
 		}
 	}
 
-	using namespace hash_literals;
+	namespace literals{
+		using namespace hash_literals;
+	}
 
 	template<typename T>
 	struct hash_functor;

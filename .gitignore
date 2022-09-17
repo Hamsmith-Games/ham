@@ -16,6 +16,7 @@ compile_commands.json
 third_party/*
 
 # IDE/Desktop related files
+CMakeLists.txt.user
 .idea
 .vs
 .kdev4

@@ -25,6 +25,12 @@
  * @{
  */
 
+#define HAM_VERSION_MAJOR @HAM_VERSION_MAJOR@
+#define HAM_VERSION_MINOR @HAM_VERSION_MINOR@
+#define HAM_VERSION_PATCH @HAM_VERSION_PATCH@
+
+#define HAM_VERSION_STR "@HAM_VERSION@"
+
 #if !defined(__GNUC__) && !defined(__cplusplus)
 #	error "Ham requires GNU C extensions or C++"
 #endif

@@ -31,6 +31,46 @@
 
 HAM_C_API_BEGIN
 
+typedef struct ham_parse_context_utf8  ham_parse_context_utf8;
+typedef struct ham_parse_context_utf16 ham_parse_context_utf16;
+typedef struct ham_parse_context_utf32 ham_parse_context_utf32;
+
+typedef struct ham_parse_scope_utf8  ham_parse_scope_utf8;
+typedef struct ham_parse_scope_utf16 ham_parse_scope_utf16;
+typedef struct ham_parse_scope_utf32 ham_parse_scope_utf32;
+
+typedef struct ham_expr_base_utf8  ham_expr_base_utf8;
+typedef struct ham_expr_base_utf16 ham_expr_base_utf16;
+typedef struct ham_expr_base_utf32 ham_expr_base_utf32;
+
+typedef struct ham_expr_error_utf8  ham_expr_error_utf8;
+typedef struct ham_expr_error_utf16 ham_expr_error_utf16;
+typedef struct ham_expr_error_utf32 ham_expr_error_utf32;
+
+typedef struct ham_expr_binding_utf8  ham_expr_binding_utf8;
+typedef struct ham_expr_binding_utf16 ham_expr_binding_utf16;
+typedef struct ham_expr_binding_utf32 ham_expr_binding_utf32;
+
+typedef struct ham_expr_ref_utf8  ham_expr_ref_utf8;
+typedef struct ham_expr_ref_utf16 ham_expr_ref_utf16;
+typedef struct ham_expr_ref_utf32 ham_expr_ref_utf32;
+
+typedef struct ham_expr_unresolved_utf8  ham_expr_unresolved_utf8;
+typedef struct ham_expr_unresolved_utf16 ham_expr_unresolved_utf16;
+typedef struct ham_expr_unresolved_utf32 ham_expr_unresolved_utf32;
+
+typedef struct ham_expr_lit_int_utf8  ham_expr_lit_int_utf8;
+typedef struct ham_expr_lit_int_utf16 ham_expr_lit_int_utf16;
+typedef struct ham_expr_lit_int_utf32 ham_expr_lit_int_utf32;
+
+typedef struct ham_expr_lit_real_utf8  ham_expr_lit_real_utf8;
+typedef struct ham_expr_lit_real_utf16 ham_expr_lit_real_utf16;
+typedef struct ham_expr_lit_real_utf32 ham_expr_lit_real_utf32;
+
+typedef struct ham_expr_lit_str_utf8  ham_expr_lit_str_utf8;
+typedef struct ham_expr_lit_str_utf16 ham_expr_lit_str_utf16;
+typedef struct ham_expr_lit_str_utf32 ham_expr_lit_str_utf32;
+
 typedef enum ham_expr_kind{
 	HAM_EXPR_ERROR,
 	HAM_EXPR_BINDING,
@@ -51,14 +91,81 @@ typedef enum ham_expr_kind{
 #define HAM_EXPR_UTF_(n, name) ham_expr_##name##_utf##n
 #define HAM_EXPR_UTF(n, name) HAM_EXPR_UTF_(n, name)
 
-#define HAM_PARSE_X_UTF 8
-#include "parse.x.h"
+//! @cond ignore
+#define HAM_IMPL_EXPR_BASE_MEMBERS_UTF(n) \
+	ham_expr_kind kind; \
+	HAM_TOKEN_RANGE_UTF(n) tokens;
 
-#define HAM_PARSE_X_UTF 16
-#include "parse.x.h"
+#define HAM_IMPL_EXPR_ERROR_MEMBERS_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	const HAM_EXPR_UTF(n, base) *prev; \
+	ham_str8 message;
 
-#define HAM_PARSE_X_UTF 32
-#include "parse.x.h"
+#define HAM_IMPL_EXPR_BINDING_MEMBERS_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	HAM_STR_UTF(n) name; \
+	const HAM_EXPR_UTF(n, base) *type, *value;
+
+#define HAM_IMPL_EXPR_REF_MEMBERS_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	const HAM_EXPR_UTF(n, binding) *refed;
+
+#define HAM_IMPL_EXPR_UNRESOLVED_MEMBERS_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	HAM_STR_UTF(n) id;
+
+#define HAM_IMPL_EXPR_LIT_INT_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	ham_aint value;
+
+#define HAM_IMPL_EXPR_LIT_REAL_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	ham_areal value;
+
+#define HAM_IMPL_EXPR_LIT_STR_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	HAM_STR_UTF(n) value;
+
+#define HAM_IMPL_PARSE_CONTEXT_MEMBERS_UTF(n) \
+
+
+//! @endcond
+
+//
+// Expressions
+//
+
+struct ham_expr_base_utf8 { HAM_IMPL_EXPR_BASE_MEMBERS_UTF(8)  };
+struct ham_expr_base_utf16{ HAM_IMPL_EXPR_BASE_MEMBERS_UTF(16) };
+struct ham_expr_base_utf32{ HAM_IMPL_EXPR_BASE_MEMBERS_UTF(32) };
+
+struct ham_expr_error_utf8 { HAM_IMPL_EXPR_ERROR_MEMBERS_UTF(8);  };
+struct ham_expr_error_utf16{ HAM_IMPL_EXPR_ERROR_MEMBERS_UTF(16); };
+struct ham_expr_error_utf32{ HAM_IMPL_EXPR_ERROR_MEMBERS_UTF(32); };
+
+struct ham_expr_binding_utf8 { HAM_IMPL_EXPR_BINDING_MEMBERS_UTF(8)  };
+struct ham_expr_binding_utf16{ HAM_IMPL_EXPR_BINDING_MEMBERS_UTF(16) };
+struct ham_expr_binding_utf32{ HAM_IMPL_EXPR_BINDING_MEMBERS_UTF(32) };
+
+struct ham_expr_ref_utf8 { HAM_IMPL_EXPR_REF_MEMBERS_UTF(8)  };
+struct ham_expr_ref_utf16{ HAM_IMPL_EXPR_REF_MEMBERS_UTF(16) };
+struct ham_expr_ref_utf32{ HAM_IMPL_EXPR_REF_MEMBERS_UTF(32) };
+
+struct ham_expr_unresolved_utf8 { HAM_IMPL_EXPR_UNRESOLVED_MEMBERS_UTF(8)  };
+struct ham_expr_unresolved_utf16{ HAM_IMPL_EXPR_UNRESOLVED_MEMBERS_UTF(16) };
+struct ham_expr_unresolved_utf32{ HAM_IMPL_EXPR_UNRESOLVED_MEMBERS_UTF(32) };
+
+struct ham_expr_lit_int_utf8 { HAM_IMPL_EXPR_LIT_INT_UTF(8)  };
+struct ham_expr_lit_int_utf16{ HAM_IMPL_EXPR_LIT_INT_UTF(16) };
+struct ham_expr_lit_int_utf32{ HAM_IMPL_EXPR_LIT_INT_UTF(32) };
+
+struct ham_expr_lit_real_utf8 { HAM_IMPL_EXPR_LIT_REAL_UTF(8)  };
+struct ham_expr_lit_real_utf16{ HAM_IMPL_EXPR_LIT_REAL_UTF(16) };
+struct ham_expr_lit_real_utf32{ HAM_IMPL_EXPR_LIT_REAL_UTF(32) };
+
+struct ham_expr_lit_str_utf8 { HAM_IMPL_EXPR_LIT_STR_UTF(8)  };
+struct ham_expr_lit_str_utf16{ HAM_IMPL_EXPR_LIT_STR_UTF(16) };
+struct ham_expr_lit_str_utf32{ HAM_IMPL_EXPR_LIT_STR_UTF(32) };
 
 //
 // Contexts
