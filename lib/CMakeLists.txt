@@ -25,6 +25,7 @@ set(
 	memory.cpp
 	str_buffer.cpp
 	fs.cpp
+	plugin.cpp
 	lex.cpp
 	parse.cpp
 )
@@ -33,10 +34,13 @@ add_library(ham SHARED ${HAM_SOURCES})
 
 set_target_properties(
 	ham PROPERTIES
+
 	C_STANDARD 11
-	CXX_STANDARD 20
 	C_VISIBILITY_PRESET hidden
+
+	CXX_STANDARD 20
 	CXX_VISIBILITY_PRESET hidden
+
 	VISIBILITY_INLINES_HIDDEN ON
 )
 

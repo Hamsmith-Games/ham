@@ -27,7 +27,6 @@
 
 #include "lex.h"
 #include "math.h"
-#include "memory.h"
 
 HAM_C_API_BEGIN
 
@@ -59,6 +58,18 @@ typedef struct ham_expr_unresolved_utf8  ham_expr_unresolved_utf8;
 typedef struct ham_expr_unresolved_utf16 ham_expr_unresolved_utf16;
 typedef struct ham_expr_unresolved_utf32 ham_expr_unresolved_utf32;
 
+typedef struct ham_expr_fn_utf8  ham_expr_fn_utf8;
+typedef struct ham_expr_fn_utf16 ham_expr_fn_utf16;
+typedef struct ham_expr_fn_utf32 ham_expr_fn_utf32;
+
+typedef struct ham_expr_call_utf8  ham_expr_call_utf8;
+typedef struct ham_expr_call_utf16 ham_expr_call_utf16;
+typedef struct ham_expr_call_utf32 ham_expr_call_utf32;
+
+typedef struct ham_expr_block_utf8  ham_expr_block_utf8;
+typedef struct ham_expr_block_utf16 ham_expr_block_utf16;
+typedef struct ham_expr_block_utf32 ham_expr_block_utf32;
+
 typedef struct ham_expr_lit_int_utf8  ham_expr_lit_int_utf8;
 typedef struct ham_expr_lit_int_utf16 ham_expr_lit_int_utf16;
 typedef struct ham_expr_lit_int_utf32 ham_expr_lit_int_utf32;
@@ -76,6 +87,9 @@ typedef enum ham_expr_kind{
 	HAM_EXPR_BINDING,
 	HAM_EXPR_REF,
 	HAM_EXPR_UNRESOLVED,
+	HAM_EXPR_FN,
+	HAM_EXPR_CALL,
+	HAM_EXPR_BLOCK,
 
 	HAM_EXPR_LIT_INT,
 	HAM_EXPR_LIT_REAL,
@@ -113,6 +127,24 @@ typedef enum ham_expr_kind{
 #define HAM_IMPL_EXPR_UNRESOLVED_MEMBERS_UTF(n) \
 	HAM_EXPR_UTF(n, base) super; \
 	HAM_STR_UTF(n) id;
+
+#define HAM_IMPL_EXPR_FN_MEMBERS_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	ham_usize num_params; \
+	const HAM_EXPR_UTF(n, base) *const *params; \
+	const HAM_EXPR_UTF(n, base) return_type; \
+	const HAM_EXPR_UTF(n, base) body;
+
+#define HAM_IMPL_EXPR_CALL_MEMBERS_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	const HAM_EXPR_UTF(n, base) fn; \
+	ham_usize num_args; \
+	const HAM_EXPR_UTF(n, base) *const *args;
+
+#define HAM_IMPL_EXPR_BLOCK_MEMBERS_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	ham_usize num_exprs; \
+	const HAM_EXPR_UTF(n, base) *const *exprs;
 
 #define HAM_IMPL_EXPR_LIT_INT_UTF(n) \
 	HAM_EXPR_UTF(n, base) super; \
@@ -155,6 +187,14 @@ struct ham_expr_unresolved_utf8 { HAM_IMPL_EXPR_UNRESOLVED_MEMBERS_UTF(8)  };
 struct ham_expr_unresolved_utf16{ HAM_IMPL_EXPR_UNRESOLVED_MEMBERS_UTF(16) };
 struct ham_expr_unresolved_utf32{ HAM_IMPL_EXPR_UNRESOLVED_MEMBERS_UTF(32) };
 
+struct ham_expr_fn_utf8 { HAM_IMPL_EXPR_FN_MEMBERS_UTF(8)  };
+struct ham_expr_fn_utf16{ HAM_IMPL_EXPR_FN_MEMBERS_UTF(16) };
+struct ham_expr_fn_utf32{ HAM_IMPL_EXPR_FN_MEMBERS_UTF(32) };
+
+struct ham_expr_call_utf8 { HAM_IMPL_EXPR_CALL_MEMBERS_UTF(8)  };
+struct ham_expr_call_utf16{ HAM_IMPL_EXPR_CALL_MEMBERS_UTF(16) };
+struct ham_expr_call_utf32{ HAM_IMPL_EXPR_CALL_MEMBERS_UTF(32) };
+
 struct ham_expr_lit_int_utf8 { HAM_IMPL_EXPR_LIT_INT_UTF(8)  };
 struct ham_expr_lit_int_utf16{ HAM_IMPL_EXPR_LIT_INT_UTF(16) };
 struct ham_expr_lit_int_utf32{ HAM_IMPL_EXPR_LIT_INT_UTF(32) };
@@ -187,9 +227,9 @@ ham_api void ham_parse_context_destroy_utf32(ham_parse_context_utf32 *ctx);
 // Scopes
 //
 
-ham_api ham_parse_scope_utf8  *ham_parse_scope_create_utf8 (ham_parse_context_utf8  *ctx, const ham_parse_scope_utf8  *parent);
-ham_api ham_parse_scope_utf16 *ham_parse_scope_create_utf16(ham_parse_context_utf16 *ctx, const ham_parse_scope_utf16 *parent);
-ham_api ham_parse_scope_utf32 *ham_parse_scope_create_utf32(ham_parse_context_utf32 *ctx, const ham_parse_scope_utf32 *parent);
+ham_api ham_parse_scope_utf8  *ham_parse_scope_create_utf8 (ham_parse_context_utf8  *ctx, ham_parse_scope_utf8  *parent);
+ham_api ham_parse_scope_utf16 *ham_parse_scope_create_utf16(ham_parse_context_utf16 *ctx, ham_parse_scope_utf16 *parent);
+ham_api ham_parse_scope_utf32 *ham_parse_scope_create_utf32(ham_parse_context_utf32 *ctx, ham_parse_scope_utf32 *parent);
 
 #define HAM_PARSE_SCOPE_CREATE_UTF(n) HAM_CONCAT(ham_parse_scope_create_utf, n)
 
@@ -204,6 +244,12 @@ ham_api ham_parse_context_utf16 *ham_parse_scope_context_utf16(const ham_parse_s
 ham_api ham_parse_context_utf32 *ham_parse_scope_context_utf32(const ham_parse_scope_utf32 *scope);
 
 #define HAM_PARSE_SCOPE_CONTEXT_UTF(n) HAM_CONCAT(ham_parse_scope_context_utf, n)
+
+ham_api ham_parse_scope_utf8  *ham_parse_scope_parent_utf8 (ham_parse_scope_utf8  *scope);
+ham_api ham_parse_scope_utf16 *ham_parse_scope_parent_utf16(ham_parse_scope_utf16 *scope);
+ham_api ham_parse_scope_utf32 *ham_parse_scope_parent_utf32(ham_parse_scope_utf32 *scope);
+
+#define HAM_PARSE_SCOPE_PARENT_UTF(n) HAM_CONCAT(ham_parse_scope_parent_utf, n)
 
 ham_api ham_str8  ham_parse_scope_get_indent_utf8 (const ham_parse_scope_utf8  *scope);
 ham_api ham_str16 ham_parse_scope_get_indent_utf16(const ham_parse_scope_utf16 *scope);
@@ -263,6 +309,24 @@ ham_api const ham_expr_unresolved_utf32 *ham_parse_context_new_unresolved_utf32(
 
 #define HAM_PARSE_CONTEXT_NEW_UNRESOLVED_UTF(n) HAM_CONCAT(ham_parse_context_new_unresolved_utf, n)
 
+ham_api const ham_expr_fn_utf8  *ham_parse_context_new_fn_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_usize num_params, const ham_expr_base_utf8  *const *params, const ham_expr_base_utf8  *return_type);
+ham_api const ham_expr_fn_utf16 *ham_parse_context_new_fn_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_usize num_params, const ham_expr_base_utf16 *const *params, const ham_expr_base_utf16 *return_type);
+ham_api const ham_expr_fn_utf32 *ham_parse_context_new_fn_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_usize num_params, const ham_expr_base_utf32 *const *params, const ham_expr_base_utf32 *return_type);
+
+#define HAM_PARSE_CONTEXT_NEW_FN_UTF(n) HAM_CONCAT(ham_parse_context_new_fn_utf, n)
+
+ham_api const ham_expr_call_utf8  *ham_parse_context_new_call_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, const ham_expr_base_utf8  *fn, ham_usize num_args, const ham_expr_base_utf8  *const *args);
+ham_api const ham_expr_call_utf16 *ham_parse_context_new_call_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, const ham_expr_base_utf16 *fn, ham_usize num_args, const ham_expr_base_utf16 *const *args);
+ham_api const ham_expr_call_utf32 *ham_parse_context_new_call_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, const ham_expr_base_utf32 *fn, ham_usize num_args, const ham_expr_base_utf32 *const *args);
+
+#define HAM_PARSE_CONTEXT_NEW_CALL_UTF(n) HAM_CONCAT(ham_parse_context_new_call_utf, n)
+
+ham_api const ham_expr_block_utf8  *ham_parse_context_new_block_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_usize num_exprs, const ham_expr_base_utf8  *const *exprs);
+ham_api const ham_expr_block_utf16 *ham_parse_context_new_block_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_usize num_exprs, const ham_expr_base_utf16 *const *exprs);
+ham_api const ham_expr_block_utf32 *ham_parse_context_new_block_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_usize num_exprs, const ham_expr_base_utf32 *const *exprs);
+
+#define HAM_PARSE_CONTEXT_NEW_BLOCK_UTF(n) HAM_CONCAT(ham_parse_context_new_block_utf, n)
+
 ham_api const ham_expr_lit_int_utf8  *ham_parse_context_new_lit_int_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_str8  val);
 ham_api const ham_expr_lit_int_utf16 *ham_parse_context_new_lit_int_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_str16 val);
 ham_api const ham_expr_lit_int_utf32 *ham_parse_context_new_lit_int_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_str32 val);
@@ -285,9 +349,9 @@ ham_api const ham_expr_lit_str_utf32 *ham_parse_context_new_lit_str_utf32(ham_pa
 // Parsing
 //
 
-ham_api const ham_expr_base_utf8  *ham_parse_utf8 (ham_parse_context_utf8  *ctx, ham_parse_scope_utf8  *scope, ham_token_range_utf8  tokens);
-ham_api const ham_expr_base_utf16 *ham_parse_utf16(ham_parse_context_utf16 *ctx, ham_parse_scope_utf16 *scope, ham_token_range_utf16 tokens);
-ham_api const ham_expr_base_utf32 *ham_parse_utf32(ham_parse_context_utf32 *ctx, ham_parse_scope_utf32 *scope, ham_token_range_utf32 tokens);
+ham_api const ham_expr_base_utf8  *ham_parse_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens);
+ham_api const ham_expr_base_utf16 *ham_parse_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens);
+ham_api const ham_expr_base_utf32 *ham_parse_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens);
 
 #define HAM_PARSE_UTF(n) HAM_CONCAT(ham_parse_utf, n)
 
@@ -303,30 +367,37 @@ typedef HAM_EXPR_UTF(HAM_UTF, error)      ham_expr_error;
 typedef HAM_EXPR_UTF(HAM_UTF, binding)    ham_expr_binding;
 typedef HAM_EXPR_UTF(HAM_UTF, ref)        ham_expr_ref;
 typedef HAM_EXPR_UTF(HAM_UTF, unresolved) ham_expr_unresolved;
+typedef HAM_EXPR_UTF(HAM_UTF, fn)         ham_expr_fn;
+typedef HAM_EXPR_UTF(HAM_UTF, call)       ham_expr_call;
+typedef HAM_EXPR_UTF(HAM_UTF, block)      ham_expr_block;
 
 typedef HAM_EXPR_UTF(HAM_UTF, lit_int)    ham_expr_lit_int;
 typedef HAM_EXPR_UTF(HAM_UTF, lit_real)   ham_expr_lit_real;
 typedef HAM_EXPR_UTF(HAM_UTF, lit_str)    ham_expr_lit_str;
 
-#define ham_parse_context_create HAM_PARSE_CONTEXT_CREATE_UTF(HAM_UTF)
+#define ham_parse_context_create  HAM_PARSE_CONTEXT_CREATE_UTF(HAM_UTF)
 #define ham_parse_context_destroy HAM_PARSE_CONTEXT_DESTROY_UTF(HAM_UTF)
 
-#define ham_parse_scope_create HAM_PARSE_SCOPE_CREATE_UTF(HAM_UTF)
-#define ham_parse_scope_destroy HAM_PARSE_SCOPE_DESTROY_UTF(HAM_UTF)
-#define ham_parse_scope_context HAM_PARSE_SCOPE_CONTEXT_UTF(HAM_UTF)
+#define ham_parse_scope_create     HAM_PARSE_SCOPE_CREATE_UTF(HAM_UTF)
+#define ham_parse_scope_destroy    HAM_PARSE_SCOPE_DESTROY_UTF(HAM_UTF)
+#define ham_parse_scope_context    HAM_PARSE_SCOPE_CONTEXT_UTF(HAM_UTF)
 #define ham_parse_scope_get_indent HAM_PARSE_SCOPE_GET_INDENT_UTF(HAM_UTF)
 #define ham_parse_scope_set_indent HAM_PARSE_SCOPE_SET_INDENT_UTF(HAM_UTF)
-#define ham_parse_scope_bind HAM_PARSE_SCOPE_BIND_UTF(HAM_UTF)
-#define ham_parse_scope_resolve HAM_PARSE_SCOPE_RESOLVE_UTF(HAM_UTF)
+#define ham_parse_scope_bind       HAM_PARSE_SCOPE_BIND_UTF(HAM_UTF)
+#define ham_parse_scope_resolve    HAM_PARSE_SCOPE_RESOLVE_UTF(HAM_UTF)
 
-#define ham_parse_context_new_expr HAM_PARSE_CONTEXT_NEW_EXPR_UTF(HAM_UTF)
-#define ham_parse_context_new_error HAM_PARSE_CONTEXT_NEW_ERROR_UTF(HAM_UTF)
-#define ham_parse_context_new_binding HAM_PARSE_CONTEXT_NEW_BINDING_UTF(HAM_UTF)
-#define ham_parse_context_new_ref HAM_PARSE_CONTEXT_NEW_REF_UTF(HAM_UTF)
+#define ham_parse_context_new_expr       HAM_PARSE_CONTEXT_NEW_EXPR_UTF(HAM_UTF)
+#define ham_parse_context_new_error      HAM_PARSE_CONTEXT_NEW_ERROR_UTF(HAM_UTF)
+#define ham_parse_context_new_binding    HAM_PARSE_CONTEXT_NEW_BINDING_UTF(HAM_UTF)
+#define ham_parse_context_new_ref        HAM_PARSE_CONTEXT_NEW_REF_UTF(HAM_UTF)
 #define ham_parse_context_new_unresolved HAM_PARSE_CONTEXT_NEW_UNRESOLVED_UTF(HAM_UTF)
-#define ham_parse_context_new_lit_int HAM_PARSE_CONTEXT_NEW_LIT_INT_UTF(HAM_UTF)
+#define ham_parse_context_new_fn         HAM_PARSE_CONTEXT_NEW_FN_UTF(HAM_UTF)
+#define ham_parse_context_new_call       HAM_PARSE_CONTEXT_NEW_CALL_UTF(HAM_UTF)
+#define ham_parse_context_new_block      HAM_PARSE_CONTEXT_NEW_BLOCK_UTF(HAM_UTF)
+
+#define ham_parse_context_new_lit_int  HAM_PARSE_CONTEXT_NEW_LIT_INT_UTF(HAM_UTF)
 #define ham_parse_context_new_lit_real HAM_PARSE_CONTEXT_NEW_LIT_REAL_UTF(HAM_UTF)
-#define ham_parse_context_new_lit_str HAM_PARSE_CONTEXT_NEW_LIT_STR_UTF(HAM_UTF)
+#define ham_parse_context_new_lit_str  HAM_PARSE_CONTEXT_NEW_LIT_STR_UTF(HAM_UTF)
 
 #define ham_parse HAM_PARSE_UTF(HAM_UTF)
 
@@ -340,6 +411,9 @@ namespace ham{
 		binding    = HAM_EXPR_BINDING,
 		ref        = HAM_EXPR_REF,
 		unresolved = HAM_EXPR_UNRESOLVED,
+		fn         = HAM_EXPR_FN,
+		call       = HAM_EXPR_CALL,
+		block      = HAM_EXPR_BLOCK,
 
 		lit_int  = HAM_EXPR_LIT_INT,
 		lit_real = HAM_EXPR_LIT_REAL,
@@ -359,6 +433,12 @@ namespace ham{
 
 	template<typename Char, bool Mutable = true>
 	class basic_parse_scope_view;
+
+	template<typename Char, bool Mutable = false>
+	class basic_expr_iterator;
+
+	template<typename Char, bool Mutable = false>
+	class basic_expr_range;
 
 	template<typename Char, expr_kind Kind, bool Mutable = false>
 	class basic_expr;
@@ -419,6 +499,22 @@ namespace ham{
 			ham_expr_unresolved_utf8,
 			ham_expr_unresolved_utf16,
 			ham_expr_unresolved_utf32
+		>;
+
+		template<typename Char>
+		using expr_fn_ctype_t = utf_conditional_t<
+			Char,
+			ham_expr_fn_utf8,
+			ham_expr_fn_utf16,
+			ham_expr_fn_utf32
+		>;
+
+		template<typename Char>
+		using expr_call_ctype_t = utf_conditional_t<
+			Char,
+			ham_expr_call_utf8,
+			ham_expr_call_utf16,
+			ham_expr_call_utf32
 		>;
 
 		template<typename Char>
@@ -520,6 +616,30 @@ namespace ham{
 		>{};
 
 		template<typename Char>
+		constexpr inline auto parse_context_ctype_new_fn = utf_conditional_t<
+			Char,
+			static_fn<ham_parse_context_new_fn_utf8>,
+			static_fn<ham_parse_context_new_fn_utf16>,
+			static_fn<ham_parse_context_new_fn_utf32>
+		>{};
+
+		template<typename Char>
+		constexpr inline auto parse_context_ctype_new_call = utf_conditional_t<
+			Char,
+			static_fn<ham_parse_context_new_call_utf8>,
+			static_fn<ham_parse_context_new_call_utf16>,
+			static_fn<ham_parse_context_new_call_utf32>
+		>{};
+
+		template<typename Char>
+		constexpr inline auto parse_context_ctype_new_block = utf_conditional_t<
+			Char,
+			static_fn<ham_parse_context_new_block_utf8>,
+			static_fn<ham_parse_context_new_block_utf16>,
+			static_fn<ham_parse_context_new_block_utf32>
+		>{};
+
+		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_lit_int = utf_conditional_t<
 			Char,
 			static_fn<ham_parse_context_new_lit_int_utf8>,
@@ -564,6 +684,14 @@ namespace ham{
 		>{};
 
 		template<typename Char>
+		constexpr inline auto parse_scope_ctype_parent = utf_conditional_t<
+			Char,
+			static_fn<ham_parse_scope_parent_utf8>,
+			static_fn<ham_parse_scope_parent_utf16>,
+			static_fn<ham_parse_scope_parent_utf32>
+		>{};
+
+		template<typename Char>
 		constexpr inline auto parse_scope_ctype_context = utf_conditional_t<
 			Char,
 			static_fn<ham_parse_scope_context_utf8>,
@@ -602,112 +730,111 @@ namespace ham{
 			static_fn<ham_parse_scope_resolve_utf16>,
 			static_fn<ham_parse_scope_resolve_utf32>
 		>{};
-
-		template<typename Self, typename Char, expr_kind Kind>
-		class basic_expr_ext{};
-
-		template<typename Self, typename Char>
-		class basic_expr_ext<Self, Char, expr_kind::binding>{
-			public:
-				const Self *self() const noexcept{ return static_cast<Self*>(this); }
-
-				basic_str<Char> name() const noexcept{ return self()->handle()->name; }
-				basic_expr<Char, expr_kind::base> value() const noexcept{ return self()->handle()->value; }
-		};
-
-		template<typename Self, typename Char>
-		class basic_expr_ext<Self, Char, expr_kind::ref>{
-			public:
-				const Self *self() const noexcept{ return static_cast<Self*>(this); }
-
-				basic_expr<Char, expr_kind::binding> refed() const noexcept{ return self()->handle()->refed; }
-		};
-
-		template<typename Self, typename Char>
-		class basic_expr_ext<Self, Char, expr_kind::unresolved>{
-			public:
-				const Self *self() const noexcept{ return static_cast<Self*>(this); }
-
-				basic_str<Char> id() const noexcept{ return self()->handle()->id; }
-		};
 	} // namespace detail
 	//! @endcond
 
 	template<typename Char, bool Mutable>
 	class basic_parse_context_view{
 		public:
-			using ctype = detail::parse_context_ctype_t<Char>;
-
-			using str_type = basic_str<Char>;
-
-			using handle_type = std::conditional_t<Mutable, ctype*, const ctype*>;
-
+			using ctype            = detail::parse_context_ctype_t<Char>;
+			using str_type         = basic_str<Char>;
+			using handle_type      = std::conditional_t<Mutable, ctype*, const ctype*>;
 			using token_range_type = basic_token_range<Char>;
+
+			template<expr_kind Kind = expr_kind::base, bool UMutable = false>
+			using expr_type = basic_expr<Char, Kind, UMutable>;
+
+			template<bool UMutable = false>
+			using expr_iterator_type = basic_expr_iterator<Char, UMutable>;
+
+			template<bool UMutable = false>
+			using expr_range_type = basic_expr_range<Char, UMutable>;
 
 			basic_parse_context_view(handle_type handle_ = nullptr) noexcept
 				: m_handle(handle_){}
 
 			operator handle_type() const noexcept{ return m_handle; }
 
-			template<expr_kind Kind>
+			template<expr_kind Kind, bool Enable = Mutable>
 			auto new_expr(const token_range_type &tokens = {})
-				-> std::enable_if_t<Mutable, basic_expr<Char, Kind, true>>
+				-> std::enable_if_t<Enable, basic_expr<Char, Kind, true>>
 			{
-				return (detail::expr_type_from_kind_t<Char, Kind>*)detail::parse_context_ctype_new_expr<Char>(handle(), Kind, tokens);
+				return (detail::expr_type_from_kind_t<Char, Kind>*)detail::parse_context_ctype_new_expr<Char>(handle(), static_cast<ham_expr_kind>(Kind), tokens);
 			}
 
-			template<typename ... Args>
-			auto new_error(const token_range_type &tokens, const basic_expr<Char, expr_kind::base> &prev, const char *fmt_str, Args &&... args)
-				-> std::enable_if_t<Mutable, basic_expr<Char, expr_kind::error>>
+			template<typename ... Args, bool Enable = Mutable>
+			auto new_error(const token_range_type &tokens, const expr_type<> &prev, const char *fmt_str, Args &&... args)
+				-> std::enable_if_t<Enable, expr_type<expr_kind::error>>
 			{
 				return detail::parse_context_ctype_new_error<Char>(handle(), tokens, prev, fmt_str, std::forward<Args>(args)...);
 			}
 
-			template<typename ... Args>
+			template<typename ... Args, bool Enable = Mutable>
 			auto new_error(const basic_expr<Char, expr_kind::base> &prev, const char *fmt_str, Args &&... args)
-				-> std::enable_if_t<Mutable, basic_expr<Char, expr_kind::error>>
+				-> std::enable_if_t<Enable, expr_type<expr_kind::error>>
 			{
 				return detail::parse_context_ctype_new_error<Char>(handle(), { nullptr, nullptr }, prev, fmt_str, std::forward<Args>(args)...);
 			}
 
 			template<bool Enable = Mutable>
-			auto new_binding(const token_range_type &tokens, const str_type &name, const basic_expr<Char, expr_kind::base> &value)
-				-> std::enable_if_t<Enable, basic_expr<Char, expr_kind::binding>>
+			auto new_binding(const token_range_type &tokens, const str_type &name, const expr_type<> &value)
+				-> std::enable_if_t<Enable, expr_type<expr_kind::binding>>
 			{
 				return detail::parse_context_ctype_new_binding<Char>(handle(), tokens, name, value);
 			}
 
 			template<bool Enable = Mutable>
-			auto new_ref(const token_range_type &tokens, const basic_expr<Char, expr_kind::binding> &refed)
-				-> std::enable_if_t<Enable, basic_expr<Char, expr_kind::ref>>
+			auto new_ref(const token_range_type &tokens, const expr_type<expr_kind::binding> &refed)
+				-> std::enable_if_t<Enable, expr_type<expr_kind::ref>>
 			{
 				return detail::parse_context_ctype_new_ref<Char>(handle(), tokens, refed);
 			}
 
 			template<bool Enable = Mutable>
 			auto new_unresolved(const token_range_type &tokens, const str_type &id)
-				-> std::enable_if_t<Enable, basic_expr<Char, expr_kind::unresolved>>
+				-> std::enable_if_t<Enable, expr_type<expr_kind::unresolved>>
 			{
 				return detail::parse_context_ctype_new_unresolved<Char>(handle(), tokens, id);
 			}
 
 			template<bool Enable = Mutable>
+			auto new_fn(const token_range_type &tokens, const expr_range_type<false> &params, const expr_type<> &return_type)
+					-> std::enable_if_t<Enable, expr_type<expr_kind::fn>>
+			{
+				return detail::parse_context_ctype_new_fn<Char>(handle(), tokens, params.size(), params.begin(), return_type);
+			}
+
+			template<bool Enable = Mutable>
+			auto new_call(const token_range_type &tokens, const expr_type<> &fn, const expr_range_type<false> &args)
+					-> std::enable_if_t<Enable, expr_type<expr_kind::call>>
+			{
+				return detail::parse_context_ctype_new_call<Char>(handle(), tokens, fn, args.size(), args.begin());
+			}
+
+			template<bool Enable = Mutable>
+			auto new_block(const token_range_type &tokens, const expr_range_type<false> &exprs)
+					-> std::enable_if_t<Enable, expr_type<expr_kind::block>>
+			{
+				return detail::parse_context_ctype_new_call<Char>(handle(), tokens, exprs.size(), exprs.begin());
+			}
+
+			template<bool Enable = Mutable>
 			auto new_lit_int(const token_range_type &tokens, const str_type &value)
-				-> std::enable_if_t<Enable, basic_expr<Char, expr_kind::lit_int>>
+				-> std::enable_if_t<Enable, expr_type<expr_kind::lit_int>>
 			{
 				return detail::parse_context_ctype_new_lit_int<Char>(handle(), tokens, value);
 			}
 
 			template<bool Enable = Mutable>
 			auto new_lit_real(const token_range_type &tokens, const str_type &value)
-				-> std::enable_if_t<Enable, basic_expr<Char, expr_kind::lit_real>>
+				-> std::enable_if_t<Enable, expr_type<expr_kind::lit_real>>
 			{
 				return detail::parse_context_ctype_new_lit_real<Char>(handle(), tokens, value);
 			}
 
 			template<bool Enable = Mutable>
 			auto new_lit_str(const token_range_type &tokens, const str_type &value)
-				-> std::enable_if_t<Enable, basic_expr<Char, expr_kind::lit_str>>
+				-> std::enable_if_t<Enable, expr_type<expr_kind::lit_str>>
 			{
 				return detail::parse_context_ctype_new_lit_str<Char>(handle(), tokens, value);
 			}
@@ -718,19 +845,36 @@ namespace ham{
 			handle_type m_handle;
 	};
 
+	using parse_context_view_utf8  = basic_parse_context_view<char8>;
+	using parse_context_view_utf16 = basic_parse_context_view<char16>;
+	using parse_context_view_utf32 = basic_parse_context_view<char32>;
+
+	using parse_context_view = basic_parse_context_view<uchar>;
+
 	template<typename Char>
 	class basic_parse_context{
 		public:
-			using ctype = detail::parse_context_ctype_t<Char>;
-
-			using str_type = basic_str<Char>;
-			using handle_type = ctype*;
+			using ctype             = detail::parse_context_ctype_t<Char>;
+			using cexpr_base_type   = detail::expr_base_ctype_t<Char>;
+			using str_type          = basic_str<Char>;
+			using handle_type       = ctype*;
 			using const_handle_type = const ctype*;
+			using token_range_type  = basic_token_range<Char>;
 
-			using token_range_type = basic_token_range<Char>;
+			template<expr_kind Kind = expr_kind::base, bool Mutable = false>
+			using expr_type = basic_expr<Char, Kind, Mutable>;
+
+			template<bool Mutable = false>
+			using expr_iterator_type = basic_expr_iterator<Char, Mutable>;
+
+			template<bool Mutable = false>
+			using expr_range_type = basic_expr_range<Char, Mutable>;
+
+			template<bool Mutable = false>
+			using view_type = basic_parse_context_view<Char, Mutable>;
 
 			explicit basic_parse_context(handle_type handle_ = nullptr) noexcept
-				: m_handle(handle_){}
+				: m_handle(handle_ ? handle_ : detail::parse_context_ctype_create<Char>()){}
 
 			basic_parse_context(basic_parse_context&&) noexcept = default;
 
@@ -740,47 +884,65 @@ namespace ham{
 
 			operator bool() const&& = delete;
 
+			operator view_type<true>() & noexcept{ return m_handle; }
+			operator view_type<false>() const& noexcept{ return m_handle; }
+
+			operator view_type<true>() && = delete;
+			operator view_type<false>() const&& = delete;
+
 			operator handle_type() & noexcept{ return m_handle.get(); }
 			operator const_handle_type() const& noexcept{ return m_handle.get(); }
 
 			operator const_handle_type() const&& = delete;
 
 			template<expr_kind Kind>
-			basic_expr<Char, Kind, true> new_expr(const token_range_type &tokens = {}){
+			expr_type<Kind, true> new_expr(const token_range_type &tokens = {}){
 				return (detail::expr_type_from_kind_t<Char, Kind>*)detail::parse_context_ctype_new_expr<Char>(handle(), Kind, tokens);
 			}
 
 			template<typename ... Args>
-			basic_expr<Char, expr_kind::error> new_error(const token_range_type &tokens, const char *fmt_str, Args &&... args){
+			expr_type<expr_kind::error> new_error(const token_range_type &tokens, const char *fmt_str, Args &&... args){
 				return detail::parse_context_ctype_new_error<Char>(handle(), tokens, fmt_str, std::forward<Args>(args)...);
 			}
 
 			template<typename ... Args>
-			basic_expr<Char, expr_kind::error> new_error(const char *fmt_str, Args &&... args){
+			expr_type<expr_kind::error> new_error(const char *fmt_str, Args &&... args){
 				return detail::parse_context_ctype_new_error<Char>(handle(), { nullptr, nullptr }, fmt_str, std::forward<Args>(args)...);
 			}
 
-			basic_expr<Char, expr_kind::binding> new_binding(const token_range_type &tokens, const str_type &name, const basic_expr<Char, expr_kind::base> &value){
+			expr_type<expr_kind::binding> new_binding(const token_range_type &tokens, const str_type &name, const expr_type<> &value){
 				return detail::parse_context_ctype_new_binding<Char>(handle(), tokens, name, value);
 			}
 
-			basic_expr<Char, expr_kind::ref> new_ref(const token_range_type &tokens, const basic_expr<Char, expr_kind::binding> &refed){
+			expr_type<expr_kind::ref> new_ref(const token_range_type &tokens, const expr_type<expr_kind::binding> &refed){
 				return detail::parse_context_ctype_new_ref<Char>(handle(), tokens, refed);
 			}
 
-			basic_expr<Char, expr_kind::unresolved> new_unresolved(const token_range_type &tokens, const str_type &id){
+			expr_type<expr_kind::unresolved> new_unresolved(const token_range_type &tokens, const str_type &id){
 				return detail::parse_context_ctype_new_unresolved<Char>(handle(), tokens, id);
 			}
 
-			basic_expr<Char, expr_kind::lit_int> new_lit_int(const token_range_type &tokens, const str_type &val){
+			expr_type<expr_kind::fn> new_fn(const token_range_type &tokens, const expr_range_type<> &params, const expr_type<> &return_type){
+				return detail::parse_context_ctype_new_fn<Char>(handle(), tokens, params.size(), params.begin(), return_type);
+			}
+
+			expr_type<expr_kind::call> new_call(const token_range_type &tokens, const expr_type<> &fn, const expr_range_type<> &args){
+				return detail::parse_context_ctype_new_call<Char>(handle(), tokens, fn, args.size(), args.begin());
+			}
+
+			expr_type<expr_kind::block> new_block(const token_range_type &tokens, const expr_range_type<> &exprs){
+				return detail::parse_context_ctype_new_block<Char>(handle(), tokens, exprs.size(), exprs.begin());
+			}
+
+			expr_type<expr_kind::lit_int> new_lit_int(const token_range_type &tokens, const str_type &val){
 				return detail::parse_context_ctype_new_lit_int<Char>(handle(), tokens, val);
 			}
 
-			basic_expr<Char, expr_kind::lit_real> new_lit_real(const token_range_type &tokens, const str_type &val){
+			expr_type<expr_kind::lit_real> new_lit_real(const token_range_type &tokens, const str_type &val){
 				return detail::parse_context_ctype_new_lit_real<Char>(handle(), tokens, val);
 			}
 
-			basic_expr<Char, expr_kind::lit_str> new_lit_str(const token_range_type &tokens, const str_type &val){
+			expr_type<expr_kind::lit_str> new_lit_str(const token_range_type &tokens, const str_type &val){
 				return detail::parse_context_ctype_new_lit_str<Char>(handle(), tokens, val);
 			}
 
@@ -791,13 +953,23 @@ namespace ham{
 			unique_handle<handle_type, detail::parse_context_ctype_destroy<Char>> m_handle;
 	};
 
+	using parse_context_utf8  = basic_parse_context<char8>;
+	using parse_context_utf16 = basic_parse_context<char16>;
+	using parse_context_utf32 = basic_parse_context<char32>;
+
+	using parse_context = basic_parse_context<uchar>;
+
 	template<typename Char, bool Mutable>
 	class basic_parse_scope_view{
 		public:
 			using ctype = detail::parse_scope_ctype_t<Char>;
-			using expr_binding_type = basic_expr<Char, expr_kind::binding>;
+
 			using str_type = basic_str<Char>;
 			using handle_type = std::conditional_t<Mutable, ctype*, const ctype*>;
+
+			template<expr_kind Kind = expr_kind::base, bool UMutable = false>
+			using expr_type = basic_expr<Char, Kind, UMutable>;
+
 			using context_view_type = basic_parse_context_view<Char, Mutable>;
 
 			basic_parse_scope_view(handle_type handle_ = nullptr) noexcept
@@ -811,8 +983,12 @@ namespace ham{
 				return detail::parse_scope_ctype_context<Char>(m_handle);
 			}
 
+			basic_parse_scope_view<Char, Mutable> parent() const noexcept{
+				return detail::parse_scope_ctype_parent<Char>(m_handle);
+			}
+
 			template<bool Enable = Mutable>
-			auto bind(expr_binding_type binding) -> std::enable_if_t<Enable, bool>{
+			auto bind(const expr_type<expr_kind::binding> &binding) -> std::enable_if_t<Enable, bool>{
 				return detail::parse_scope_ctype_bind<Char>(m_handle, binding);
 			}
 
@@ -825,7 +1001,7 @@ namespace ham{
 				return detail::parse_scope_ctype_set_indent<Char>(m_handle, new_indent);
 			}
 
-			expr_binding_type resolve(str_type name) const noexcept{
+			expr_type<expr_kind::binding> resolve(str_type name) const noexcept{
 				return detail::parse_scope_ctype_resolve<Char>(m_handle, name);
 			}
 
@@ -835,19 +1011,30 @@ namespace ham{
 			handle_type m_handle;
 	};
 
+	using parse_scope_view_utf8  = basic_parse_scope_view<char8>;
+	using parse_scope_view_utf16 = basic_parse_scope_view<char16>;
+	using parse_scope_view_utf32 = basic_parse_scope_view<char32>;
+
+	using parse_scope_view = basic_parse_scope_view<uchar>;
+
 	template<typename Char>
 	class basic_parse_scope{
 		public:
 			using ctype = detail::parse_scope_ctype_t<Char>;
 			using cparse_context = detail::parse_context_ctype_t<Char>;
-			using expr_binding = basic_expr<Char, expr_kind::binding>;
-
-			using context_view_type = basic_parse_context_view<Char, true>;
-
-			using str_type = basic_str<Char>;
 
 			using handle_type = ctype*;
 			using const_handle_type = const ctype*;
+
+			template<bool Mutable>
+			using view_type = basic_parse_scope_view<Char, Mutable>;
+
+			using str_type = basic_str<Char>;
+
+			template<expr_kind Kind = expr_kind::base, bool Mutable = false>
+			using expr_type = basic_expr<Char, Kind, Mutable>;
+
+			using context_view_type = basic_parse_context_view<Char, true>;
 
 			explicit basic_parse_scope(handle_type handle_) noexcept
 				: m_handle(handle_){}
@@ -881,8 +1068,8 @@ namespace ham{
 
 			basic_parse_scope &operator=(basic_parse_scope&&) noexcept = default;
 
-			basic_parse_scope_view<Char, true> view() noexcept{ return m_handle.get(); }
-			basic_parse_scope_view<Char, false> view() const noexcept{ return m_handle.get(); }
+			view_type<true>  view()       noexcept{ return m_handle.get(); }
+			view_type<false> view() const noexcept{ return m_handle.get(); }
 
 			str_type get_indent() const noexcept{
 				return detail::parse_scope_ctype_get_indent<Char>(m_handle.get());
@@ -892,11 +1079,11 @@ namespace ham{
 				return detail::parse_scope_ctype_set_indent<Char>(m_handle.get(), new_indent);
 			}
 
-			bool bind(expr_binding binding){
+			bool bind(const expr_type<expr_kind::binding> &binding){
 				return detail::parse_scope_ctype_bind<Char>(m_handle.get(), binding);
 			}
 
-			expr_binding resolve(str_type name) noexcept{
+			expr_type<expr_kind::binding> resolve(str_type name) noexcept{
 				return detail::parse_scope_ctype_resolve<Char>(m_handle.get(), name);
 			}
 
@@ -911,9 +1098,114 @@ namespace ham{
 			unique_handle<handle_type, detail::parse_scope_ctype_destroy<Char>> m_handle;
 	};
 
-	template<typename Char, expr_kind Kind, bool Mutable>
-	class basic_expr: public detail::basic_expr_ext<basic_expr<Char, Kind>, Char, Kind>{
+	using parse_scope_utf8  = basic_parse_scope<char8>;
+	using parse_scope_utf16 = basic_parse_scope<char16>;
+	using parse_scope_utf32 = basic_parse_scope<char32>;
+
+	using parse_scope = basic_parse_scope<uchar>;
+
+	template<typename Char, bool Mutable>
+	class basic_expr_iterator{
 		public:
+			using ptr_type = std::conditional_t<Mutable, basic_expr<Char, expr_kind::base, Mutable>*, const basic_expr<Char, expr_kind::base, Mutable>*>;
+			using cptr_type = std::conditional_t<Mutable, detail::expr_base_ctype_t<Char>* const*, const detail::expr_base_ctype_t<Char>* const*>;
+
+			basic_expr_iterator(const basic_expr_iterator&) noexcept = default;
+
+			basic_expr_iterator(cptr_type cptr_it) noexcept
+				: m_val{ .cptr = cptr_it }{}
+
+			operator ptr_type()  const noexcept{ return m_val.ptr; }
+			operator cptr_type() const noexcept{ return m_val.cptr; }
+
+			basic_expr_iterator &operator=(const basic_expr_iterator&) noexcept = default;
+
+			basic_expr<Char, expr_kind::base, Mutable> operator*() const noexcept{ return *m_val.ptr; }
+
+			ptr_type operator->() const noexcept{ return ptr(); }
+
+			ptr_type  ptr()  const noexcept{ return m_val.ptr; }
+			cptr_type cptr() const noexcept{ return m_val.cptr; }
+
+		private:
+			union {
+				ptr_type ptr;
+				cptr_type cptr;
+			} m_val;
+	};
+
+	template<typename Char, bool Mutable>
+	class basic_expr_range{
+		public:
+			using iterator = basic_expr_iterator<Char, Mutable>;
+
+			basic_expr_range() noexcept
+				: m_beg{nullptr}, m_end{nullptr}{}
+
+			basic_expr_range(iterator beg_, iterator end_) noexcept
+				: m_beg{beg_}, m_end{end_}{}
+
+			iterator begin() const noexcept{ return m_beg; }
+			iterator end()   const noexcept{ return m_end; }
+
+			usize size() const noexcept{ return ((uptr)m_end.cptr() - (uptr)m_beg.cptr())/sizeof(void*); }
+			usize length() const noexcept{ return size(); }
+
+		private:
+			iterator m_beg, m_end;
+	};
+
+	//! @cond ignore
+	namespace detail{
+		template<typename Self, typename Char, expr_kind Kind, bool Mutable>
+		class basic_expr_ext{};
+
+		template<typename Self, typename Char, bool Mutable>
+		class basic_expr_ext<Self, Char, expr_kind::binding, Mutable>{
+			public:
+				const Self *self() const noexcept{ return static_cast<const Self*>(this); }
+
+				basic_str<Char> name() const noexcept{ return self()->handle()->name; }
+				basic_expr<Char, expr_kind::base> value() const noexcept{ return self()->handle()->value; }
+		};
+
+		template<typename Self, typename Char, bool Mutable>
+		class basic_expr_ext<Self, Char, expr_kind::error, Mutable>{
+			public:
+				Self *self() noexcept{ return static_cast<Self*>(this); }
+				const Self *self() const noexcept{ return static_cast<const Self*>(this); }
+
+				str8 message() const noexcept{ return self()->handle()->message; }
+
+				template<bool Enable = Mutable>
+				auto set_message(const str8 &new_message) -> std::enable_if_t<Enable>{
+					self()->handle()->message = new_message;
+				}
+		};
+
+		template<typename Self, typename Char, bool Mutable>
+		class basic_expr_ext<Self, Char, expr_kind::ref, Mutable>{
+			public:
+				const Self *self() const noexcept{ return static_cast<const Self*>(this); }
+
+				basic_expr<Char, expr_kind::binding> refed() const noexcept{ return self()->handle()->refed; }
+		};
+
+		template<typename Self, typename Char, bool Mutable>
+		class basic_expr_ext<Self, Char, expr_kind::unresolved, Mutable>{
+			public:
+				const Self *self() const noexcept{ return static_cast<const Self*>(this); }
+
+				basic_str<Char> id() const noexcept{ return self()->handle()->id; }
+		};
+	}
+	//! @endcond
+
+	template<typename Char, expr_kind Kind, bool Mutable>
+	class basic_expr: public detail::basic_expr_ext<basic_expr<Char, Kind, Mutable>, Char, Kind, Mutable>{
+		public:
+			enum{ is_mutable = Mutable };
+
 			using ctype = detail::expr_type_from_kind_t<Char, Kind>;
 
 			using cexpr_base_type = std::conditional_t<
@@ -934,44 +1226,49 @@ namespace ham{
 
 			operator handle_type() const noexcept{ return m_expr; }
 
+			basic_token_range<Char> tokens() const noexcept{
+				if constexpr(Kind == expr_kind::base){
+					return m_expr->tokens;
+				}
+				else{
+					return m_expr->super.tokens;
+				}
+			}
+
+			bool is_of_kind(expr_kind kind_) const noexcept{
+				if constexpr(Kind == expr_kind::base){
+					return kind() == kind_;
+				}
+				else{
+					return Kind == kind_;
+				}
+			}
+
+			bool is_error()      const noexcept{ return is_of_kind(expr_kind::error); }
+			bool is_binding()    const noexcept{ return is_of_kind(expr_kind::binding); }
+			bool is_ref()        const noexcept{ return is_of_kind(expr_kind::ref); }
+			bool is_unresolved() const noexcept{ return is_of_kind(expr_kind::unresolved); }
+			bool is_fn()         const noexcept{ return is_of_kind(expr_kind::fn); }
+			bool is_call()       const noexcept{ return is_of_kind(expr_kind::call); }
+
+			bool is_lit_int()  const noexcept{ return is_of_kind(expr_kind::lit_int); }
+			bool is_lit_real() const noexcept{ return is_of_kind(expr_kind::lit_real); }
+			bool is_lit_str()  const noexcept{ return is_of_kind(expr_kind::lit_str); }
+
 			handle_type handle() const noexcept{ return m_expr; }
 
 			expr_kind kind() const noexcept{
 				if constexpr(Kind == expr_kind::base){
-					return m_expr->kind;
+					return static_cast<expr_kind>(m_expr->kind);
 				}
 				else{
-					return m_expr->super.kind;
+					return static_cast<expr_kind>(m_expr->super.kind);
 				}
 			}
 
 		private:
 			handle_type m_expr;
 	};
-
-	using parse_context_view_utf8  = basic_parse_context_view<char8>;
-	using parse_context_view_utf16 = basic_parse_context_view<char16>;
-	using parse_context_view_utf32 = basic_parse_context_view<char32>;
-
-	using parse_context_view = basic_parse_context_view<uchar>;
-
-	using parse_context_utf8  = basic_parse_context<char8>;
-	using parse_context_utf16 = basic_parse_context<char16>;
-	using parse_context_utf32 = basic_parse_context<char32>;
-
-	using parse_context = basic_parse_context<uchar>;
-
-	using parse_scope_view_utf8  = basic_parse_scope_view<char8>;
-	using parse_scope_view_utf16 = basic_parse_scope_view<char16>;
-	using parse_scope_view_utf32 = basic_parse_scope_view<char32>;
-
-	using parse_scope_view = basic_parse_scope_view<uchar>;
-
-	using parse_scope_utf8  = basic_parse_scope<char8>;
-	using parse_scope_utf16 = basic_parse_scope<char16>;
-	using parse_scope_utf32 = basic_parse_scope<char32>;
-
-	using parse_scope = basic_parse_scope<uchar>;
 
 	template<expr_kind Kind, bool Mutable = false>
 	using expr_utf8 = basic_expr<char8, Kind, Mutable>;
@@ -1024,6 +1321,28 @@ namespace ham{
 	using expr_lit_int  = expr<expr_kind::lit_int>;
 	using expr_lit_real = expr<expr_kind::lit_real>;
 	using expr_lit_str  = expr<expr_kind::lit_str>;
+
+	//! @cond ignore
+	namespace detail{
+		template<typename Char>
+		constexpr inline auto cparse = utf_conditional_t<
+			Char,
+			static_fn<ham_parse_utf8>,
+			static_fn<ham_parse_utf16>,
+			static_fn<ham_parse_utf32>
+		>{};
+	}
+	//! @endcond
+
+	template<typename Char>
+	static inline basic_expr<Char, expr_kind::base> parse(const basic_parse_context_view<Char, true> &ctx, const basic_token_range<Char> &tokens){
+		return detail::cparse<Char>(ctx, tokens);
+	}
+
+	template<typename Char>
+	static inline basic_expr<Char, expr_kind::base> parse(basic_parse_context<Char> &ctx, const basic_token_range<Char> &tokens){
+		return detail::cparse<Char>(ctx.handle(), tokens);
+	}
 }
 
 #endif // __cplusplus

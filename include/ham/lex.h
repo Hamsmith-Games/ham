@@ -39,7 +39,6 @@ typedef struct ham_token_range_utf8  ham_token_range_utf8;
 typedef struct ham_token_range_utf16 ham_token_range_utf16;
 typedef struct ham_token_range_utf32 ham_token_range_utf32;
 
-
 typedef enum ham_token_kind{
 	HAM_TOKEN_EOF,
 	HAM_TOKEN_ERROR,
@@ -51,6 +50,7 @@ typedef enum ham_token_kind{
 	HAM_TOKEN_STR,
 	HAM_TOKEN_OP,
 	HAM_TOKEN_BRACKET,
+	HAM_TOKEN_SEMICOLON,
 
 	HAM_TOKEN_KIND_COUNT,
 	HAM_TOKEN_KIND_ERROR = HAM_TOKEN_KIND_COUNT,
@@ -241,6 +241,9 @@ namespace ham{
 		}
 	}
 
+	/**
+	 * @brief Source location template class.
+	 */
 	template<typename Char>
 	class basic_source_location{
 		public:
@@ -281,6 +284,19 @@ namespace ham{
 			ctype m_val;
 	};
 
+	using source_location_utf8  = basic_source_location<char8>;
+	using source_location_utf16 = basic_source_location<char16>;
+	using source_location_utf32 = basic_source_location<char32>;
+
+	static_assert(layout_is_same_v<source_location_utf8,  ham_source_location_utf8>);
+	static_assert(layout_is_same_v<source_location_utf16, ham_source_location_utf16>);
+	static_assert(layout_is_same_v<source_location_utf32, ham_source_location_utf32>);
+
+	using source_location = basic_source_location<uchar>;
+
+	/**
+	 * @brief Token template class.
+	 */
 	template<typename Char>
 	class basic_token{
 		public:
@@ -333,6 +349,19 @@ namespace ham{
 			ctype m_val;
 	};
 
+	using token_utf8  = basic_token<char8>;
+	using token_utf16 = basic_token<char16>;
+	using token_utf32 = basic_token<char32>;
+
+	static_assert(layout_is_same_v<token_utf8,  ham_token_utf8>);
+	static_assert(layout_is_same_v<token_utf16, ham_token_utf16>);
+	static_assert(layout_is_same_v<token_utf32, ham_token_utf32>);
+
+	using token = basic_token<uchar>;
+
+	/**
+	 * @brief Token iterator template class.
+	 */
 	template<typename Char, bool Mutable>
 	class basic_token_iterator{
 		public:
@@ -386,7 +415,7 @@ namespace ham{
 			pointer ptr() const noexcept{ return m_val.ptr; }
 			cpointer cptr() const noexcept{ return m_val.cptr; }
 
-		private:
+		//private:
 			union {
 				cpointer cptr;
 				pointer ptr;
@@ -397,6 +426,19 @@ namespace ham{
 	basic_token_iterator(const ham_token_utf16*) -> basic_token_iterator<char16>;
 	basic_token_iterator(const ham_token_utf32*) -> basic_token_iterator<char32>;
 
+	using token_iterator_utf8  = basic_token_iterator<char8>;
+	using token_iterator_utf16 = basic_token_iterator<char16>;
+	using token_iterator_utf32 = basic_token_iterator<char32>;
+
+	static_assert(layout_is_same_v<token_iterator_utf8,  const ham_token_utf8*>);
+	static_assert(layout_is_same_v<token_iterator_utf16, const ham_token_utf16*>);
+	static_assert(layout_is_same_v<token_iterator_utf32, const ham_token_utf32*>);
+
+	using token_iterator = basic_token_iterator<uchar>;
+
+	/**
+	 * @brief Token range template class.
+	 */
 	template<typename Char>
 	class basic_token_range{
 		public:
@@ -441,7 +483,8 @@ namespace ham{
 			constexpr iterator begin() const noexcept{ return m_u.self.beg; }
 			constexpr iterator end()   const noexcept{ return m_u.self.end; }
 
-		private:
+		// TODO: wait for c++ to allow this on POD types
+		//private:
 			union {
 				ctype cval;
 				struct {
@@ -454,34 +497,9 @@ namespace ham{
 	basic_token_range(const ham_token_utf16*, const ham_token_utf16*) -> basic_token_range<char16>;
 	basic_token_range(const ham_token_utf32*, const ham_token_utf32*) -> basic_token_range<char32>;
 
-	template<typename Char>
-	basic_token_range(basic_token_iterator<Char>,  basic_token_iterator<Char>)  -> basic_token_range<Char>;
-
-	using source_location_utf8  = basic_source_location<char8>;
-	using source_location_utf16 = basic_source_location<char16>;
-	using source_location_utf32 = basic_source_location<char32>;
-
-	static_assert(layout_is_same_v<source_location_utf8,  ham_source_location_utf8>);
-	static_assert(layout_is_same_v<source_location_utf16, ham_source_location_utf16>);
-	static_assert(layout_is_same_v<source_location_utf32, ham_source_location_utf32>);
-
-	using source_location = basic_source_location<uchar>;
-
-	using token_utf8  = basic_token<char8>;
-	using token_utf16 = basic_token<char16>;
-	using token_utf32 = basic_token<char32>;
-
-	static_assert(layout_is_same_v<token_utf8,  ham_token_utf8>);
-	static_assert(layout_is_same_v<token_utf16, ham_token_utf16>);
-	static_assert(layout_is_same_v<token_utf32, ham_token_utf32>);
-
-	using token = basic_token<uchar>;
-
-	using token_iterator_utf8  = basic_token_iterator<char8>;
-	using token_iterator_utf16 = basic_token_iterator<char16>;
-	using token_iterator_utf32 = basic_token_iterator<char32>;
-
-	using token_iterator = basic_token_iterator<uchar>;
+	basic_token_range(token_iterator_utf8,  token_iterator_utf8)  -> basic_token_range<char8>;
+	basic_token_range(token_iterator_utf16, token_iterator_utf16) -> basic_token_range<char16>;
+	basic_token_range(token_iterator_utf32, token_iterator_utf32) -> basic_token_range<char32>;
 
 	using token_range_utf8  = basic_token_range<char8>;
 	using token_range_utf16 = basic_token_range<char16>;
@@ -493,6 +511,7 @@ namespace ham{
 
 	using token_range = basic_token_range<uchar>;
 
+	//! @cond ignore
 	namespace detail{
 		template<typename Char>
 		constexpr static inline bool constexpr_lex_utf(csource_location_t<Char> *loc, const basic_str<Char> &str, ctoken_t<Char> *ret) noexcept{
@@ -646,6 +665,10 @@ namespace ham{
 				loc->col = 0;
 				tok_end = tail.begin();
 			}
+			else if(cp == U';'){
+				ret->kind = HAM_TOKEN_SEMICOLON;
+				tok_end = tail.begin();
+			}
 			else if(ham_utf_is_bracket(cp)){
 				ret->kind = HAM_TOKEN_BRACKET;
 				tok_end = tail.begin();
@@ -705,7 +728,7 @@ namespace ham{
 			ret->loc = start_loc;
 
 			if(ret->kind != HAM_TOKEN_KIND_COUNT){
-				ret->str = str_type(src_beg, ((uptr)tok_end/sizeof(*tok_end)) - ((uptr)src_beg/(sizeof(*src_beg))));
+				ret->str = str_type(src_beg, ((uptr)tok_end - (uptr)src_beg)/(sizeof(*src_beg)));
 				return true;
 			}
 			else{
@@ -724,6 +747,7 @@ namespace ham{
 			}
 		}
 	}
+	//! @endcond
 
 	template<typename Char>
 	constexpr bool lex(basic_source_location<Char> &loc, const basic_str<Char> &str, basic_token<Char> &ret) noexcept{

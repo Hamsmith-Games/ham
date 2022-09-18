@@ -18,7 +18,7 @@
 
 #include "ham/fs.h"
 #include "ham/str_buffer.h"
-#include "ham/lex.h"
+#include "ham/parse.h"
 
 #include "ham/std_vector.hpp"
 
@@ -148,6 +148,8 @@ int main(int argc, char *argv[]){
 		return 2;
 	}
 
+	ham::std_vector<ham::parse_context_utf8> ctxs;
+
 	for(auto &&path_buf : comp_options.input_files){
 		const auto input_file = ham::file(path_buf.get(), ham::file_open_flags::read);
 		if(!input_file){
@@ -180,6 +182,16 @@ int main(int argc, char *argv[]){
 			return 3;
 		}
 
+		ham::parse_context_utf8 ctx;
+		if(!ctx){
+			if(!comp_options.quiet) fprintf(stderr, "Failed to create parse context: %s\n", path_buf.c_str());
+			return 3;
+		}
+
+		//
+		// Lexing
+		//
+
 		ham::std_vector<ham::token_utf8> toks;
 
 		ham::source_location_utf8 loc;
@@ -196,14 +208,59 @@ int main(int argc, char *argv[]){
 			return 4;
 		}
 
-		// TODO: parse the damn thing
+		//
+		// Parsing
+		//
+
+		const auto toks_beg = toks.begin();
+		const auto toks_end = toks.end();
+		auto toks_it = toks_beg;
+
+		ham::expr_base_utf8 prev_expr;
+
+		while(toks_it != toks_end && !toks_it->is_eof()){
+			const auto parse_res = ham::parse(ctx, ham::basic_token_range{ &*toks_it, &*toks_end });
+			if(!parse_res){
+				if(!comp_options.quiet) fprintf(stderr, "Parsing error [%s]\n", path_buf.c_str());
+				return 5;
+			}
+			else if(parse_res.is_error()){
+				const ham::expr_error_utf8 err_expr = (const ham_expr_error_utf8*)parse_res.handle();
+
+				const auto err_toks = err_expr.tokens();
+				const auto err_toks_beg = err_toks.begin();
+				const auto err_toks_end = err_toks.end();
+
+				ham::source_location_utf8 src_loc{path_buf.get(), 0, 0};
+
+				if(err_toks_beg != err_toks_end){
+					src_loc = err_toks_beg->source_location();
+				}
+
+				if(!comp_options.quiet){
+					fprintf(
+						stderr,
+						"Parsing error [%s:%zu:%zu]: %s\n",
+						path_buf.c_str(), src_loc.line() + 1, src_loc.column() + 1,
+						err_expr.message().ptr()
+					);
+				}
+				return 5;
+			}
+
+			prev_expr = parse_res;
+		}
+
+		ctxs.emplace_back(std::move(ctx));
 	}
 
-	// TODO: resolve the damn things
+	// TODO: resolve/combine the damn contexts
 
-	// TODO: typecheck the damn thing
+	// TODO: typecheck the god-damn thing
 
-	// TODO: compile the damn thing
+	// TODO: compile the bastard
+
+	// TODO: output 'em to a file or possibly stdout in future
 
 	return 0;
 }

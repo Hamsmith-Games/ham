@@ -63,6 +63,7 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/str_buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/hash.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/fs.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/plugin.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/lex.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/parse.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/memory.h
@@ -78,10 +79,12 @@ set(
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
+option(HAM_BUILD_DOCS  "Whether to build documentation" ${PROJECT_IS_TOP_LEVEL})
 option(HAM_BUILD_TESTS "Whether to build library tests" ${PROJECT_IS_TOP_LEVEL})
-option(HAM_BUILD_TOOLS "Whether to build tools" ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_TOOLS "Whether to build tools"         ${PROJECT_IS_TOP_LEVEL})
 
-option(HAM_INSTALL_TOOLS "Whether to install compiled tools" ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_DOCS  "Whether to install generated documentation" ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_TOOLS "Whether to install compiled tools"          ${PROJECT_IS_TOP_LEVEL})
 
 ##
 # Dependencies
@@ -109,6 +112,10 @@ endif()
 
 if(HAM_BUILD_TESTS)
 	add_subdirectory(test)
+endif()
+
+if(HAM_BUILD_DOCS)
+	add_subdirectory(docs)
 endif()
 
 ##

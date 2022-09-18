@@ -26,6 +26,7 @@
  */
 
 #include "ham/config.h"
+#include "pp.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -108,9 +109,10 @@ typedef double ham_f64;
 #define HAM_USIZE_MIN            0
 #define HAM_USIZE_MAX HAM_UPTR_MAX
 
-//
-// Buffer types
-//
+/**
+ * @defgroup HAM_STATIC_BUFFERS Static buffer types
+ * @{
+ */
 
 typedef ham_char8  ham_name_buffer_utf8[HAM_NAME_BUFFER_SIZE];
 typedef ham_char16 ham_name_buffer_utf16[HAM_NAME_BUFFER_SIZE];
@@ -128,9 +130,46 @@ typedef ham_char32 ham_message_buffer_utf32[HAM_MESSAGE_BUFFER_SIZE];
 #define HAM_PATH_BUFFER_UTF(n) HAM_CONCAT(ham_path_buffer_utf, n)
 #define HAM_MESSAGE_BUFFER_UTF(n) HAM_CONCAT(ham_message_buffer_utf, n)
 
-//
-// UUIDs
-//
+typedef HAM_NAME_BUFFER_UTF(HAM_UTF)    ham_name_buffer;
+typedef HAM_PATH_BUFFER_UTF(HAM_UTF)    ham_path_buffer;
+typedef HAM_MESSAGE_BUFFER_UTF(HAM_UTF) ham_message_buffer;
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup HAM_VERSIONS Versions
+ * @{
+ */
+
+typedef struct ham_version{
+	ham_u16 major, minor, patch;
+} ham_version;
+
+ham_constexpr ham_nothrow static inline int ham_version_cmp(ham_version lhs, ham_version rhs){
+	const int dmajor = (int)lhs.major - (int)rhs.major;
+	if(dmajor != 0) return dmajor;
+
+	const int dminor = (int)lhs.minor - (int)rhs.minor;
+	if(dminor != 0) return dminor;
+
+	const int dpatch = (int)lhs.patch - (int)rhs.patch;
+	return dpatch;
+}
+
+ham_constexpr ham_nothrow static inline bool ham_version_is_compatible(ham_version supplied, ham_version requested){
+	return supplied.major == requested.major && supplied.minor >= requested.minor;
+}
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup HAM_UUIDS UUIDs
+ * @{
+ */
 
 typedef union ham_uuid{
 	ham_u8 u8s[16];
@@ -157,6 +196,10 @@ ham_constexpr ham_nothrow static inline bool ham_uuid_lt (ham_uuid a, ham_uuid b
 ham_constexpr ham_nothrow static inline bool ham_uuid_lte(ham_uuid a, ham_uuid b){ return ham_uuid_cmp(a, b) <= 0; }
 ham_constexpr ham_nothrow static inline bool ham_uuid_gt (ham_uuid a, ham_uuid b){ return ham_uuid_cmp(a, b) >  0; }
 ham_constexpr ham_nothrow static inline bool ham_uuid_gte(ham_uuid a, ham_uuid b){ return ham_uuid_cmp(a, b) >= 0; }
+
+/**
+ * @}
+ */
 
 /**
  * @defgroup HAM_UTF_CP UTF Codepoints
@@ -261,8 +304,54 @@ ham_constexpr ham_nothrow static inline bool ham_utf_is_bracket(ham_utf_cp cp){
 	}
 }
 
+#define HAM_UTF8_NON_ASCII_BIT 0x80
+#define HAM_UTF8_BYTE_MASK 0xF0
+#define HAM_UTF16_SURROGATE_HIGH_MIN 0xD800
+#define HAM_UTF16_SURROGATE_HIGH_MAX 0xDBFF
+
+ham_constexpr ham_nothrow static inline ham_usize ham_codepoint_num_chars_utf8(const ham_char8 *cp, ham_usize max_len){
+	if(!cp || max_len == 0){
+		return 0;
+	}
+	else if(*cp & HAM_UTF8_NON_ASCII_BIT){
+		const ham_u32 byte_mask = (ham_u8)*cp & (ham_u8)HAM_UTF8_BYTE_MASK;
+		const ham_u32 count = ham_popcnt32(byte_mask);
+		return (max_len < count) ? (ham_usize)-1 : count;
+	}
+	else{
+		return 1;
+	}
+}
+
+ham_constexpr ham_nothrow static inline ham_usize ham_codepoint_num_chars_utf16(const ham_char16 *cp, ham_usize max_len){
+	if(!cp || max_len == 0) return 0;
+
+	const ham_char16 high = *cp;
+
+	if(high <= HAM_UTF16_SURROGATE_HIGH_MAX && high >= HAM_UTF16_SURROGATE_HIGH_MIN){
+		// surrogate pair
+		return max_len >= 2 ? 2 : (ham_usize)-1;
+	}
+	else{
+		return 1;
+	}
+}
+
+ham_constexpr ham_nothrow static inline ham_usize ham_codepoint_num_chars_utf32(const ham_char32 *cp, ham_usize max_len){
+	return (!cp || max_len == 0) ? 0 : 1;
+}
+
+#define HAM_CHAR_UTF(n) HAM_CONCAT(ham_char, n)
+
+typedef HAM_CHAR_UTF(HAM_UTF) ham_uchar;
+
 /**
  * @}
+ */
+
+/**
+ * @defgroup HAM_STR Strings
+ * @{
  */
 
 typedef struct ham_str8 { const ham_char8  *ptr; ham_uptr len; } ham_str8;
@@ -333,43 +422,6 @@ typedef struct ham_str32{ const ham_char32 *ptr; ham_uptr len; } ham_str32;
 #endif // __GNUC__
 
 //! @endcond
-
-#define HAM_UTF8_NON_ASCII_BIT 0x80
-#define HAM_UTF8_BYTE_MASK 0xF0
-#define HAM_UTF16_SURROGATE_HIGH_MIN 0xD800
-#define HAM_UTF16_SURROGATE_HIGH_MAX 0xDBFF
-
-ham_constexpr ham_nothrow static inline ham_usize ham_codepoint_num_chars_utf8(const ham_char8 *cp, ham_usize max_len){
-	if(!cp || max_len == 0){
-		return 0;
-	}
-	else if(*cp & HAM_UTF8_NON_ASCII_BIT){
-		const ham_u32 byte_mask = (ham_u8)*cp & (ham_u8)HAM_UTF8_BYTE_MASK;
-		const ham_u32 count = ham_popcnt32(byte_mask);
-		return (max_len < count) ? (ham_usize)-1 : count;
-	}
-	else{
-		return 1;
-	}
-}
-
-ham_constexpr ham_nothrow static inline ham_usize ham_codepoint_num_chars_utf16(const ham_char16 *cp, ham_usize max_len){
-	if(!cp || max_len == 0) return 0;
-
-	const ham_char16 high = *cp;
-
-	if(high <= HAM_UTF16_SURROGATE_HIGH_MAX && high >= HAM_UTF16_SURROGATE_HIGH_MIN){
-		// surrogate pair
-		return max_len >= 2 ? 2 : (ham_usize)-1;
-	}
-	else{
-		return 1;
-	}
-}
-
-ham_constexpr ham_nothrow static inline ham_usize ham_codepoint_num_chars_utf32(const ham_char32 *cp, ham_usize max_len){
-	return (!cp || max_len == 0) ? 0 : 1;
-}
 
 ham_constexpr ham_nothrow static inline ham_usize ham_str_next_codepoint_utf8(ham_utf_cp *cp, const ham_char8 *str, ham_usize max_chars){
 	const ham_usize req_chars = ham_codepoint_num_chars_utf8(str, max_chars);
@@ -600,51 +652,54 @@ ham_nothrow static inline ham_usize ham_str_conv_utf32_utf8(ham_str32 str, ham_c
 }
 
 #define HAM_STR_CMP_UTF(n) HAM_CONCAT(ham_str_cmp_utf, n)
-#define HAM_STR_EQ_UTF(n) HAM_CONCAT(ham_str_eq_utf, n)
+#define HAM_STR_EQ_UTF(n)  HAM_CONCAT(ham_str_eq_utf, n)
 #define HAM_STR_NEQ_UTF(n) HAM_CONCAT(ham_str_neq_utf, n)
 
 #define ham_str_cmp HAM_STR_CMP_UTF(HAM_UTF)
-#define ham_str_eq HAM_STR_EQ_UTF(HAM_UTF)
+#define ham_str_eq  HAM_STR_EQ_UTF(HAM_UTF)
 #define ham_str_neq HAM_STR_NEQ_UTF(HAM_UTF)
 
-#define HAM_CHAR_UTF_(n) ham_char##n
-#define HAM_CHAR_UTF(n) HAM_CHAR_UTF_(n)
+#define HAM_STR_UTF(n)  HAM_CONCAT(ham_str, n)
 
-#define HAM_STR_UTF_(n) ham_str##n
-#define HAM_STR_UTF(n) HAM_STR_UTF_(n)
-
-#define HAM_EMPTY_STR_UTF(n) ((HAM_CONCAT(ham_str, n)){ ham_null, 0 })
+#define HAM_EMPTY_STR_UTF(n) ((HAM_STR_UTF(n)){ ham_null, 0 })
 
 #define HAM_EMPTY_STR8  HAM_EMPTY_STR_UTF(8)
 #define HAM_EMPTY_STR16 HAM_EMPTY_STR_UTF(16)
 #define HAM_EMPTY_STR32 HAM_EMPTY_STR_UTF(32)
 
 #define HAM_LIT_C_UTF8(lit) (lit)
-#define HAM_LIT_C_UTF16(lit) (HAM_CONCAT_(u, lit))
-#define HAM_LIT_C_UTF32(lit) (HAM_CONCAT_(U, lit))
+#define HAM_LIT_C_UTF16(lit) (HAM_CONCAT(u, lit))
+#define HAM_LIT_C_UTF32(lit) (HAM_CONCAT(U, lit))
 
-#define HAM_LIT_UTF8(lit) ((HAM_STR_UTF_(8)){ (lit), (sizeof(lit)-1) })
-#define HAM_LIT_UTF16(lit) ((HAM_STR_UTF_(16)){ (u##lit), ((sizeof(u##lit)/sizeof(*(u##lit)))-1) })
-#define HAM_LIT_UTF32(lit) ((HAM_STR_UTF_(32)){ (U##lit), ((sizeof(U##lit)/sizeof(*(U##lit)))-1) })
+//! @cond ignore
+#define HAM_IMPL_LIT_UTF(n, lit_prefixed) ((HAM_STR_UTF(n)){ (lit_prefixed), (sizeof(lit_prefixed)/sizeof(*(lit_prefixed)))-1 })
+//! @endcond
+
+#define HAM_LIT_UTF8(lit)  HAM_IMPL_LIT_UTF(8, lit)
+#define HAM_LIT_UTF16(lit) HAM_IMPL_LIT_UTF(16, HAM_CONCAT(u, lit))
+#define HAM_LIT_UTF32(lit) HAM_IMPL_LIT_UTF(32, HAM_CONCAT(U, lit))
 
 #define HAM_LIT_UTF_(n, lit) HAM_LIT_UTF##n(lit)
 #define HAM_LIT_UTF(n, lit) HAM_LIT_UTF_(n, lit)
 
-#define HAM_LIT_C_UTF__(macro_n, lit) macro_n(lit)
-#define HAM_LIT_C_UTF_(n, lit) HAM_LIT_C_UTF__(HAM_LIT_C_UTF##n, lit)
-#define HAM_LIT_C_UTF(n, lit) HAM_LIT_C_UTF_(n, lit)
+#define HAM_LIT_C_UTF(n, lit) HAM_APPLY(HAM_CONCAT(HAM_LIT_C_UTF, n), lit)
 
 #define HAM_LIT_C(lit) HAM_LIT_C_UTF(HAM_UTF, lit)
-#define HAM_LIT(lit) HAM_LIT_UTF(HAM_UTF, lit)
+#define HAM_LIT(lit)   HAM_LIT_UTF(HAM_UTF, lit)
 
 #define HAM_EMPTY_STR HAM_EMPTY_STR_UTF(HAM_UTF)
 
-typedef HAM_CHAR_UTF(HAM_UTF) ham_uchar;
 typedef HAM_STR_UTF(HAM_UTF)  ham_str;
 
-typedef HAM_NAME_BUFFER_UTF(HAM_UTF)    ham_name_buffer;
-typedef HAM_PATH_BUFFER_UTF(HAM_UTF)    ham_path_buffer;
-typedef HAM_MESSAGE_BUFFER_UTF(HAM_UTF) ham_message_buffer;
+/**
+ * @}
+ */
+
+#define HAM_SUPER_NAME _ham_super
+
+#define ham_derive(base) base HAM_SUPER_NAME;
+
+#define ham_super(derived_ptr) (&(derived_ptr)->HAM_SUPER_NAME)
 
 HAM_C_API_END
 

@@ -47,9 +47,6 @@
 #	define HAM_MESSAGE_BUFFER_SIZE 512
 #endif
 
-#define HAM_CONCAT_(a, b) a##b
-#define HAM_CONCAT(a, b) HAM_CONCAT_(a, b)
-
 #ifdef HAM_UTF32
 #	define HAM_UTF 32
 #elif defined(HAM_UTF16)
@@ -66,11 +63,13 @@
 #	define ham_auto auto
 #	define ham_constexpr constexpr
 #	define ham_thread_local thread_local
+#	define ham_types_compatible(type1, type2) __builtin_types_compatible_p(type1, type2)
 #else
 #	define HAM_C_API_BEGIN
 #	define HAM_C_API_END
 #	define ham_null NULL
 #	define ham_constexpr
+#	define ham_types_compatible(type1, type2) (_Generic((type1*)NULL, type2: true, default: false))
 #endif
 
 #ifdef _WIN32
@@ -146,7 +145,6 @@
 #else
 #	define ham_api ham_public ham_import
 #endif
-
 
 /**
  * @}

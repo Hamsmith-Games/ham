@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>@HAM_DOCS_TITLE@</title>
+	<meta name="description" content="@HAM_DOCS_DESCRIPTION@">
+	<meta name="author" content="@HAM_DOCS_AUTHOR@">
+
+    <meta property="og:title" content="@HAM_DOCS_TITLE@">
+	<meta property="og:type" content="website">
+	<meta property="og:url" content="@HAM_DOCS_URL@">
+	<meta property="og:description" content="@HAM_DOCS_DESCRIPTION@">
+	<!-- <meta property="og:image" content="image.png"> -->
+</head>
+
+<body>
+    <nav>
+	    <h1>Ham</h1>
+	</nav>
+    <main>
+
+    </main>
+</body>
+
+</html>
