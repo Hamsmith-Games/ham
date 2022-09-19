@@ -1,5 +1,5 @@
 #
-# The Ham Programming Language Interpreter
+# The Ham World Engine
 # Copyright (C) 2022  Hamsmith Ltd.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,13 +16,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-##
-# Ham programming language interpreter
-##
+add_executable(ham-engine-server main.cpp)
 
-find_package(Readline REQUIRED)
-
-add_executable(hami main.cpp)
-add_executable(ham::interpreter ALIAS hami)
-
-target_link_libraries(hami PUBLIC ham::ham readline::readline)
+target_link_libraries(ham-engine-server PUBLIC ham::engine-common)

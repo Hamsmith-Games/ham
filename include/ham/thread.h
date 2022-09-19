@@ -16,26 +16,35 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef HAM_STD_VECTOR_HPP
-#define HAM_STD_VECTOR_HPP 1
+#ifndef HAM_THREAD_H
+#define HAM_THREAD_H 1
 
 /**
- * @defgroup HAM_STD_VECTOR std::vector wrapper
+ * @defgroup HAM_THREAD Threads
  * @ingroup HAM
  * @{
  */
 
-#include "memory.h"
+#include "typedefs.h"
 
-#include <vector>
+HAM_C_API_BEGIN
 
-namespace ham{
-	template<typename T, typename Allocator = allocator<T>>
-	using std_vector = std::vector<T, Allocator>;
-}
+typedef struct ham_thread ham_thread;
+
+typedef ham_uptr(*ham_thread_fn)(void *user);
+
+ham_api ham_thread *ham_thread_create(ham_thread_fn fn, void *user);
+
+ham_api void ham_thread_destroy(ham_thread *thd);
+
+ham_api bool ham_thread_join(ham_thread *thd, ham_uptr *ret);
+
+ham_api bool ham_thread_set_name(ham_thread *thd, ham_str8 name);
+
+HAM_C_API_END
 
 /**
  * @}
  */
 
-#endif // !HAM_STD_VECTOR_HPP
+#endif // !HAM_THREAD_H

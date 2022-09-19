@@ -10,7 +10,7 @@
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# GNU Lesser General Public License for more details.
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
@@ -62,6 +62,7 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/math.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/str_buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/hash.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/thread.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/fs.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/plugin.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/lex.h
@@ -79,18 +80,19 @@ set(
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-option(HAM_BUILD_DOCS  "Whether to build documentation" ${PROJECT_IS_TOP_LEVEL})
-option(HAM_BUILD_TESTS "Whether to build library tests" ${PROJECT_IS_TOP_LEVEL})
-option(HAM_BUILD_TOOLS "Whether to build tools"         ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_DOCS   "Whether to build documentation"    ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_TESTS  "Whether to build library tests"    ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_TOOLS  "Whether to build tools"            ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_ENGINE "Whether to build the world engine" ${PROJECT_IS_TOP_LEVEL})
 
-option(HAM_INSTALL_DOCS  "Whether to install generated documentation" ${PROJECT_IS_TOP_LEVEL})
-option(HAM_INSTALL_TOOLS "Whether to install compiled tools"          ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_DOCS   "Whether to install generated documentation" ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_TOOLS  "Whether to install compiled tools"          ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_TESTS  "Whether to install the tests"               OFF)
+option(HAM_INSTALL_ENGINE "Whether to install the world engine"        OFF)
 
 ##
 # Dependencies
 ##
-
-# none yet...
 
 FetchContent_Declare(
 	robin_hood_content
@@ -111,6 +113,10 @@ if(HAM_BUILD_TOOLS)
 	add_subdirectory(comp)
 endif()
 
+if(HAM_BUILD_ENGINE)
+	add_subdirectory(engine)
+endif()
+
 if(HAM_BUILD_TESTS)
 	add_subdirectory(test)
 endif()
@@ -124,12 +130,12 @@ endif()
 ##
 
 install(
-	FILES ${CMAKE_CURRENT_LIST_DIR}/include/gpwe.h
+	FILES ${CMAKE_CURRENT_LIST_DIR}/include/ham.h
 	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 install(
-	DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/include/gpwe
+	DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/include/ham
 	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 	FILES_MATCHING
 	    PATTERN "*.h"
@@ -144,7 +150,14 @@ install(
 
 if(HAM_INSTALL_TOOLS)
 	install(
-		TARGETS hamc
+		TARGETS hamc hami
+		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+	)
+endif()
+
+if(HAM_INSTALL_TEST)
+	install(
+		TARGETS ham-test
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	)
 endif()

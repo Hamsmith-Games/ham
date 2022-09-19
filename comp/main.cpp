@@ -1,5 +1,5 @@
 /**
- * The Ham Programming Language
+ * The Ham Programming Language Compiler
  * Copyright (C) 2022  Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify

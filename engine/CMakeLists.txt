@@ -1,5 +1,5 @@
 #
-# The Ham Programming Language Interpreter
+# The Ham World Engine
 # Copyright (C) 2022  Hamsmith Ltd.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,12 +17,32 @@
 #
 
 ##
-# Ham programming language interpreter
+# The Ham World Engine
 ##
 
-find_package(Readline REQUIRED)
+set(HAM_ENGINE_SOURCE_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 
-add_executable(hami main.cpp)
-add_executable(ham::interpreter ALIAS hami)
+set(
+	HAM_ENGINE_SOURCE_HEADERS
+	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine.h
+)
 
-target_link_libraries(hami PUBLIC ham::ham readline::readline)
+add_subdirectory(common)
+add_subdirectory(server)
+add_subdirectory(client)
+
+if(HAM_INSTALL_ENGINE)
+	install(
+		TARGETS ham-engine-common ham-engine-client ham-engine-client
+		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	)
+
+    install(
+		DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/include/ham
+		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+		FILES_MATCHING
+		    PATTERN "*.h"
+			PATTERN "*.hpp"
+	)
+endif()

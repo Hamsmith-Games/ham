@@ -10,7 +10,7 @@
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# GNU Lesser General Public License for more details.
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
@@ -24,6 +24,7 @@ set(
 	${HAM_HEADERS}
 	memory.cpp
 	str_buffer.cpp
+	thread.cpp
 	fs.cpp
 	plugin.cpp
 	lex.cpp
@@ -57,5 +58,9 @@ target_include_directories(
 
 target_link_libraries(ham PUBLIC gmp::gmp mpfr::mpfr)
 target_link_libraries(ham PRIVATE robin_hood::robin_hood)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+	target_link_options(ham PRIVATE "-Wl,--enable-new-dtags")
+endif()
 
 add_library(ham::ham ALIAS ham)
