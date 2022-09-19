@@ -16,6 +16,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+find_package(SDL2 CONFIG REQUIRED)
+
 add_executable(ham-engine-client main.cpp)
 
-target_link_libraries(ham-engine-client PUBLIC ham::engine-common)
+target_link_libraries(ham-engine-client PRIVATE SDL2::SDL2 ham::engine-common)

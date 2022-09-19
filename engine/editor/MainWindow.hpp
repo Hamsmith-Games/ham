@@ -16,22 +16,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#define HAM_ENGINE_CLIENT_API_NAME "ham-engine-client"
+#ifndef HAM_ENGINE_EDITOR_MAINWINDOW_HPP
+#define HAM_ENGINE_EDITOR_MAINWINDOW_HPP 1
 
-#include "ham/log.h"
-#include "ham/engine.h"
+#include <QMainWindow>
 
-#include "SDL.h"
-
-int main(int argc, char *argv[]){
-	ham_engine_init(argc, argv);
-
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) != 0){
-		ham_logerrorf(HAM_ENGINE_CLIENT_API_NAME, "Error in SDL_Init: %s", SDL_GetError());
-		return 1;
-	}
-
-	atexit(SDL_Quit);
-
-	return ham_exec();
+namespace ham::engine{
+	class MainWindow: public QMainWindow{
+		public:
+			MainWindow();
+			~MainWindow();
+	};
 }
+
+#endif // !HAM_ENGINE_EDITOR_MAINWINDOW_HPP

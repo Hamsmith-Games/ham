@@ -16,22 +16,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#define HAM_ENGINE_CLIENT_API_NAME "ham-engine-client"
+#include "ham/config.h"
 
-#include "ham/log.h"
-#include "ham/engine.h"
+#include "MainWindow.hpp"
 
-#include "SDL.h"
+#include <QApplication>
+
+namespace engine = ham::engine;
 
 int main(int argc, char *argv[]){
-	ham_engine_init(argc, argv);
+	QApplication app(argc, argv);
+	QApplication::setApplicationDisplayName("Ham World Editor");
+	QApplication::setApplicationName("ham-engine-editor");
+	QApplication::setApplicationVersion(HAM_VERSION_STR);
 
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) != 0){
-		ham_logerrorf(HAM_ENGINE_CLIENT_API_NAME, "Error in SDL_Init: %s", SDL_GetError());
-		return 1;
-	}
+	engine::MainWindow main_window;
+	main_window.show();
 
-	atexit(SDL_Quit);
-
-	return ham_exec();
+	return app.exec();
 }

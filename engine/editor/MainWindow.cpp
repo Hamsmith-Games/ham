@@ -16,22 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#define HAM_ENGINE_CLIENT_API_NAME "ham-engine-client"
+#include "MainWindow.hpp"
 
-#include "ham/log.h"
-#include "ham/engine.h"
+namespace engine = ham::engine;
 
-#include "SDL.h"
-
-int main(int argc, char *argv[]){
-	ham_engine_init(argc, argv);
-
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) != 0){
-		ham_logerrorf(HAM_ENGINE_CLIENT_API_NAME, "Error in SDL_Init: %s", SDL_GetError());
-		return 1;
-	}
-
-	atexit(SDL_Quit);
-
-	return ham_exec();
+engine::MainWindow::MainWindow(){
+	setMinimumSize(854, 480);
 }
+
+engine::MainWindow::~MainWindow(){}

@@ -62,6 +62,7 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/math.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/str_buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/hash.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/log.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/thread.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/fs.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/plugin.h

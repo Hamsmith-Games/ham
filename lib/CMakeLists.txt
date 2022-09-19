@@ -23,6 +23,7 @@ set(
 	HAM_SOURCES
 	${HAM_HEADERS}
 	memory.cpp
+	log.cpp
 	str_buffer.cpp
 	thread.cpp
 	fs.cpp

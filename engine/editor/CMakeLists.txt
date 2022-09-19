@@ -16,19 +16,28 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-add_library(
-	ham-engine-common SHARED
-	${HAM_ENGINE_SOURCE_HEADERS}
-	engine.cpp
-	sys.cpp
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+
+qt_standard_project_setup()
+
+add_executable(
+	ham-engine-editor
+	main.cpp
+
+	MainWindow.hpp
+	MainWindow.cpp
 )
 
-add_library(ham::engine-common ALIAS ham-engine-common)
+target_link_libraries(
+	ham-engine-editor
+	PRIVATE
+	    ham::engine-common
+		Qt6::Widgets
+)
 
-target_link_libraries(ham-engine-common PUBLIC ham::ham)
-
-target_include_directories(
-	ham-engine-common PUBLIC
-	$<BUILD_INTERFACE:${HAM_ENGINE_SOURCE_INCLUDE_DIR}>
-	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+set_target_properties(
+	ham-engine-editor
+	PROPERTIES
+	    WIN32_EXECUTABLE ON
+		MACOSX_BUNDLE    ON
 )
