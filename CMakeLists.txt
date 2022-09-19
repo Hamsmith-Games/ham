@@ -107,6 +107,7 @@ FetchContent_MakeAvailable(robin_hood_content)
 add_subdirectory(lib)
 
 if(HAM_BUILD_TOOLS)
+	add_subdirectory(interpreter)
 	add_subdirectory(comp)
 endif()
 

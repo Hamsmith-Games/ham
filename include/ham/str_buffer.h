@@ -95,73 +95,73 @@ namespace ham{
 		template<typename Char>
 		constexpr inline auto str_buffer_ctype_create_allocator = utf_conditional_t<
 			Char,
-			static_fn<ham_str_buffer_create_allocator_utf8>,
-			static_fn<ham_str_buffer_create_allocator_utf16>,
-			static_fn<ham_str_buffer_create_allocator_utf32>
+			meta::static_fn<ham_str_buffer_create_allocator_utf8>,
+			meta::static_fn<ham_str_buffer_create_allocator_utf16>,
+			meta::static_fn<ham_str_buffer_create_allocator_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto str_buffer_ctype_create = utf_conditional_t<
 			Char,
-			static_fn<ham_str_buffer_create_utf8>,
-			static_fn<ham_str_buffer_create_utf16>,
-			static_fn<ham_str_buffer_create_utf32>
+			meta::static_fn<ham_str_buffer_create_utf8>,
+			meta::static_fn<ham_str_buffer_create_utf16>,
+			meta::static_fn<ham_str_buffer_create_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto str_buffer_ctype_destroy = utf_conditional_t<
 			Char,
-			static_fn<ham_str_buffer_destroy_utf8>,
-			static_fn<ham_str_buffer_destroy_utf16>,
-			static_fn<ham_str_buffer_destroy_utf32>
+			meta::static_fn<ham_str_buffer_destroy_utf8>,
+			meta::static_fn<ham_str_buffer_destroy_utf16>,
+			meta::static_fn<ham_str_buffer_destroy_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto str_buffer_ctype_reserve = utf_conditional_t<
 			Char,
-			static_fn<ham_str_buffer_reserve_utf8>,
-			static_fn<ham_str_buffer_reserve_utf16>,
-			static_fn<ham_str_buffer_reserve_utf32>
+			meta::static_fn<ham_str_buffer_reserve_utf8>,
+			meta::static_fn<ham_str_buffer_reserve_utf16>,
+			meta::static_fn<ham_str_buffer_reserve_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto str_buffer_ctype_resize = utf_conditional_t<
 			Char,
-			static_fn<ham_str_buffer_resize_utf8>,
-			static_fn<ham_str_buffer_resize_utf16>,
-			static_fn<ham_str_buffer_resize_utf32>
+			meta::static_fn<ham_str_buffer_resize_utf8>,
+			meta::static_fn<ham_str_buffer_resize_utf16>,
+			meta::static_fn<ham_str_buffer_resize_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto str_buffer_ctype_ptr = utf_conditional_t<
 			Char,
-			static_fn<ham_str_buffer_ptr_utf8>,
-			static_fn<ham_str_buffer_ptr_utf16>,
-			static_fn<ham_str_buffer_ptr_utf32>
+			meta::static_fn<ham_str_buffer_ptr_utf8>,
+			meta::static_fn<ham_str_buffer_ptr_utf16>,
+			meta::static_fn<ham_str_buffer_ptr_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto str_buffer_ctype_c_str = utf_conditional_t<
 			Char,
-			static_fn<ham_str_buffer_c_str_utf8>,
-			static_fn<ham_str_buffer_c_str_utf16>,
-			static_fn<ham_str_buffer_c_str_utf32>
+			meta::static_fn<ham_str_buffer_c_str_utf8>,
+			meta::static_fn<ham_str_buffer_c_str_utf16>,
+			meta::static_fn<ham_str_buffer_c_str_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto str_buffer_ctype_get = utf_conditional_t<
 			Char,
-			static_fn<ham_str_buffer_get_utf8>,
-			static_fn<ham_str_buffer_get_utf16>,
-			static_fn<ham_str_buffer_get_utf32>
+			meta::static_fn<ham_str_buffer_get_utf8>,
+			meta::static_fn<ham_str_buffer_get_utf16>,
+			meta::static_fn<ham_str_buffer_get_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto str_buffer_ctype_set = utf_conditional_t<
 			Char,
-			static_fn<ham_str_buffer_set_utf8>,
-			static_fn<ham_str_buffer_set_utf16>,
-			static_fn<ham_str_buffer_set_utf32>
+			meta::static_fn<ham_str_buffer_set_utf8>,
+			meta::static_fn<ham_str_buffer_set_utf16>,
+			meta::static_fn<ham_str_buffer_set_utf32>
 		>{};
 	}
 

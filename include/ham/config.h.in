@@ -25,6 +25,10 @@
  * @{
  */
 
+//
+// Configuration macros
+//
+
 #define HAM_VERSION_MAJOR @HAM_VERSION_MAJOR@
 #define HAM_VERSION_MINOR @HAM_VERSION_MINOR@
 #define HAM_VERSION_PATCH @HAM_VERSION_PATCH@
@@ -56,6 +60,10 @@
 #	define HAM_UTF 8
 #endif
 
+//
+// Language-specific stuff
+//
+
 #ifdef __cplusplus
 #	define HAM_C_API_BEGIN extern "C" {
 #	define HAM_C_API_END }
@@ -72,7 +80,26 @@
 #	define ham_types_compatible(type1, type2) (_Generic((type1*)NULL, type2: true, default: false))
 #endif
 
-#ifdef _WIN32
+//
+// Platform-specific stuff
+//
+
+#define HAM_PLATFORM_UNIX 0
+#define HAM_PLATFORM_WIN32 1
+
+#if defined(_WIN32)
+#	define HAM_PLATFORM HAM_PLATFORM_WIN32
+#elif defined(__unix__)
+#	define HAM_PLATFORM HAM_PLATFORM_UNIX
+#else
+#	error "Unrecognized platform"
+#endif
+
+#ifdef __MINGW32__
+#	define _GNU_SOURCE 1
+#endif
+
+#if HAM_PLATFORM == HAM_PLATFORM_WIN32
 #	define ham_import __declspec(dllimport)
 #	define ham_export __declspec(dllexport)
 #	define ham_nothrow __declspec(nothrow)
@@ -84,10 +111,16 @@
 #	define ham_export
 #endif
 
+//
+// Compiler stuff
+//
+
 #ifdef __GNUC__
 
 #	define ham_public __attribute__((visibility("default")))
 #	define ham_private __attribute__((visibility("hidden")))
+
+#	define ham_nonnull_args(...) __attribute__((nonnull(__VA_ARGS__)))
 
 #	ifndef ham_nothrow
 #		define ham_nothrow __attribute__((nothrow))
@@ -113,6 +146,14 @@
 #		define ham_popcnt64 __builtin_popcountl
 #	endif
 
+#	ifndef ham_lzcnt32
+#		define ham_lzcnt32 __builtin_clz
+#	endif
+
+#	ifndef ham_lzcnt64
+#		define ham_lzcnt64 __builtin_clzl
+#	endif
+
 #	define ham_min(a, b) \
 		({	const ham_auto a_ = (a); const ham_auto b_ = (b); \
 			a_ < b_ ? a_ : b_; })
@@ -121,7 +162,7 @@
 		({	const ham_auto a_ = (a); const ham_auto b_ = (b); \
 			a_ < b_ ? b_ : a_; })
 
-#else
+#else // __cplusplus
 
 #	define ham_public
 #	define ham_private
@@ -139,6 +180,11 @@
 #endif // __GNUC__
 
 #define ham_popcnt ham_popcnt32
+#define ham_lzcnt  ham_lzcnt32
+
+#ifndef ham_nonnull_args
+#	define ham_nonnull_args(...)
+#endif
 
 #ifdef HAM_LIB_IMPLEMENTATION
 #	define ham_api ham_public ham_export

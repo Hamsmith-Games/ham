@@ -443,7 +443,7 @@ ham_constexpr ham_nothrow static inline ham_usize ham_str_next_codepoint_utf8(ha
 				return (ham_usize)-1;
 			}
 
-			*cp = (str[0]-192)*64 + (str[1]-128);
+			*cp = ((str[0] & 0b00011111) << 6) | (str[1] & 0b00111111);
 			break;
 		}
 
@@ -453,7 +453,11 @@ ham_constexpr ham_nothrow static inline ham_usize ham_str_next_codepoint_utf8(ha
 				return (ham_usize)-1;
 			}
 
-			*cp = (str[0]-224)*4096 + (str[1]-128)*64 + (str[2]-128);
+			*cp =
+				((str[0] & 0b00001111) << 12) |
+				((str[1] & 0b00111111) << 6)  |
+				(str[2] & 0b00111111);
+
 			break;
 		}
 
@@ -463,7 +467,12 @@ ham_constexpr ham_nothrow static inline ham_usize ham_str_next_codepoint_utf8(ha
 				return (ham_usize)-1;
 			}
 
-			*cp = (str[0]-240)*262144 + (str[1]-128)*4096 + (str[2]-128)*64 + (str[3]-128);
+			*cp =
+				((str[0] & 0b00000111) << 18) |
+				((str[1] & 0b00111111) << 12) |
+				((str[2] & 0b00111111) << 6)  |
+				(str[3] & 0b00111111);
+
 			break;
 		}
 
@@ -791,14 +800,18 @@ namespace ham{
 			Handle m_handle;
 	};
 
-	namespace detail{
-		template<typename T> struct id{ using type = T; };
+	namespace meta{
+		template<typename T>
+		struct id{ using type = T; };
 
-		template<auto Value>
-		struct constant_value{ constexpr static auto value = Value; };
+		template<typename T, T Value>
+		struct constant_value{
+			using type = T;
+			constexpr static T value = Value;
+		};
 
 		template<auto Fn, auto ... Args>
-		struct constant_call{ constexpr static auto value = Fn(Args...); };
+		struct constant_call: constant_value<decltype(Fn(Args...)), Fn(Args...)>{};
 
 		template<auto Fn>
 		struct static_fn{
@@ -807,6 +820,10 @@ namespace ham{
 				return Fn(std::forward<Args>(args)...);
 			}
 		};
+	}
+
+	namespace detail{
+		template<typename T> struct id{ using type = T; };
 
 		template<
 			typename Char,
@@ -835,49 +852,49 @@ namespace ham{
 		template<typename Char>
 		constexpr inline auto cstr_cmp = utf_conditional_t<
 			Char,
-			static_fn<ham_str_cmp_utf8>,
-			static_fn<ham_str_cmp_utf16>,
-			static_fn<ham_str_cmp_utf32>
+			meta::static_fn<ham_str_cmp_utf8>,
+			meta::static_fn<ham_str_cmp_utf16>,
+			meta::static_fn<ham_str_cmp_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto cstr_eq = utf_conditional_t<
 			Char,
-			static_fn<ham_str_eq_utf8>,
-			static_fn<ham_str_eq_utf16>,
-			static_fn<ham_str_eq_utf32>
+			meta::static_fn<ham_str_eq_utf8>,
+			meta::static_fn<ham_str_eq_utf16>,
+			meta::static_fn<ham_str_eq_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto cstr_neq = utf_conditional_t<
 			Char,
-			static_fn<ham_str_neq_utf8>,
-			static_fn<ham_str_neq_utf16>,
-			static_fn<ham_str_neq_utf32>
+			meta::static_fn<ham_str_neq_utf8>,
+			meta::static_fn<ham_str_neq_utf16>,
+			meta::static_fn<ham_str_neq_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto cstr_next_codepoint = utf_conditional_t<
 			Char,
-			static_fn<ham_str_next_codepoint_utf8>,
-			static_fn<ham_str_next_codepoint_utf16>,
-			static_fn<ham_str_next_codepoint_utf32>
+			meta::static_fn<ham_str_next_codepoint_utf8>,
+			meta::static_fn<ham_str_next_codepoint_utf16>,
+			meta::static_fn<ham_str_next_codepoint_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto ccodepoint_num_chars = utf_conditional_t<
 			Char,
-			static_fn<ham_codepoint_num_chars_utf8>,
-			static_fn<ham_codepoint_num_chars_utf16>,
-			static_fn<ham_codepoint_num_chars_utf32>
+			meta::static_fn<ham_codepoint_num_chars_utf8>,
+			meta::static_fn<ham_codepoint_num_chars_utf16>,
+			meta::static_fn<ham_codepoint_num_chars_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto cstr_num_codepoints = utf_conditional_t<
 			Char,
-			static_fn<ham_str_num_codepoints_utf8>,
-			static_fn<ham_str_num_codepoints_utf16>,
-			static_fn<ham_str_num_codepoints_utf32>
+			meta::static_fn<ham_str_num_codepoints_utf8>,
+			meta::static_fn<ham_str_num_codepoints_utf16>,
+			meta::static_fn<ham_str_num_codepoints_utf32>
 		>{};
 
 		template<typename Char>
@@ -951,6 +968,8 @@ namespace ham{
 
 			constexpr basic_str &operator=(const basic_str&) noexcept = default;
 
+			constexpr const Char &operator[](usize idx) const noexcept{ return m_val.ptr[idx]; }
+
 			constexpr int compare(const basic_str &other) const noexcept{ return detail::cstr_cmp<Char>(m_val, other.m_val); }
 
 			constexpr bool operator==(const basic_str &other) const noexcept{ return detail::cstr_eq<Char> (m_val, other.m_val); }
@@ -1009,6 +1028,7 @@ namespace ham{
 				return basic_str(ptr() + actual_from, actual_len);
 			}
 
+		// breaks constexpr
 		//private:
 			ctype m_val;
 	};
@@ -1044,6 +1064,49 @@ namespace ham{
 	}
 
 	using namespace literals;
+
+	namespace meta{
+		// pretty much useless
+		template<unit Value> using constant_unit = constant_value<unit, Value>;
+
+		template<bool Value> using constant_bool = constant_value<bool, Value>;
+
+		template<i8  Value> using constant_i8  = constant_value<i8,  Value>;
+		template<u8  Value> using constant_u8  = constant_value<u8,  Value>;
+		template<i16 Value> using constant_i16 = constant_value<i16, Value>;
+		template<u16 Value> using constant_u16 = constant_value<u16, Value>;
+		template<i32 Value> using constant_i32 = constant_value<i32, Value>;
+		template<u32 Value> using constant_u32 = constant_value<u32, Value>;
+		template<i64 Value> using constant_i64 = constant_value<i64, Value>;
+		template<u64 Value> using constant_u64 = constant_value<u64, Value>;
+
+	#ifdef HAM_INT128
+		template<i128 Value> using constant_i128 = constant_value<i128, Value>;
+		template<u128 Value> using constant_u128 = constant_value<u128, Value>;
+	#endif
+
+		template<iptr Value> using constant_iptr = constant_value<iptr, Value>;
+		template<uptr Value> using constant_uptr = constant_value<uptr, Value>;
+
+		template<isize Value> using constant_isize = constant_value<isize, Value>;
+		template<usize Value> using constant_usize = constant_value<usize, Value>;
+
+	#ifdef HAM_FLOAT16
+		template<f16 Value> using constant_f16 = constant_value<f16, Value>;
+	#endif
+
+		template<f32 Value> using constant_f32 = constant_value<f32, Value>;
+		template<f64 Value> using constant_f64 = constant_value<f64, Value>;
+
+	#ifdef HAM_FLOAT128
+		template<f128 Value> using constant_f128 = constant_value<f128, Value>;
+	#endif
+
+		template<uuid  Value> using constant_uuid  = constant_value<uuid,  Value>;
+		template<str8  Value> using constant_str8  = constant_value<str8,  Value>;
+		template<str16 Value> using constant_str16 = constant_value<str16, Value>;
+		template<str32 Value> using constant_str32 = constant_value<str32, Value>;
+	}
 }
 
 template<typename Char>

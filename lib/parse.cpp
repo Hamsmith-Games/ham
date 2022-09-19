@@ -169,6 +169,13 @@ namespace ham{
 					HAM_CASE(HAM_EXPR_REF,        expr_ref_ctype_t<Char>)
 					HAM_CASE(HAM_EXPR_UNRESOLVED, expr_unresolved_ctype_t<Char>)
 
+					HAM_CASE(HAM_EXPR_FN,    expr_fn_ctype_t<Char>)
+					HAM_CASE(HAM_EXPR_CALL,  expr_call_ctype_t<Char>)
+					HAM_CASE(HAM_EXPR_BLOCK, expr_block_ctype_t<Char>)
+
+					HAM_CASE(HAM_EXPR_UNARY_OP, expr_unary_op_ctype_t<Char>)
+					HAM_CASE(HAM_EXPR_BINARY_OP, expr_binary_op_ctype_t<Char>)
+
 					case HAM_EXPR_LIT_INT:{
 						const auto int_expr = (expr_lit_int_ctype_t<Char>*)expr;
 						ham_aint_finish(&int_expr->value);
@@ -206,7 +213,7 @@ namespace ham{
 		static inline expr_base_ctype_t<Char> *impl_parse_context_new_expr(
 			basic_parse_context_view<Char> ctx,
 			expr_kind kind,
-			basic_token_range<Char> tokens
+			const basic_token_range<Char> &tokens
 		){
 			if(!ctx || static_cast<ham_expr_kind>(kind) >= HAM_EXPR_KIND_COUNT){
 				return nullptr;
@@ -225,6 +232,7 @@ namespace ham{
 						return nullptr; \
 					} \
 					ptr->super.kind = static_cast<ham_expr_kind>(kind); \
+					ptr->super.tokens = tokens; \
 					return &ptr->super; \
 					break; \
 				}
@@ -233,6 +241,13 @@ namespace ham{
 				HAM_CASE(expr_kind::binding,    expr_binding_ctype_t<Char>)
 				HAM_CASE(expr_kind::ref,        expr_ref_ctype_t<Char>)
 				HAM_CASE(expr_kind::unresolved, expr_unresolved_ctype_t<Char>)
+
+				HAM_CASE(expr_kind::fn,    expr_fn_ctype_t<Char>)
+				HAM_CASE(expr_kind::call,  expr_call_ctype_t<Char>)
+				HAM_CASE(expr_kind::block, expr_block_ctype_t<Char>)
+
+				HAM_CASE(expr_kind::unary_op,  expr_unary_op_ctype_t<Char>)
+				HAM_CASE(expr_kind::binary_op, expr_binary_op_ctype_t<Char>)
 
 				HAM_CASE(expr_kind::lit_int,  expr_lit_int_ctype_t<Char>)
 				HAM_CASE(expr_kind::lit_real, expr_lit_real_ctype_t<Char>)
@@ -247,8 +262,8 @@ namespace ham{
 		template<typename Char>
 		static inline const expr_error_ctype_t<Char> *impl_parse_context_new_error(
 			basic_parse_context_view<Char> ctx,
-			basic_token_range<Char> tokens,
-			basic_expr<Char, expr_kind::base> prev,
+			const basic_token_range<Char> &tokens,
+			const basic_expr<Char, expr_kind::base> &prev,
 			const char *fmt_str,
 			va_list va
 		){
@@ -281,10 +296,10 @@ namespace ham{
 		template<typename Char>
 		static inline const expr_binding_ctype_t<Char> *impl_parse_context_new_binding(
 			basic_parse_context_view<Char> ctx,
-			basic_token_range<Char> tokens,
-			basic_str<Char> name,
-			basic_expr<Char, expr_kind::base> type,
-			basic_expr<Char, expr_kind::base> value
+			const basic_token_range<Char> &tokens,
+			const basic_str<Char> &name,
+			const basic_expr<Char, expr_kind::base> &type,
+			const basic_expr<Char, expr_kind::base> &value
 		){
 			const auto new_expr = (expr_binding_ctype_t<Char>*)impl_parse_context_new_expr<Char>(ctx, expr_kind::binding, tokens);
 			if(!new_expr) return nullptr;
@@ -298,8 +313,8 @@ namespace ham{
 		template<typename Char>
 		static inline const expr_ref_ctype_t<Char> *impl_parse_context_new_ref(
 			basic_parse_context_view<Char> ctx,
-			basic_token_range<Char> tokens,
-			basic_expr<Char, expr_kind::binding> refed
+			const basic_token_range<Char> &tokens,
+			const basic_expr<Char, expr_kind::binding> &refed
 		){
 			const auto new_expr = (expr_ref_ctype_t<Char>*)impl_parse_context_new_expr<Char>(ctx, expr_kind::ref, tokens);
 			if(!new_expr) return nullptr;
@@ -311,8 +326,8 @@ namespace ham{
 		template<typename Char>
 		static inline const expr_unresolved_ctype_t<Char> *impl_parse_context_new_unresolved(
 			basic_parse_context_view<Char> ctx,
-			basic_token_range<Char> tokens,
-			basic_str<Char> id
+			const basic_token_range<Char> &tokens,
+			const basic_str<Char> &id
 		){
 			const auto new_expr = (expr_unresolved_ctype_t<Char>*)impl_parse_context_new_expr<Char>(ctx, expr_kind::unresolved, tokens);
 			if(!new_expr) return nullptr;
@@ -322,10 +337,42 @@ namespace ham{
 		}
 
 		template<typename Char>
+		static inline const expr_unary_op_ctype_t<Char> *impl_parse_context_new_unary_op(
+			basic_parse_context_view<Char> ctx,
+			const basic_token_range<Char> &tokens,
+			const basic_str<Char> &op,
+			const basic_expr<Char> &expr
+		){
+			const auto new_expr = (expr_unary_op_ctype_t<Char>*)impl_parse_context_new_expr<Char>(ctx, expr_kind::unary_op, tokens);
+			if(!new_expr) return nullptr;
+
+			new_expr->op = op;
+			new_expr->expr = expr;
+			return new_expr;
+		}
+
+		template<typename Char>
+		static inline const expr_binary_op_ctype_t<Char> *impl_parse_context_new_binary_op(
+			basic_parse_context_view<Char> ctx,
+			const basic_token_range<Char> &tokens,
+			const basic_str<Char> &op,
+			const basic_expr<Char> &lhs,
+			const basic_expr<Char> &rhs
+		){
+			const auto new_expr = (expr_binary_op_ctype_t<Char>*)impl_parse_context_new_expr<Char>(ctx, expr_kind::binary_op, tokens);
+			if(!new_expr) return nullptr;
+
+			new_expr->op = op;
+			new_expr->lhs = lhs;
+			new_expr->rhs = rhs;
+			return new_expr;
+		}
+
+		template<typename Char>
 		static inline const expr_lit_int_ctype_t<Char> *impl_parse_context_new_lit_int(
 			basic_parse_context_view<Char> ctx,
-			basic_token_range<Char> tokens,
-			basic_str<Char> value
+			const basic_token_range<Char> &tokens,
+			const basic_str<Char> &value
 		){
 			const auto new_expr = (expr_lit_int_ctype_t<Char>*)impl_parse_context_new_expr<Char>(ctx, expr_kind::lit_int, tokens);
 			if(!new_expr) return nullptr;
@@ -401,6 +448,14 @@ namespace ham{
 				if(!resolved){
 					return nullptr;
 				}
+			}
+
+			if(tail.begin() == tail.end()) return resolved;
+
+			auto toks_it = tail.begin();
+			if(toks_it->str()[0] == Char('(')){
+				// TODO: implement function definitions
+				return scope.context().new_error(basic_token_range{ head.cptr(), tail.end() }, resolved, "Function definitions unimplemented");
 			}
 
 			return impl_parse_leading(scope, resolved, tail);
@@ -506,7 +561,7 @@ namespace ham{
 				return scope.context().new_error(basic_token_range{ head, tail.end() }, lhs_expr, "Error parsing right hand side of binary operator expression.");
 			}
 
-			return scope.context().new_error(basic_token_range{ head, tail.end() }, lhs_expr, "Binary operators not implemented.");
+			return scope.context().new_binary_op(basic_token_range{ head, rhs_expr.tokens().end() }, head->str(), lhs_expr, rhs_expr);
 		}
 
 		template<typename Char>
@@ -554,7 +609,7 @@ namespace ham{
 			const auto toks_end = tail.end();
 			auto tok_it = toks_beg;
 
-			if(tok_it == toks_end || head->kind() == token_kind::eof) return {};
+			if(!head || tok_it == toks_end || head->kind() == token_kind::eof) return {};
 
 			basic_str<Char> indent_str;
 
@@ -795,6 +850,26 @@ const ham_expr_ref_utf32 *ham_parse_context_new_ref_utf32(ham_parse_context_utf3
 const ham_expr_unresolved_utf8  *ham_parse_context_new_unresolved_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_str8  id){ return ham::detail::impl_parse_context_new_unresolved<char8> (ctx, tokens, id); }
 const ham_expr_unresolved_utf16 *ham_parse_context_new_unresolved_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_str16 id){ return ham::detail::impl_parse_context_new_unresolved<char16>(ctx, tokens, id); }
 const ham_expr_unresolved_utf32 *ham_parse_context_new_unresolved_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_str32 id){ return ham::detail::impl_parse_context_new_unresolved<char32>(ctx, tokens, id); }
+
+// unary ops
+
+const ham_expr_unary_op_utf8  *ham_parse_context_new_unary_op_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_str8  op, const ham_expr_base_utf8  *expr){ return ham::detail::impl_parse_context_new_unary_op<char8> (ctx, tokens, op, expr); }
+const ham_expr_unary_op_utf16 *ham_parse_context_new_unary_op_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_str16 op, const ham_expr_base_utf16 *expr){ return ham::detail::impl_parse_context_new_unary_op<char16>(ctx, tokens, op, expr); }
+const ham_expr_unary_op_utf32 *ham_parse_context_new_unary_op_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_str32 op, const ham_expr_base_utf32 *expr){ return ham::detail::impl_parse_context_new_unary_op<char32>(ctx, tokens, op, expr); }
+
+// binary ops
+
+const ham_expr_binary_op_utf8 *ham_parse_context_new_binary_op_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_str8 op, const ham_expr_base_utf8 *lhs, const ham_expr_base_utf8 *rhs){
+	return ham::detail::impl_parse_context_new_binary_op<char8> (ctx, tokens, op, lhs, rhs);
+}
+
+const ham_expr_binary_op_utf16 *ham_parse_context_new_binary_op_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_str16 op, const ham_expr_base_utf16 *lhs, const ham_expr_base_utf16 *rhs){
+	return ham::detail::impl_parse_context_new_binary_op<char16>(ctx, tokens, op, lhs, rhs);
+}
+
+const ham_expr_binary_op_utf32 *ham_parse_context_new_binary_op_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_str32 op, const ham_expr_base_utf32 *lhs, const ham_expr_base_utf32 *rhs){
+	return ham::detail::impl_parse_context_new_binary_op<char32>(ctx, tokens, op, lhs, rhs);
+}
 
 // literal ints
 

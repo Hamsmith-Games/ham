@@ -128,6 +128,8 @@ HAM_C_API_END
 
 #ifdef __cplusplus
 
+#include "std_vector.hpp"
+
 namespace ham{
 	namespace detail{
 		template<typename Char>
@@ -379,6 +381,8 @@ namespace ham{
 				: m_val{ .ptr = ptr_ }{}
 
 			constexpr basic_token_iterator(const basic_token_iterator&) noexcept = default;
+
+			constexpr explicit operator bool() const noexcept{ return m_val.cptr != nullptr; }
 
 			constexpr basic_token_iterator &operator=(const basic_token_iterator&) noexcept = default;
 
@@ -752,6 +756,37 @@ namespace ham{
 	template<typename Char>
 	constexpr bool lex(basic_source_location<Char> &loc, const basic_str<Char> &str, basic_token<Char> &ret) noexcept{
 		return detail::constexpr_lex_utf<Char>(&((detail::csource_location_t<Char>&)loc), str, &(detail::ctoken_t<Char>&)ret);
+	}
+
+	template<typename Char>
+	std_vector<basic_token<Char>> lex_all(basic_source_location<Char> &loc, const basic_str<Char> &str){
+		std_vector<basic_token<Char>> ret;
+		ret.reserve(16);
+
+		basic_token<Char> tok;
+
+		basic_str<Char> rem = str;
+
+		while(lex(loc, rem, tok)){
+			if(tok.is_eof()) break;
+
+			const auto tok_str = tok.str();
+
+			ret.emplace_back(tok);
+			rem = basic_str<Char>(rem.ptr() + tok_str.len(), rem.len() - tok_str.len());
+		}
+
+		if(tok.is_error()){
+			ret.emplace_back(tok);
+		}
+
+		return ret;
+	}
+
+	template<typename Char>
+	std_vector<basic_token<Char>> lex_all(const basic_str<Char> &str){
+		basic_source_location<Char> loc(0, 0);
+		return lex_all(loc, str);
 	}
 }
 

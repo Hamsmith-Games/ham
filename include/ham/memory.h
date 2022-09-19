@@ -29,6 +29,8 @@
 
 HAM_C_API_BEGIN
 
+ham_api ham_usize ham_get_page_size();
+
 typedef void*(*ham_alloc_fn)(ham_usize alignment, ham_usize size, void *user);
 typedef void(*ham_free_fn)(void *mem, void *user);
 

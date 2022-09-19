@@ -70,6 +70,14 @@ typedef struct ham_expr_block_utf8  ham_expr_block_utf8;
 typedef struct ham_expr_block_utf16 ham_expr_block_utf16;
 typedef struct ham_expr_block_utf32 ham_expr_block_utf32;
 
+typedef struct ham_expr_unary_op_utf8  ham_expr_unary_op_utf8;
+typedef struct ham_expr_unary_op_utf16 ham_expr_unary_op_utf16;
+typedef struct ham_expr_unary_op_utf32 ham_expr_unary_op_utf32;
+
+typedef struct ham_expr_binary_op_utf8  ham_expr_binary_op_utf8;
+typedef struct ham_expr_binary_op_utf16 ham_expr_binary_op_utf16;
+typedef struct ham_expr_binary_op_utf32 ham_expr_binary_op_utf32;
+
 typedef struct ham_expr_lit_int_utf8  ham_expr_lit_int_utf8;
 typedef struct ham_expr_lit_int_utf16 ham_expr_lit_int_utf16;
 typedef struct ham_expr_lit_int_utf32 ham_expr_lit_int_utf32;
@@ -90,6 +98,9 @@ typedef enum ham_expr_kind{
 	HAM_EXPR_FN,
 	HAM_EXPR_CALL,
 	HAM_EXPR_BLOCK,
+
+	HAM_EXPR_UNARY_OP,
+	HAM_EXPR_BINARY_OP,
 
 	HAM_EXPR_LIT_INT,
 	HAM_EXPR_LIT_REAL,
@@ -132,12 +143,12 @@ typedef enum ham_expr_kind{
 	HAM_EXPR_UTF(n, base) super; \
 	ham_usize num_params; \
 	const HAM_EXPR_UTF(n, base) *const *params; \
-	const HAM_EXPR_UTF(n, base) return_type; \
-	const HAM_EXPR_UTF(n, base) body;
+	const HAM_EXPR_UTF(n, base) *return_type; \
+	const HAM_EXPR_UTF(n, base) *body;
 
 #define HAM_IMPL_EXPR_CALL_MEMBERS_UTF(n) \
 	HAM_EXPR_UTF(n, base) super; \
-	const HAM_EXPR_UTF(n, base) fn; \
+	const HAM_EXPR_UTF(n, base) *fn; \
 	ham_usize num_args; \
 	const HAM_EXPR_UTF(n, base) *const *args;
 
@@ -145,6 +156,16 @@ typedef enum ham_expr_kind{
 	HAM_EXPR_UTF(n, base) super; \
 	ham_usize num_exprs; \
 	const HAM_EXPR_UTF(n, base) *const *exprs;
+
+#define HAM_IMPL_EXPR_UNARY_OP_MEMBERS_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	HAM_STR_UTF(n) op; \
+	const HAM_EXPR_UTF(n, base) *expr;
+
+#define HAM_IMPL_EXPR_BINARY_OP_MEMBERS_UTF(n) \
+	HAM_EXPR_UTF(n, base) super; \
+	HAM_STR_UTF(n) op; \
+	const HAM_EXPR_UTF(n, base) *lhs, *rhs;
 
 #define HAM_IMPL_EXPR_LIT_INT_UTF(n) \
 	HAM_EXPR_UTF(n, base) super; \
@@ -194,6 +215,18 @@ struct ham_expr_fn_utf32{ HAM_IMPL_EXPR_FN_MEMBERS_UTF(32) };
 struct ham_expr_call_utf8 { HAM_IMPL_EXPR_CALL_MEMBERS_UTF(8)  };
 struct ham_expr_call_utf16{ HAM_IMPL_EXPR_CALL_MEMBERS_UTF(16) };
 struct ham_expr_call_utf32{ HAM_IMPL_EXPR_CALL_MEMBERS_UTF(32) };
+
+struct ham_expr_block_utf8 { HAM_IMPL_EXPR_BLOCK_MEMBERS_UTF(8)  };
+struct ham_expr_block_utf16{ HAM_IMPL_EXPR_BLOCK_MEMBERS_UTF(16) };
+struct ham_expr_block_utf32{ HAM_IMPL_EXPR_BLOCK_MEMBERS_UTF(32) };
+
+struct ham_expr_unary_op_utf8 { HAM_IMPL_EXPR_UNARY_OP_MEMBERS_UTF(8)  };
+struct ham_expr_unary_op_utf16{ HAM_IMPL_EXPR_UNARY_OP_MEMBERS_UTF(16) };
+struct ham_expr_unary_op_utf32{ HAM_IMPL_EXPR_UNARY_OP_MEMBERS_UTF(32) };
+
+struct ham_expr_binary_op_utf8 { HAM_IMPL_EXPR_BINARY_OP_MEMBERS_UTF(8)  };
+struct ham_expr_binary_op_utf16{ HAM_IMPL_EXPR_BINARY_OP_MEMBERS_UTF(16) };
+struct ham_expr_binary_op_utf32{ HAM_IMPL_EXPR_BINARY_OP_MEMBERS_UTF(32) };
 
 struct ham_expr_lit_int_utf8 { HAM_IMPL_EXPR_LIT_INT_UTF(8)  };
 struct ham_expr_lit_int_utf16{ HAM_IMPL_EXPR_LIT_INT_UTF(16) };
@@ -327,6 +360,18 @@ ham_api const ham_expr_block_utf32 *ham_parse_context_new_block_utf32(ham_parse_
 
 #define HAM_PARSE_CONTEXT_NEW_BLOCK_UTF(n) HAM_CONCAT(ham_parse_context_new_block_utf, n)
 
+ham_api const ham_expr_unary_op_utf8  *ham_parse_context_new_unary_op_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_str8  op, const ham_expr_base_utf8  *expr);
+ham_api const ham_expr_unary_op_utf16 *ham_parse_context_new_unary_op_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_str16 op, const ham_expr_base_utf16 *expr);
+ham_api const ham_expr_unary_op_utf32 *ham_parse_context_new_unary_op_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_str32 op, const ham_expr_base_utf32 *expr);
+
+#define HAM_PARSE_CONTEXT_NEW_UNARY_OP_UTF(n) HAM_CONCAT(ham_parse_context_new_unary_op_utf, n)
+
+ham_api const ham_expr_binary_op_utf8  *ham_parse_context_new_binary_op_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_str8  op, const ham_expr_base_utf8  *lhs, const ham_expr_base_utf8  *rhs);
+ham_api const ham_expr_binary_op_utf16 *ham_parse_context_new_binary_op_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_str16 op, const ham_expr_base_utf16 *lhs, const ham_expr_base_utf16 *rhs);
+ham_api const ham_expr_binary_op_utf32 *ham_parse_context_new_binary_op_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_str32 op, const ham_expr_base_utf32 *lhs, const ham_expr_base_utf32 *rhs);
+
+#define HAM_PARSE_CONTEXT_NEW_BINARY_OP_UTF(n) HAM_CONCAT(ham_parse_context_new_binary_op_utf, n)
+
 ham_api const ham_expr_lit_int_utf8  *ham_parse_context_new_lit_int_utf8 (ham_parse_context_utf8  *ctx, ham_token_range_utf8  tokens, ham_str8  val);
 ham_api const ham_expr_lit_int_utf16 *ham_parse_context_new_lit_int_utf16(ham_parse_context_utf16 *ctx, ham_token_range_utf16 tokens, ham_str16 val);
 ham_api const ham_expr_lit_int_utf32 *ham_parse_context_new_lit_int_utf32(ham_parse_context_utf32 *ctx, ham_token_range_utf32 tokens, ham_str32 val);
@@ -370,6 +415,9 @@ typedef HAM_EXPR_UTF(HAM_UTF, unresolved) ham_expr_unresolved;
 typedef HAM_EXPR_UTF(HAM_UTF, fn)         ham_expr_fn;
 typedef HAM_EXPR_UTF(HAM_UTF, call)       ham_expr_call;
 typedef HAM_EXPR_UTF(HAM_UTF, block)      ham_expr_block;
+
+typedef HAM_EXPR_UTF(HAM_UTF, unary_op)  ham_expr_unary_op;
+typedef HAM_EXPR_UTF(HAM_UTF, binary_op) ham_expr_binary_op;
 
 typedef HAM_EXPR_UTF(HAM_UTF, lit_int)    ham_expr_lit_int;
 typedef HAM_EXPR_UTF(HAM_UTF, lit_real)   ham_expr_lit_real;
@@ -415,12 +463,39 @@ namespace ham{
 		call       = HAM_EXPR_CALL,
 		block      = HAM_EXPR_BLOCK,
 
+		unary_op  = HAM_EXPR_UNARY_OP,
+		binary_op = HAM_EXPR_BINARY_OP,
+
 		lit_int  = HAM_EXPR_LIT_INT,
 		lit_real = HAM_EXPR_LIT_REAL,
 		lit_str  = HAM_EXPR_LIT_STR,
 
 		base, // special c++ only kind
 	};
+
+	constexpr str8 expr_kind_str8(expr_kind kind){
+		switch(kind){
+		#define HAM_CASE(kind_) case (kind_): return #kind_;
+
+			HAM_CASE(expr_kind::error)
+			HAM_CASE(expr_kind::binding)
+			HAM_CASE(expr_kind::ref)
+			HAM_CASE(expr_kind::unresolved)
+			HAM_CASE(expr_kind::fn)
+			HAM_CASE(expr_kind::call)
+			HAM_CASE(expr_kind::block)
+
+			HAM_CASE(expr_kind::unary_op)
+			HAM_CASE(expr_kind::binary_op)
+
+			HAM_CASE(expr_kind::lit_int)
+			HAM_CASE(expr_kind::lit_real)
+			HAM_CASE(expr_kind::lit_str)
+
+		#undef HAM_CASE
+			default: return "unknown";
+		}
+	}
 
 	template<typename Char, bool Mutable = true>
 	class basic_parse_context_view;
@@ -440,7 +515,7 @@ namespace ham{
 	template<typename Char, bool Mutable = false>
 	class basic_expr_range;
 
-	template<typename Char, expr_kind Kind, bool Mutable = false>
+	template<typename Char, expr_kind Kind = expr_kind::base, bool Mutable = false>
 	class basic_expr;
 
 	//! @cond ignore
@@ -518,6 +593,30 @@ namespace ham{
 		>;
 
 		template<typename Char>
+		using expr_block_ctype_t = utf_conditional_t<
+			Char,
+			ham_expr_block_utf8,
+			ham_expr_block_utf16,
+			ham_expr_block_utf32
+		>;
+
+		template<typename Char>
+		using expr_unary_op_ctype_t = utf_conditional_t<
+			Char,
+			ham_expr_unary_op_utf8,
+			ham_expr_unary_op_utf16,
+			ham_expr_unary_op_utf32
+		>;
+
+		template<typename Char>
+		using expr_binary_op_ctype_t = utf_conditional_t<
+			Char,
+			ham_expr_binary_op_utf8,
+			ham_expr_binary_op_utf16,
+			ham_expr_binary_op_utf32
+		>;
+
+		template<typename Char>
 		using expr_lit_int_ctype_t = utf_conditional_t<
 			Char,
 			ham_expr_lit_int_utf8,
@@ -548,6 +647,13 @@ namespace ham{
 		template<typename Char> struct expr_type_from_kind<Char, expr_kind::ref>:        id<expr_ref_ctype_t<Char>>{};
 		template<typename Char> struct expr_type_from_kind<Char, expr_kind::unresolved>: id<expr_unresolved_ctype_t<Char>>{};
 
+		template<typename Char> struct expr_type_from_kind<Char, expr_kind::fn>:    id<expr_fn_ctype_t<Char>>{};
+		template<typename Char> struct expr_type_from_kind<Char, expr_kind::call>:  id<expr_call_ctype_t<Char>>{};
+		template<typename Char> struct expr_type_from_kind<Char, expr_kind::block>: id<expr_block_ctype_t<Char>>{};
+
+		template<typename Char> struct expr_type_from_kind<Char, expr_kind::unary_op>:  id<expr_unary_op_ctype_t<Char>>{};
+		template<typename Char> struct expr_type_from_kind<Char, expr_kind::binary_op>: id<expr_binary_op_ctype_t<Char>>{};
+
 		template<typename Char> struct expr_type_from_kind<Char, expr_kind::lit_int>:  id<expr_lit_int_ctype_t<Char>>{};
 		template<typename Char> struct expr_type_from_kind<Char, expr_kind::lit_real>: id<expr_lit_real_ctype_t<Char>>{};
 		template<typename Char> struct expr_type_from_kind<Char, expr_kind::lit_str>:  id<expr_lit_str_ctype_t<Char>>{};
@@ -562,105 +668,121 @@ namespace ham{
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_create = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_create_utf8>,
-			static_fn<ham_parse_context_create_utf16>,
-			static_fn<ham_parse_context_create_utf32>
+			meta::static_fn<ham_parse_context_create_utf8>,
+			meta::static_fn<ham_parse_context_create_utf16>,
+			meta::static_fn<ham_parse_context_create_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_destroy = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_destroy_utf8>,
-			static_fn<ham_parse_context_destroy_utf16>,
-			static_fn<ham_parse_context_destroy_utf32>
+			meta::static_fn<ham_parse_context_destroy_utf8>,
+			meta::static_fn<ham_parse_context_destroy_utf16>,
+			meta::static_fn<ham_parse_context_destroy_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_expr = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_new_expr_utf8>,
-			static_fn<ham_parse_context_new_expr_utf16>,
-			static_fn<ham_parse_context_new_expr_utf32>
+			meta::static_fn<ham_parse_context_new_expr_utf8>,
+			meta::static_fn<ham_parse_context_new_expr_utf16>,
+			meta::static_fn<ham_parse_context_new_expr_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_error = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_new_error_utf8>,
-			static_fn<ham_parse_context_new_error_utf16>,
-			static_fn<ham_parse_context_new_error_utf32>
+			meta::static_fn<ham_parse_context_new_error_utf8>,
+			meta::static_fn<ham_parse_context_new_error_utf16>,
+			meta::static_fn<ham_parse_context_new_error_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_binding = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_new_binding_utf8>,
-			static_fn<ham_parse_context_new_binding_utf16>,
-			static_fn<ham_parse_context_new_binding_utf32>
+			meta::static_fn<ham_parse_context_new_binding_utf8>,
+			meta::static_fn<ham_parse_context_new_binding_utf16>,
+			meta::static_fn<ham_parse_context_new_binding_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_ref = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_new_ref_utf8>,
-			static_fn<ham_parse_context_new_ref_utf16>,
-			static_fn<ham_parse_context_new_ref_utf32>
+			meta::static_fn<ham_parse_context_new_ref_utf8>,
+			meta::static_fn<ham_parse_context_new_ref_utf16>,
+			meta::static_fn<ham_parse_context_new_ref_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_unresolved = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_new_unresolved_utf8>,
-			static_fn<ham_parse_context_new_unresolved_utf16>,
-			static_fn<ham_parse_context_new_unresolved_utf32>
+			meta::static_fn<ham_parse_context_new_unresolved_utf8>,
+			meta::static_fn<ham_parse_context_new_unresolved_utf16>,
+			meta::static_fn<ham_parse_context_new_unresolved_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_fn = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_new_fn_utf8>,
-			static_fn<ham_parse_context_new_fn_utf16>,
-			static_fn<ham_parse_context_new_fn_utf32>
+			meta::static_fn<ham_parse_context_new_fn_utf8>,
+			meta::static_fn<ham_parse_context_new_fn_utf16>,
+			meta::static_fn<ham_parse_context_new_fn_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_call = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_new_call_utf8>,
-			static_fn<ham_parse_context_new_call_utf16>,
-			static_fn<ham_parse_context_new_call_utf32>
+			meta::static_fn<ham_parse_context_new_call_utf8>,
+			meta::static_fn<ham_parse_context_new_call_utf16>,
+			meta::static_fn<ham_parse_context_new_call_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_block = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_new_block_utf8>,
-			static_fn<ham_parse_context_new_block_utf16>,
-			static_fn<ham_parse_context_new_block_utf32>
+			meta::static_fn<ham_parse_context_new_block_utf8>,
+			meta::static_fn<ham_parse_context_new_block_utf16>,
+			meta::static_fn<ham_parse_context_new_block_utf32>
+		>{};
+
+		template<typename Char>
+		constexpr inline auto parse_context_ctype_new_unary_op = utf_conditional_t<
+			Char,
+			meta::static_fn<ham_parse_context_new_unary_op_utf8>,
+			meta::static_fn<ham_parse_context_new_unary_op_utf16>,
+			meta::static_fn<ham_parse_context_new_unary_op_utf32>
+		>{};
+
+		template<typename Char>
+		constexpr inline auto parse_context_ctype_new_binary_op = utf_conditional_t<
+			Char,
+			meta::static_fn<ham_parse_context_new_binary_op_utf8>,
+			meta::static_fn<ham_parse_context_new_binary_op_utf16>,
+			meta::static_fn<ham_parse_context_new_binary_op_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_lit_int = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_new_lit_int_utf8>,
-			static_fn<ham_parse_context_new_lit_int_utf16>,
-			static_fn<ham_parse_context_new_lit_int_utf32>
+			meta::static_fn<ham_parse_context_new_lit_int_utf8>,
+			meta::static_fn<ham_parse_context_new_lit_int_utf16>,
+			meta::static_fn<ham_parse_context_new_lit_int_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_lit_real = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_new_lit_real_utf8>,
-			static_fn<ham_parse_context_new_lit_real_utf16>,
-			static_fn<ham_parse_context_new_lit_real_utf32>
+			meta::static_fn<ham_parse_context_new_lit_real_utf8>,
+			meta::static_fn<ham_parse_context_new_lit_real_utf16>,
+			meta::static_fn<ham_parse_context_new_lit_real_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_context_ctype_new_lit_str = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_context_new_lit_str_utf8>,
-			static_fn<ham_parse_context_new_lit_str_utf16>,
-			static_fn<ham_parse_context_new_lit_str_utf32>
+			meta::static_fn<ham_parse_context_new_lit_str_utf8>,
+			meta::static_fn<ham_parse_context_new_lit_str_utf16>,
+			meta::static_fn<ham_parse_context_new_lit_str_utf32>
 		>{};
 
 		//
@@ -670,65 +792,65 @@ namespace ham{
 		template<typename Char>
 		constexpr inline auto parse_scope_ctype_create = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_scope_create_utf8>,
-			static_fn<ham_parse_scope_create_utf16>,
-			static_fn<ham_parse_scope_create_utf32>
+			meta::static_fn<ham_parse_scope_create_utf8>,
+			meta::static_fn<ham_parse_scope_create_utf16>,
+			meta::static_fn<ham_parse_scope_create_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_scope_ctype_destroy = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_scope_destroy_utf8>,
-			static_fn<ham_parse_scope_destroy_utf16>,
-			static_fn<ham_parse_scope_destroy_utf32>
+			meta::static_fn<ham_parse_scope_destroy_utf8>,
+			meta::static_fn<ham_parse_scope_destroy_utf16>,
+			meta::static_fn<ham_parse_scope_destroy_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_scope_ctype_parent = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_scope_parent_utf8>,
-			static_fn<ham_parse_scope_parent_utf16>,
-			static_fn<ham_parse_scope_parent_utf32>
+			meta::static_fn<ham_parse_scope_parent_utf8>,
+			meta::static_fn<ham_parse_scope_parent_utf16>,
+			meta::static_fn<ham_parse_scope_parent_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_scope_ctype_context = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_scope_context_utf8>,
-			static_fn<ham_parse_scope_context_utf16>,
-			static_fn<ham_parse_scope_context_utf32>
+			meta::static_fn<ham_parse_scope_context_utf8>,
+			meta::static_fn<ham_parse_scope_context_utf16>,
+			meta::static_fn<ham_parse_scope_context_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_scope_ctype_get_indent = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_scope_get_indent_utf8>,
-			static_fn<ham_parse_scope_get_indent_utf16>,
-			static_fn<ham_parse_scope_get_indent_utf32>
+			meta::static_fn<ham_parse_scope_get_indent_utf8>,
+			meta::static_fn<ham_parse_scope_get_indent_utf16>,
+			meta::static_fn<ham_parse_scope_get_indent_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_scope_ctype_set_indent = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_scope_set_indent_utf8>,
-			static_fn<ham_parse_scope_set_indent_utf16>,
-			static_fn<ham_parse_scope_set_indent_utf32>
+			meta::static_fn<ham_parse_scope_set_indent_utf8>,
+			meta::static_fn<ham_parse_scope_set_indent_utf16>,
+			meta::static_fn<ham_parse_scope_set_indent_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_scope_ctype_bind = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_scope_bind_utf8>,
-			static_fn<ham_parse_scope_bind_utf16>,
-			static_fn<ham_parse_scope_bind_utf32>
+			meta::static_fn<ham_parse_scope_bind_utf8>,
+			meta::static_fn<ham_parse_scope_bind_utf16>,
+			meta::static_fn<ham_parse_scope_bind_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto parse_scope_ctype_resolve = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_scope_resolve_utf8>,
-			static_fn<ham_parse_scope_resolve_utf16>,
-			static_fn<ham_parse_scope_resolve_utf32>
+			meta::static_fn<ham_parse_scope_resolve_utf8>,
+			meta::static_fn<ham_parse_scope_resolve_utf16>,
+			meta::static_fn<ham_parse_scope_resolve_utf32>
 		>{};
 	} // namespace detail
 	//! @endcond
@@ -816,6 +938,20 @@ namespace ham{
 					-> std::enable_if_t<Enable, expr_type<expr_kind::block>>
 			{
 				return detail::parse_context_ctype_new_call<Char>(handle(), tokens, exprs.size(), exprs.begin());
+			}
+
+			template<bool Enable = Mutable>
+			auto new_unary_op(const token_range_type &tokens, const str_type &op, const expr_type<> &expr)
+					-> std::enable_if_t<Enable, expr_type<expr_kind::unary_op>>
+			{
+				return detail::parse_context_ctype_new_unary_op<Char>(handle(), tokens, op, expr);
+			}
+
+			template<bool Enable = Mutable>
+			auto new_binary_op(const token_range_type &tokens, const str_type &op, const expr_type<> &lhs, const expr_type<> &rhs)
+					-> std::enable_if_t<Enable, expr_type<expr_kind::binary_op>>
+			{
+				return detail::parse_context_ctype_new_binary_op<Char>(handle(), tokens, op, lhs, rhs);
 			}
 
 			template<bool Enable = Mutable>
@@ -932,6 +1068,14 @@ namespace ham{
 
 			expr_type<expr_kind::block> new_block(const token_range_type &tokens, const expr_range_type<> &exprs){
 				return detail::parse_context_ctype_new_block<Char>(handle(), tokens, exprs.size(), exprs.begin());
+			}
+
+			expr_type<expr_kind::unary_op> new_unary_op(const token_range_type &tokens, const str_type &op, const expr_type<> &expr){
+				return detail::parse_context_ctype_new_unary_op<Char>(handle(), tokens, op, expr);
+			}
+
+			expr_type<expr_kind::binary_op> new_binary_op(const token_range_type &tokens, const str_type &op, const expr_type<> &lhs, const expr_type<> &rhs){
+				return detail::parse_context_ctype_new_binary_op<Char>(handle(), tokens, op, lhs, rhs);
 			}
 
 			expr_type<expr_kind::lit_int> new_lit_int(const token_range_type &tokens, const str_type &val){
@@ -1250,6 +1394,10 @@ namespace ham{
 			bool is_unresolved() const noexcept{ return is_of_kind(expr_kind::unresolved); }
 			bool is_fn()         const noexcept{ return is_of_kind(expr_kind::fn); }
 			bool is_call()       const noexcept{ return is_of_kind(expr_kind::call); }
+			bool is_block()      const noexcept{ return is_of_kind(expr_kind::block); }
+
+			bool is_unary_op()   const noexcept{ return is_of_kind(expr_kind::unary_op); }
+			bool is_binary_op()  const noexcept{ return is_of_kind(expr_kind::binary_op); }
 
 			bool is_lit_int()  const noexcept{ return is_of_kind(expr_kind::lit_int); }
 			bool is_lit_real() const noexcept{ return is_of_kind(expr_kind::lit_real); }
@@ -1278,6 +1426,12 @@ namespace ham{
 	using expr_binding_utf8    = expr_utf8<expr_kind::binding>;
 	using expr_ref_utf8        = expr_utf8<expr_kind::ref>;
 	using expr_unresolved_utf8 = expr_utf8<expr_kind::unresolved>;
+	using expr_fn_utf8         = expr_utf8<expr_kind::fn>;
+	using expr_call_utf8       = expr_utf8<expr_kind::call>;
+	using expr_block_utf8      = expr_utf8<expr_kind::block>;
+
+	using expr_unary_op_utf8  = expr_utf8<expr_kind::unary_op>;
+	using expr_binary_op_utf8 = expr_utf8<expr_kind::binary_op>;
 
 	using expr_lit_int_utf8  = expr_utf8<expr_kind::lit_int>;
 	using expr_lit_real_utf8 = expr_utf8<expr_kind::lit_real>;
@@ -1291,6 +1445,12 @@ namespace ham{
 	using expr_binding_utf16    = expr_utf16<expr_kind::binding>;
 	using expr_ref_utf16        = expr_utf16<expr_kind::ref>;
 	using expr_unresolved_utf16 = expr_utf16<expr_kind::unresolved>;
+	using expr_fn_utf16         = expr_utf16<expr_kind::fn>;
+	using expr_call_utf16       = expr_utf16<expr_kind::call>;
+	using expr_block_utf16      = expr_utf16<expr_kind::block>;
+
+	using expr_unary_op_utf16  = expr_utf16<expr_kind::unary_op>;
+	using expr_binary_op_utf16 = expr_utf16<expr_kind::binary_op>;
 
 	using expr_lit_int_utf16  = expr_utf16<expr_kind::lit_int>;
 	using expr_lit_real_utf16 = expr_utf16<expr_kind::lit_real>;
@@ -1304,6 +1464,12 @@ namespace ham{
 	using expr_binding_utf32    = expr_utf32<expr_kind::binding>;
 	using expr_ref_utf32        = expr_utf32<expr_kind::ref>;
 	using expr_unresolved_utf32 = expr_utf32<expr_kind::unresolved>;
+	using expr_fn_utf32         = expr_utf32<expr_kind::fn>;
+	using expr_call_utf32       = expr_utf32<expr_kind::call>;
+	using expr_block_utf32      = expr_utf32<expr_kind::block>;
+
+	using expr_unary_op_utf32  = expr_utf32<expr_kind::unary_op>;
+	using expr_binary_op_utf32 = expr_utf32<expr_kind::binary_op>;
 
 	using expr_lit_int_utf32  = expr_utf32<expr_kind::lit_int>;
 	using expr_lit_real_utf32 = expr_utf32<expr_kind::lit_real>;
@@ -1317,6 +1483,12 @@ namespace ham{
 	using expr_binding    = expr<expr_kind::binding>;
 	using expr_ref        = expr<expr_kind::ref>;
 	using expr_unresolved = expr<expr_kind::unresolved>;
+	using expr_fn         = expr<expr_kind::fn>;
+	using expr_call       = expr<expr_kind::call>;
+	using expr_block      = expr<expr_kind::block>;
+
+	using expr_unary_op  = expr<expr_kind::unary_op>;
+	using expr_binary_op = expr<expr_kind::binary_op>;
 
 	using expr_lit_int  = expr<expr_kind::lit_int>;
 	using expr_lit_real = expr<expr_kind::lit_real>;
@@ -1327,9 +1499,9 @@ namespace ham{
 		template<typename Char>
 		constexpr inline auto cparse = utf_conditional_t<
 			Char,
-			static_fn<ham_parse_utf8>,
-			static_fn<ham_parse_utf16>,
-			static_fn<ham_parse_utf32>
+			meta::static_fn<ham_parse_utf8>,
+			meta::static_fn<ham_parse_utf16>,
+			meta::static_fn<ham_parse_utf32>
 		>{};
 	}
 	//! @endcond

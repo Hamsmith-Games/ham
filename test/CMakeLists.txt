@@ -16,6 +16,14 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-add_executable(ham-test main.cpp)
+add_executable(
+	ham-test
+	tests.hpp
+	test-meta.cpp
+	test-utf.cpp
+	test-lex.cpp
+	test-parse.cpp
+	main.cpp
+)
 
 target_link_libraries(ham-test PUBLIC ham::ham)

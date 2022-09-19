@@ -37,8 +37,10 @@ namespace ham{
 			Char *new_mem = buf->allocator.allocate(req_capacity + 1);
 			if(!new_mem) return false;
 
-			memcpy(new_mem, buf->mem, sizeof(Char) * buf->stored);
-			new_mem[buf->stored] = Char(0);
+			if(buf->mem && buf->stored){
+				memcpy(new_mem, buf->mem, sizeof(Char) * buf->stored);
+				new_mem[buf->stored] = Char(0);
+			}
 
 			buf->allocator.deallocate(buf->mem, buf->capacity + 1);
 			buf->mem = new_mem;

@@ -72,17 +72,17 @@ namespace ham{
 		template<typename Char>
 		constexpr inline auto cpath_exists = utf_conditional_t<
 			Char,
-			static_fn<ham_path_exists_utf8>,
-			static_fn<ham_path_exists_utf16>,
-			static_fn<ham_path_exists_utf32>
+			meta::static_fn<ham_path_exists_utf8>,
+			meta::static_fn<ham_path_exists_utf16>,
+			meta::static_fn<ham_path_exists_utf32>
 		>{};
 
 		template<typename Char>
 		constexpr inline auto file_ctype_open = utf_conditional_t<
 			Char,
-			static_fn<ham_file_open_utf8>,
-			static_fn<ham_file_open_utf16>,
-			static_fn<ham_file_open_utf32>
+			meta::static_fn<ham_file_open_utf8>,
+			meta::static_fn<ham_file_open_utf16>,
+			meta::static_fn<ham_file_open_utf32>
 		>{};
 	}
 

@@ -20,6 +20,10 @@
 
 #ifdef _WIN32
 
+#	define VC_EXTRALEAN 1
+#	define WIN32_LEAN_AND_MEAN 1
+
+#	include <sysinfoapi.h>
 #	include <malloc.h>
 
 #	define ham_aligned_alloc(alignment, size) (_aligned_malloc((size), (alignment)))
@@ -37,6 +41,23 @@
 using namespace ham::typedefs;
 
 HAM_C_API_BEGIN
+
+ham_usize ham_get_page_size(){
+#ifdef _WIN32
+	SYSTEM_INFO info;
+	GetSystemInfo(&info);
+	return (ham_usize)info.dwPageSize;
+#elif defined(__unix__)
+	long res = sysconf(_SC_PAGESIZE);
+	if(res <= 0){
+		// wtf?
+		return 4096; // safe bet
+	}
+	return (ham_usize)res;
+#else
+	return 4096;
+#endif
+}
 
 const ham_allocator ham_impl_default_allocator = {
 	.alloc = [](usize alignment, usize size, void*){ return ham_aligned_alloc(alignment, size); },

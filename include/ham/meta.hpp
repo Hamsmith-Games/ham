@@ -27,54 +27,37 @@
 
 #include "typedefs.h"
 
-namespace ham{
-	template<typename T, T Value>
-	struct constant_value{
-		using type = T;
-		constexpr static T value = Value;
+namespace ham::meta{
+	template<typename Char, usize N>
+	struct cexpr_str{
+		public:
+			constexpr cexpr_str(const Char (&lit)[N]) noexcept
+				: m_ptr(lit){}
+
+			constexpr static usize size() noexcept{ return N-1; }
+			constexpr const Char *data() const noexcept{ return m_ptr; }
+
+			constexpr operator basic_str<Char>() const noexcept{ return basic_str(m_ptr, N-1); }
+
+			const Char *const m_ptr;
 	};
 
-	// pretty much useless
-	template<unit Value> using constant_unit = constant_value<unit, Value>;
+	template<typename Char, usize N>
+	cexpr_str(const Char(&)[N]) -> cexpr_str<Char, N>;
 
-	template<bool Value> using constant_bool = constant_value<bool, Value>;
+	template<cexpr_str Str>
+	using constant_cexpr_str = meta::constant_value<decltype(Str), Str>;
+}
 
-	template<i8  Value> using constant_i8  = constant_value<i8,  Value>;
-	template<u8  Value> using constant_u8  = constant_value<u8,  Value>;
-	template<i16 Value> using constant_i16 = constant_value<i16, Value>;
-	template<u16 Value> using constant_u16 = constant_value<u16, Value>;
-	template<i32 Value> using constant_i32 = constant_value<i32, Value>;
-	template<u32 Value> using constant_u32 = constant_value<u32, Value>;
-	template<i64 Value> using constant_i64 = constant_value<i64, Value>;
-	template<u64 Value> using constant_u64 = constant_value<u64, Value>;
+namespace ham{
+	namespace str_literals{
+		template<meta::cexpr_str Str>
+		constexpr inline auto operator""_cexpr(){ return Str; }
+	}
+}
 
-#ifdef HAM_INT128
-	template<i128 Value> using constant_i128 = constant_value<i128, Value>;
-	template<u128 Value> using constant_u128 = constant_value<u128, Value>;
-#endif
-
-	template<iptr Value> using constant_iptr = constant_value<iptr, Value>;
-	template<uptr Value> using constant_uptr = constant_value<uptr, Value>;
-
-	template<isize Value> using constant_isize = constant_value<isize, Value>;
-	template<usize Value> using constant_usize = constant_value<usize, Value>;
-
-#ifdef HAM_FLOAT16
-	template<f16 Value> using constant_f16 = constant_value<f16, Value>;
-#endif
-
-	template<f32 Value> using constant_f32 = constant_value<f32, Value>;
-	template<f64 Value> using constant_f64 = constant_value<f64, Value>;
-
-#ifdef HAM_FLOAT128
-	template<f128 Value> using constant_f128 = constant_value<f128, Value>;
-#endif
-
-	template<uuid  Value> using constant_uuid  = constant_value<uuid,  Value>;
-	template<str8  Value> using constant_str8  = constant_value<str8,  Value>;
-	template<str16 Value> using constant_str16 = constant_value<str16, Value>;
-	template<str32 Value> using constant_str32 = constant_value<str32, Value>;
-
+namespace ham::meta{
+	//! @cond ignore
 	namespace detail{
 		constexpr inline str8 type_name_void() noexcept{ return "void"; }
 		constexpr inline str8 type_name_bool() noexcept{ return "bool"; }
@@ -105,6 +88,7 @@ namespace ham{
 
 		constexpr inline str8 type_name_uuid() noexcept{ return "uuid"; }
 	}
+	//! @endcond
 
 	template<typename T>
 	struct type_name{
@@ -149,46 +133,50 @@ namespace ham{
 		constexpr static str8 value = get_name();
 	};
 
+	//! @cond ignore
+#define HAM_IMPL_TYPE_NAME(typename_) constexpr static str8 value = HAM_CONCAT(detail::type_name_, typename_)()
+	//! @endcond
+
 	template<typename T>
 	constexpr inline auto type_name_v = type_name<T>::value;
 
-	template<> struct type_name<void>: detail::constant_call<detail::type_name_void>{};
-	template<> struct type_name<bool>: detail::constant_call<detail::type_name_bool>{};
+	template<> struct type_name<void>{ HAM_IMPL_TYPE_NAME(void); };
+	template<> struct type_name<bool>{ HAM_IMPL_TYPE_NAME(bool); };
 
-	template<> struct type_name<char8>:  detail::constant_call<detail::type_name_char8>{};
-	template<> struct type_name<char16>: detail::constant_call<detail::type_name_char16>{};
-	template<> struct type_name<char32>: detail::constant_call<detail::type_name_char32>{};
+	template<> struct type_name<char8> { HAM_IMPL_TYPE_NAME(char8); };
+	template<> struct type_name<char16>{ HAM_IMPL_TYPE_NAME(char16); };
+	template<> struct type_name<char32>{ HAM_IMPL_TYPE_NAME(char32); };
 
-	template<> struct type_name<i8>:  detail::constant_call<detail::type_name_i8>{};
-	template<> struct type_name<u8>:  detail::constant_call<detail::type_name_u8>{};
-	template<> struct type_name<i16>: detail::constant_call<detail::type_name_i16>{};
-	template<> struct type_name<u16>: detail::constant_call<detail::type_name_u16>{};
-	template<> struct type_name<i32>: detail::constant_call<detail::type_name_i32>{};
-	template<> struct type_name<u32>: detail::constant_call<detail::type_name_u32>{};
-	template<> struct type_name<i64>: detail::constant_call<detail::type_name_i64>{};
-	template<> struct type_name<u64>: detail::constant_call<detail::type_name_u64>{};
+	template<> struct type_name<i8> { HAM_IMPL_TYPE_NAME(i8); };
+	template<> struct type_name<u8> { HAM_IMPL_TYPE_NAME(u8); };
+	template<> struct type_name<i16>{ HAM_IMPL_TYPE_NAME(i16); };
+	template<> struct type_name<u16>{ HAM_IMPL_TYPE_NAME(u16); };
+	template<> struct type_name<i32>{ HAM_IMPL_TYPE_NAME(i32); };
+	template<> struct type_name<u32>{ HAM_IMPL_TYPE_NAME(u32); };
+	template<> struct type_name<i64>{ HAM_IMPL_TYPE_NAME(i64); };
+	template<> struct type_name<u64>{ HAM_IMPL_TYPE_NAME(u64); };
 
 #ifdef HAM_INT128
-	template<> struct type_name<i128>: detail::constant_call<detail::type_name_i128>{};
-	template<> struct type_name<u128>: detail::constant_call<detail::type_name_u128>{};
+	template<> struct type_name<i128>{ HAM_IMPL_TYPE_NAME(i128); };
+	template<> struct type_name<u128>{ HAM_IMPL_TYPE_NAME(u128); };
 #endif
 
 #ifdef HAM_FLOAT16
-	template<> struct type_name<f16>: detail::constant_call<detail::type_name_f16>{};
+	template<> struct type_name<f16>{ HAM_IMPL_TYPE_NAME(f16); };
 #endif
 
-	template<> struct type_name<f32>: detail::constant_call<detail::type_name_f32>{};
-	template<> struct type_name<f64>: detail::constant_call<detail::type_name_f64>{};
+	template<> struct type_name<f32>{ HAM_IMPL_TYPE_NAME(f32); };
+	template<> struct type_name<f64>{ HAM_IMPL_TYPE_NAME(f64); };
 
 #ifdef HAM_FLOAT128
-	template<> struct type_name<f128>: detail::constant_call<detail::type_name_f128>{};
+	template<> struct type_name<f128>{ HAM_IMPL_TYPE_NAME(f128); };
 #endif
 
-	template<> struct type_name<ham_str8>:  detail::constant_call<detail::type_name_str8>{};
-	template<> struct type_name<ham_str16>: detail::constant_call<detail::type_name_str16>{};
-	template<> struct type_name<ham_str32>: detail::constant_call<detail::type_name_str32>{};
+	template<> struct type_name<ham_str8> { HAM_IMPL_TYPE_NAME(str8); };
+	template<> struct type_name<ham_str16>{ HAM_IMPL_TYPE_NAME(str16); };
+	template<> struct type_name<ham_str32>{ HAM_IMPL_TYPE_NAME(str32); };
 
-	template<> struct type_name<ham_uuid>: detail::constant_call<detail::type_name_uuid>{};
+	template<> struct type_name<ham_uuid>{ HAM_IMPL_TYPE_NAME(uuid); };
 }
 
 /**

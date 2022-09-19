@@ -11,6 +11,15 @@
 
 HAM_C_API_BEGIN
 
+typedef struct ham_plugin ham_plugin;
+typedef struct ham_plugin_vtable ham_plugin_vtable;
+
+ham_api ham_plugin *ham_plugin_load(ham_str8 path);
+
+ham_api void ham_plugin_unload(ham_plugin *plugin);
+
+ham_api void *ham_plugin_symbol(const ham_plugin *plugin, ham_str8 name);
+
 typedef ham_str8(*ham_plugin_name_fn)();
 typedef ham_str8(*ham_plugin_author_fn)();
 typedef ham_str8(*ham_plugin_license_fn)();
@@ -33,14 +42,6 @@ typedef struct ham_plugin_vtable{
 	ham_plugin_on_load_fn on_load;
 	ham_plugin_on_unload_fn on_unload;
 } ham_plugin_vtable;
-
-typedef struct ham_plugin ham_plugin;
-
-ham_api ham_plugin *ham_plugin_load(ham_str8 path);
-
-ham_api void ham_plugin_unload(ham_plugin *plugin);
-
-ham_api void *ham_plugin_symbol(const ham_plugin *plugin, ham_str8 name);
 
 //! @cond ignore
 #define HAM_IMPL_PLUGIN_VTABLE_NAME(derived) HAM_CONCAT(ham_impl_vtable_, derived)

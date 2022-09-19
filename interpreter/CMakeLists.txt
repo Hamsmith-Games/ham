@@ -17,10 +17,12 @@
 #
 
 ##
-# Ham programming language compiler
+# Ham programming language interpreter
 ##
 
-add_executable(hamc main.cpp)
-add_executable(ham::compiler ALIAS hamc)
+find_package(Readline REQUIRED)
 
-target_link_libraries(hamc PUBLIC ham::ham)
+add_executable(hami main.cpp)
+add_executable(ham::interpreter ALIAS hami)
+
+target_link_libraries(hami PUBLIC ham::ham readline::readline)
