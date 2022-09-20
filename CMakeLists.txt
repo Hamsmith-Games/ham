@@ -1,5 +1,5 @@
 #
-# The Ham Programming Language
+# The Hamsmith Development Environment
 # Copyright (C) 2022  Hamsmith Ltd.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -25,7 +25,7 @@ cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 project(
 	ham
 	VERSION 0.0.1
-	DESCRIPTION "The Ham Programming Language"
+	DESCRIPTION "The Hamsmith Programming Language"
 	LANGUAGES C CXX
 )
 
@@ -119,7 +119,7 @@ FetchContent_MakeAvailable(robin_hood_content)
 # Targets
 ##
 
-add_subdirectory(lib)
+add_subdirectory(runtime)
 
 if(HAM_BUILD_TOOLS)
 	add_subdirectory(interpreter)

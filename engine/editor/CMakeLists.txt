@@ -48,6 +48,6 @@ endif()
 target_link_libraries(
 	ham-engine-editor
 	PRIVATE
-	    ham::engine-common
+	    ham::engine
 		Qt6::Widgets
 )

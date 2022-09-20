@@ -32,4 +32,4 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	target_link_options(ham-engine-server PRIVATE "-rdynamic")
 endif()
 
-target_link_libraries(ham-engine-server PRIVATE ham::engine-common)
+target_link_libraries(ham-engine-server PRIVATE ham::engine)

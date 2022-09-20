@@ -43,7 +43,7 @@ add_subdirectory(editor)
 
 if(HAM_INSTALL_ENGINE)
 	install(
-		TARGETS ham-engine-common ham-engine-client ham-engine-client
+		TARGETS ham-engine ham-engine-client ham-engine-server ham-engine-editor
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	)
