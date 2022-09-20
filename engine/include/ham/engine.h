@@ -24,13 +24,31 @@
  * @{
  */
 
-#include "ham/typedefs.h"
+#include "ham/engine/config.h"
+#include "ham/memory.h"
 
 HAM_C_API_BEGIN
 
-void ham_engine_init(int argc, char **argv);
+typedef struct ham_screen{
+	ham_u32 w, h, refresh;
+} ham_screen;
 
-int ham_exec();
+/**
+ * @defgroup HAM_ENGINE_CTX Context management
+ * @{
+ */
+
+typedef struct ham_engine_context ham_engine_context;
+
+ham_engine_api ham_engine_context *ham_engine_create(const char *vtable_id, int argc, char **argv);
+
+ham_engine_api void ham_engine_destroy(ham_engine_context *ctx);
+
+ham_engine_api int ham_engine_exec(ham_engine_context *ctx);
+
+/**
+ * @}
+ */
 
 HAM_C_API_END
 

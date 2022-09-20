@@ -27,6 +27,10 @@
 
 #include "typedefs.h"
 
+#ifdef __cplusplus
+#	include <new>
+#endif
+
 HAM_C_API_BEGIN
 
 ham_api ham_usize ham_get_page_size();
@@ -47,6 +51,14 @@ static inline void *ham_allocator_alloc(const ham_allocator *allocator, ham_usiz
 static inline void ham_allocator_free(const ham_allocator *allocator, void *mem){
 	allocator->free(mem, allocator->user);
 }
+
+#ifdef __cplusplus
+#	define ham_allocator_new(allocator, t) (new(ham_allocator_alloc((allocator), alignof(t), sizeof(t))) t)
+#	define ham_allocator_delete(allocator, ptr) (std::destroy_at((ptr)), ham_allocator_free((allocator), (ptr)))
+#else
+#	define ham_allocator_new(allocator t) ((t*)ham_allocator_alloc((allocator), alignof(t), sizeof(t)))
+#	define ham_allocator_free(allocator, ptr) (ham_allocator_free((allocator), (ptr)))
+#endif
 
 //! @cond ignore
 ham_api extern const ham_allocator ham_impl_default_allocator;

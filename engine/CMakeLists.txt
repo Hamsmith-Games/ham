@@ -20,11 +20,20 @@
 # The Ham World Engine
 ##
 
+set(HAM_ENGINE_CLIENT_PLUGIN_UUID "94d6f295-4e71-4b60-a7e5-a9fdc8bef7d2")
+set(HAM_ENGINE_SERVER_PLUGIN_UUID "db70e897-5f3f-4d38-a506-3445a20c1b5f")
+
+configure_file(include/ham/engine/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/ham/engine/config.h @ONLY)
+
 set(HAM_ENGINE_SOURCE_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
+set(HAM_ENGINE_BINARY_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 set(
 	HAM_ENGINE_SOURCE_HEADERS
+	${HAM_ENGINE_BINARY_INCLUDE_DIR}/ham/engine/config.h
+
 	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine.h
+	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine-vtable.h
 )
 
 add_subdirectory(common)
@@ -39,11 +48,19 @@ if(HAM_INSTALL_ENGINE)
 		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	)
 
-    install(
-		DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/include/ham
+	install(
+		DIRECTORY ${HAM_ENGINE_BINARY_INCLUDE_DIR}/include/ham
 		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 		FILES_MATCHING
 		    PATTERN "*.h"
+			PATTERN "*.hpp"
+	)
+
+	install(
+		DIRECTORY ${HAM_ENGINE_SOURCE_INCLUDE_DIR}/include/ham
+		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+		FILES_MATCHING
+			PATTERN "*.h"
 			PATTERN "*.hpp"
 	)
 endif()

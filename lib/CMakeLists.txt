@@ -18,6 +18,7 @@
 
 find_package(GMP REQUIRED)
 find_package(MPFR REQUIRED)
+find_package(Magic REQUIRED)
 
 set(
 	HAM_SOURCES
@@ -32,17 +33,21 @@ set(
 	parse.cpp
 )
 
+if(WIN32)
+	list(APPEND HAM_SOURCES dll-win32.cpp)
+elseif(UNIX)
+	list(APPEND HAM_SOURCES dll-unix.cpp)
+else()
+	message(FATAL_ERROR "Unsupported platform")
+endif()
+
 add_library(ham SHARED ${HAM_SOURCES})
 
 set_target_properties(
 	ham PROPERTIES
 
-	C_STANDARD 11
 	C_VISIBILITY_PRESET hidden
-
-	CXX_STANDARD 20
 	CXX_VISIBILITY_PRESET hidden
-
 	VISIBILITY_INLINES_HIDDEN ON
 )
 
@@ -57,8 +62,21 @@ target_include_directories(
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-target_link_libraries(ham PUBLIC gmp::gmp mpfr::mpfr)
-target_link_libraries(ham PRIVATE robin_hood::robin_hood)
+target_link_libraries(
+	ham
+	PUBLIC
+	    gmp::gmp
+		mpfr::mpfr
+		magic::magic
+)
+
+target_link_libraries(
+	ham
+	PRIVATE
+	    ${CMAKE_DL_LIBS}
+		bfd
+		robin_hood::robin_hood
+)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	target_link_options(ham PRIVATE "-Wl,--enable-new-dtags")

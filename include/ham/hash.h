@@ -62,6 +62,15 @@ ham_constexpr static inline ham_u64 ham_hash_fnv1a_64(const char *bytes, ham_usi
 }
 
 //
+// UUID hashing functions
+//
+
+ham_constexpr static inline ham_u32 ham_uuid_hash32(ham_uuid uuid){ return ham_hash_fnv1a_32(uuid.bytes, 16); }
+ham_constexpr static inline ham_u64 ham_uuid_hash64(ham_uuid uuid){ return ham_hash_fnv1a_64(uuid.bytes, 16); }
+
+#define ham_uuid_hash ham_uuid_hash64
+
+//
 // String hashing functions
 //
 
@@ -196,28 +205,29 @@ namespace ham{
 
 	template<>
 	struct hash_functor<str8>{
-		constexpr ham_uptr operator()(const str8 &s) const noexcept{
-			return ham_str_hash_utf8(s);
-		}
+		constexpr ham_uptr operator()(const str8 &s) const noexcept{ return ham_str_hash_utf8(s); }
 	};
 
 	template<>
 	struct hash_functor<str16>{
-		constexpr ham_uptr operator()(const str16 &s) const noexcept{
-			return ham_str_hash_utf16(s);
-		}
+		constexpr ham_uptr operator()(const str16 &s) const noexcept{ return ham_str_hash_utf16(s); }
 	};
 
 	template<>
 	struct hash_functor<str32>{
-		constexpr ham_uptr operator()(const str32 &s) const noexcept{
-			return ham_str_hash_utf32(s);
-		}
+		constexpr ham_uptr operator()(const str32 &s) const noexcept{ return ham_str_hash_utf32(s); }
+	};
+
+	template<>
+	struct hash_functor<uuid>{
+		constexpr ham_uptr operator()(const uuid &uuid_) const noexcept{ return ham_uuid_hash(uuid_); }
 	};
 
 	template<> struct hash_functor<ham_str8>: hash_functor<str8>{};
 	template<> struct hash_functor<ham_str16>: hash_functor<str16>{};
 	template<> struct hash_functor<ham_str32>: hash_functor<str32>{};
+
+	template<> struct hash_functor<ham_uuid>: hash_functor<uuid>{};
 
 	template<typename T>
 	constexpr static inline ham_uptr hash(const T &val) noexcept{
@@ -236,6 +246,9 @@ template<>
 struct std::hash<ham::str32>: ham::hash_functor<ham::str32>{};
 
 template<>
+struct std::hash<ham::uuid>: ham::hash_functor<ham::uuid>{};
+
+template<>
 struct std::hash<ham_str8>: ham::hash_functor<ham_str8>{};
 
 template<>
@@ -243,6 +256,9 @@ struct std::hash<ham_str16>: ham::hash_functor<ham_str16>{};
 
 template<>
 struct std::hash<ham_str32>: ham::hash_functor<ham_str32>{};
+
+template<>
+struct std::hash<ham_uuid>: ham::hash_functor<ham_uuid>{};
 
 #endif
 

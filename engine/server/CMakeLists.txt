@@ -18,4 +18,18 @@
 
 add_executable(ham-engine-server main.cpp)
 
-target_link_libraries(ham-engine-server PUBLIC ham::engine-common)
+set_target_properties(
+	ham-engine-server PROPERTIES
+	ENABLE_EXPORTS ON
+	C_VISIBILITY_PRESET hidden
+	CXX_VISIBILITY_PRESET hidden
+	VISIBILITY_INLINES_HIDDEN ON
+)
+
+target_compile_features(ham-engine-server PRIVATE c_std_17 cxx_std_20)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+	target_link_options(ham-engine-server PRIVATE "-rdynamic")
+endif()
+
+target_link_libraries(ham-engine-server PRIVATE ham::engine-common)

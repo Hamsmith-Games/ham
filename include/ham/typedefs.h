@@ -114,25 +114,31 @@ typedef double ham_f64;
  * @{
  */
 
-typedef ham_char8  ham_name_buffer_utf8[HAM_NAME_BUFFER_SIZE];
+typedef ham_char8  ham_name_buffer_utf8 [HAM_NAME_BUFFER_SIZE];
 typedef ham_char16 ham_name_buffer_utf16[HAM_NAME_BUFFER_SIZE];
 typedef ham_char32 ham_name_buffer_utf32[HAM_NAME_BUFFER_SIZE];
 
-typedef ham_char8  ham_path_buffer_utf8[HAM_PATH_BUFFER_SIZE];
+typedef ham_char8  ham_path_buffer_utf8 [HAM_PATH_BUFFER_SIZE];
 typedef ham_char16 ham_path_buffer_utf16[HAM_PATH_BUFFER_SIZE];
 typedef ham_char32 ham_path_buffer_utf32[HAM_PATH_BUFFER_SIZE];
 
-typedef ham_char8  ham_message_buffer_utf8[HAM_MESSAGE_BUFFER_SIZE];
+typedef ham_char8  ham_message_buffer_utf8 [HAM_MESSAGE_BUFFER_SIZE];
 typedef ham_char16 ham_message_buffer_utf16[HAM_MESSAGE_BUFFER_SIZE];
 typedef ham_char32 ham_message_buffer_utf32[HAM_MESSAGE_BUFFER_SIZE];
+
+typedef ham_char8  ham_uuid_buffer_utf8 [HAM_UUID_BUFFER_SIZE];
+typedef ham_char16 ham_uuid_buffer_utf16[HAM_UUID_BUFFER_SIZE];
+typedef ham_char32 ham_uuid_buffer_utf32[HAM_UUID_BUFFER_SIZE];
 
 #define HAM_NAME_BUFFER_UTF(n) HAM_CONCAT(ham_name_buffer_utf, n)
 #define HAM_PATH_BUFFER_UTF(n) HAM_CONCAT(ham_path_buffer_utf, n)
 #define HAM_MESSAGE_BUFFER_UTF(n) HAM_CONCAT(ham_message_buffer_utf, n)
+#define HAM_UUID_BUFFER_UTF(n) HAM_CONCAT(ham_uuid_buffer_utf, n)
 
 typedef HAM_NAME_BUFFER_UTF(HAM_UTF)    ham_name_buffer;
 typedef HAM_PATH_BUFFER_UTF(HAM_UTF)    ham_path_buffer;
 typedef HAM_MESSAGE_BUFFER_UTF(HAM_UTF) ham_message_buffer;
+typedef HAM_UUID_BUFFER_UTF(HAM_UTF)    ham_uuid_buffer;
 
 /**
  * @}
@@ -146,6 +152,8 @@ typedef HAM_MESSAGE_BUFFER_UTF(HAM_UTF) ham_message_buffer;
 typedef struct ham_version{
 	ham_u16 major, minor, patch;
 } ham_version;
+
+#define HAM_VERSION ((ham_version){HAM_VERSION_MAJOR,HAM_VERSION_MINOR,HAM_VERSION_PATCH})
 
 ham_constexpr ham_nothrow static inline int ham_version_cmp(ham_version lhs, ham_version rhs){
 	const int dmajor = (int)lhs.major - (int)rhs.major;
@@ -172,6 +180,7 @@ ham_constexpr ham_nothrow static inline bool ham_version_is_compatible(ham_versi
  */
 
 typedef union ham_uuid{
+	char bytes[16];
 	ham_u8 u8s[16];
 	ham_u16 u16s[8];
 	ham_u32 u32s[4];
@@ -302,6 +311,33 @@ ham_constexpr ham_nothrow static inline bool ham_utf_is_bracket(ham_utf_cp cp){
 
 		default: return false;
 	}
+}
+
+ham_constexpr ham_nothrow static inline ham_utf_cp ham_utf_to_lower(ham_utf_cp cp){
+	if(cp < 91 && cp > 64) return cp + 33;
+	else return cp;
+}
+
+ham_constexpr ham_nothrow static inline ham_utf_cp ham_utf_to_upper(ham_utf_cp cp){
+	if(cp < 123 && cp > 96) return cp - 33;
+	else return cp;
+}
+
+ham_constexpr ham_nothrow static inline char ham_to_lower(char c){
+	if(c < 91 && c > 64) return c + 33;
+	else return c;
+}
+
+ham_constexpr ham_nothrow static inline char ham_to_upper(char c){
+	if(c < 123 && c > 96) return c - 33;
+	else return c;
+}
+
+ham_constexpr ham_nothrow static inline ham_u32 ham_char_hex_value(char c){
+	c = ham_to_upper(c);
+	if(c > 47 && c < 58) return (ham_u32)(c - 48);
+	else if(c > 64 && c < 71) return 10u + (ham_u32)(c - 65);
+	else return (ham_u32)-1;
 }
 
 #define HAM_UTF8_NON_ASCII_BIT 0x80
@@ -587,6 +623,41 @@ ham_constexpr ham_nothrow static inline bool ham_str_neq_utf16(ham_str16 a, ham_
 ham_constexpr ham_nothrow static inline int  ham_str_cmp_utf32(ham_str32 a, ham_str32 b){ return HAM_IMPL_STR_CMP(a, b); }
 ham_constexpr ham_nothrow static inline bool  ham_str_eq_utf32(ham_str32 a, ham_str32 b){ return HAM_IMPL_STR_EQ(a, b); }
 ham_constexpr ham_nothrow static inline bool ham_str_neq_utf32(ham_str32 a, ham_str32 b){ return HAM_IMPL_STR_NEQ(a, b); }
+
+ham_constexpr ham_nothrow static inline ham_uuid ham_str_to_uuid_utf8(ham_str8 uuid_str){
+	if(!uuid_str.ptr || uuid_str.len >= HAM_UUID_BUFFER_SIZE) return (ham_uuid){ .u64s = { (ham_u64)-1, (ham_u64)-1 } };
+
+	ham_uuid_buffer_utf8 uuid_buf;
+
+	ham_usize written = 0;
+	for(ham_usize i = 0; i < uuid_str.len; i++){
+		const char c = uuid_str.ptr[i];
+		if(c == '\0') break;
+
+		if(ham_utf_is_alpha(c)){
+			uuid_buf[written++] = ham_to_upper(c);
+		}
+		else if(ham_utf_is_digit(c)){
+			uuid_buf[written++] = c;
+		}
+		else continue;
+	}
+
+	if(written != 32){
+		return (ham_uuid){ .u64s = { (ham_u64)-1, (ham_u64)-1 } };
+	}
+
+	ham_uuid ret;
+
+	for(ham_usize i = 0; i < 32; i++){
+		const char c = uuid_buf[i];
+		const ham_usize bit_off = (i * 4) % 64;
+		const ham_usize u64_off = i / sizeof(ham_u64);
+		ret.u64s[u64_off] |= ((ham_char_hex_value(c) & 0xF) << bit_off);
+	}
+
+	return ret;
+}
 
 ham_nothrow static inline ham_usize ham_str_conv_utf16_utf8(ham_str16 str, ham_char8 *buf, ham_usize buf_len){
 	if(!buf || buf_len == 0){
@@ -922,27 +993,6 @@ namespace ham{
 	template<typename T>
 	constexpr inline type_tag<T> type_tag_v;
 
-	class uuid{
-		public:
-			constexpr uuid() noexcept = default;
-
-			constexpr uuid(ham_uuid val_) noexcept: m_val(val_){}
-
-			constexpr uuid(const uuid&) noexcept = default;
-
-			constexpr uuid &operator=(const uuid&) noexcept = default;
-
-			constexpr bool operator==(const uuid &other) const noexcept{ return ham_uuid_eq (m_val, other.m_val); }
-			constexpr bool operator!=(const uuid &other) const noexcept{ return ham_uuid_neq(m_val, other.m_val); }
-			constexpr bool operator< (const uuid &other) const noexcept{ return ham_uuid_lt (m_val, other.m_val); }
-			constexpr bool operator<=(const uuid &other) const noexcept{ return ham_uuid_lte(m_val, other.m_val); }
-			constexpr bool operator> (const uuid &other) const noexcept{ return ham_uuid_gt (m_val, other.m_val); }
-			constexpr bool operator>=(const uuid &other) const noexcept{ return ham_uuid_gte(m_val, other.m_val); }
-
-		//private:
-			ham_uuid m_val;
-	};
-
 	template<typename Char>
 	class basic_str{
 		public:
@@ -1033,6 +1083,33 @@ namespace ham{
 			ctype m_val;
 	};
 
+	class uuid{
+		public:
+			constexpr uuid() noexcept = default;
+
+			constexpr uuid(ham_uuid val_) noexcept: m_val(val_){}
+
+			constexpr uuid(const uuid&) noexcept = default;
+
+			constexpr explicit uuid(const basic_str<char8> &uuid_str) noexcept
+				: m_val(ham_str_to_uuid_utf8(uuid_str)){}
+
+			constexpr operator ham_uuid&() &noexcept{ return m_val; }
+			constexpr operator const ham_uuid&() const& noexcept{ return m_val; }
+
+			constexpr uuid &operator=(const uuid&) noexcept = default;
+
+			constexpr bool operator==(const uuid &other) const noexcept{ return ham_uuid_eq (m_val, other.m_val); }
+			constexpr bool operator!=(const uuid &other) const noexcept{ return ham_uuid_neq(m_val, other.m_val); }
+			constexpr bool operator< (const uuid &other) const noexcept{ return ham_uuid_lt (m_val, other.m_val); }
+			constexpr bool operator<=(const uuid &other) const noexcept{ return ham_uuid_lte(m_val, other.m_val); }
+			constexpr bool operator> (const uuid &other) const noexcept{ return ham_uuid_gt (m_val, other.m_val); }
+			constexpr bool operator>=(const uuid &other) const noexcept{ return ham_uuid_gte(m_val, other.m_val); }
+
+		//private:
+			ham_uuid m_val;
+	};
+
 	basic_str(const ham_str8&)  -> basic_str<char8>;
 	basic_str(const ham_str16&) -> basic_str<char16>;
 	basic_str(const ham_str32&) -> basic_str<char32>;
@@ -1059,8 +1136,13 @@ namespace ham{
 		constexpr inline auto operator""_str(const char32 *ptr, usize len){ return str32(ptr, len); }
 	}
 
+	namespace uuid_literals{
+		constexpr inline uuid operator""_uuid(const char8 *ptr, usize len){ return uuid(str8(ptr, len)); }
+	}
+
 	namespace literals{
 		using namespace str_literals;
+		using namespace uuid_literals;
 	}
 
 	using namespace literals;

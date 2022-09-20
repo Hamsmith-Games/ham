@@ -19,7 +19,7 @@
 #include "ham/engine.h"
 
 int main(int argc, char *argv[]){
-	ham_engine_init(argc, argv);
+	const auto ctx = ham_engine_create(nullptr, argc, argv);
 
-	return ham_exec();
+	return ham_engine_exec(ctx);
 }

@@ -25,10 +25,26 @@ add_library(
 
 add_library(ham::engine-common ALIAS ham-engine-common)
 
+set_target_properties(
+	ham-engine-common PROPERTIES
+	C_VISIBILITY_PRESET hidden
+	CXX_VISIBILITY_PRESET hidden
+	VISIBILITY_INLINES_HIDDEN ON
+)
+
+target_compile_features(ham-engine-common PUBLIC c_std_17 cxx_std_20)
+
+target_compile_definitions(ham-engine-common PRIVATE HAM_ENGINE_LIB_IMPLEMENTATION)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+	target_link_options(ham-engine-common PRIVATE "-Wl,--enable-new-dtags")
+endif()
+
 target_link_libraries(ham-engine-common PUBLIC ham::ham)
 
 target_include_directories(
 	ham-engine-common PUBLIC
 	$<BUILD_INTERFACE:${HAM_ENGINE_SOURCE_INCLUDE_DIR}>
+	$<BUILD_INTERFACE:${HAM_ENGINE_BINARY_INCLUDE_DIR}>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )

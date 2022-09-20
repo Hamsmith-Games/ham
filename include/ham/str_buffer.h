@@ -26,6 +26,7 @@
  */
 
 #include "memory.h"
+#include "hash.h"
 
 HAM_C_API_BEGIN
 
@@ -173,10 +174,12 @@ namespace ham{
 			using char_type = Char;
 			using str_type = basic_str<Char>;
 
+			basic_str_buffer(): m_handle(detail::str_buffer_ctype_create_allocator<Char>(ham_current_allocator(), str_type{})){}
+
 			explicit basic_str_buffer(const ham_allocator *allocator_)
 				: m_handle(detail::str_buffer_ctype_create_allocator<Char>(allocator_, str_type{})){}
 
-			basic_str_buffer(const str_type &str_ = {}, const ham_allocator *allocator_ = ham_current_allocator())
+			basic_str_buffer(const str_type &str_ , const ham_allocator *allocator_ = ham_current_allocator())
 				: m_handle(detail::str_buffer_ctype_create_allocator<Char>(allocator_, str_)){}
 
 			template<usize N>
@@ -199,6 +202,15 @@ namespace ham{
 			operator basic_str<Char>() const& noexcept{ return get(); }
 
 			operator basic_str<Char>() const&& = delete;
+
+			int compare(const basic_str<Char> &other) const noexcept{ return get().compare(other); }
+
+			bool operator==(const basic_str<Char> &other) const noexcept{ return get() == other; }
+			bool operator!=(const basic_str<Char> &other) const noexcept{ return get() != other; }
+			bool operator< (const basic_str<Char> &other) const noexcept{ return get() <  other; }
+			bool operator<=(const basic_str<Char> &other) const noexcept{ return get() <= other; }
+			bool operator> (const basic_str<Char> &other) const noexcept{ return get() >  other; }
+			bool operator>=(const basic_str<Char> &other) const noexcept{ return get() >= other; }
 
 			bool reserve(usize req_capacity){
 				return detail::str_buffer_ctype_reserve<Char>(m_handle.get(), req_capacity);
@@ -237,7 +249,20 @@ namespace ham{
 	using str_buffer_utf32 = basic_str_buffer<char32>;
 
 	using str_buffer = basic_str_buffer<uchar>;
+
+	template<> struct hash_functor<str_buffer_utf8>: hash_functor<str8>{};
+	template<> struct hash_functor<str_buffer_utf16>: hash_functor<str16>{};
+	template<> struct hash_functor<str_buffer_utf32>: hash_functor<str32>{};
 }
+
+template<>
+struct std::hash<ham::str_buffer_utf8>: ham::hash_functor<ham::str_buffer_utf8>{};
+
+template<>
+struct std::hash<ham::str_buffer_utf16>: ham::hash_functor<ham::str_buffer_utf16>{};
+
+template<>
+struct std::hash<ham::str_buffer_utf32>: ham::hash_functor<ham::str_buffer_utf32>{};
 
 template<typename Char>
 inline std::basic_ostream<Char> &operator<<(std::basic_ostream<Char> &stream, const ham::basic_str_buffer<Char> &str){

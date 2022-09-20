@@ -28,16 +28,26 @@ add_executable(
 	MainWindow.cpp
 )
 
-target_link_libraries(
-	ham-engine-editor
-	PRIVATE
-	    ham::engine-common
-		Qt6::Widgets
-)
-
 set_target_properties(
 	ham-engine-editor
 	PROPERTIES
 	    WIN32_EXECUTABLE ON
 		MACOSX_BUNDLE    ON
+		ENABLE_EXPORTS   ON
+
+		C_VISIBILITY_PRESET   hidden
+		CXX_VISIBILITY_PRESET hidden
+
+		VISIBILITY_INLINES_HIDDEN ON
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+	target_link_options(ham-engine-client PRIVATE "-rdynamic")
+endif()
+
+target_link_libraries(
+	ham-engine-editor
+	PRIVATE
+	    ham::engine-common
+		Qt6::Widgets
 )

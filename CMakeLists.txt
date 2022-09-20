@@ -46,6 +46,17 @@ set(HAM_VERSION ${ham_VERSION})
 set(HAM_SOURCE_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 set(HAM_BINARY_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
 
+if(NOT HAM_TARGET_TRIPLE)
+	execute_process(
+		COMMAND
+		    gcc -dumpmachine
+
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+		OUTPUT_VARIABLE
+		    HAM_TARGET_TRIPLE
+	)
+endif()
+
 configure_file(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/config.h.in
 	${HAM_BINARY_INCLUDE_DIR}/ham/config.h
@@ -65,6 +76,7 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/log.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/thread.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/fs.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/dll.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/plugin.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/lex.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/parse.h

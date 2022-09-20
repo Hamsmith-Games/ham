@@ -39,6 +39,13 @@
 #define HAM_EAT(...) __VA_ARGS__
 
 //! @cond ignore
+#define HAM_IMPL_STRINGIFY_(x) #x
+#define HAM_IMPL_STRINGIFY(x) HAM_IMPL_STRINGIFY_(x)
+//! @endcond
+
+#define HAM_STRINGIFY(x) HAM_IMPL_STRINGIFY(x)
+
+//! @cond ignore
 #define HAM_IMPL_ARG_N( \
 		  _1, _2, _3, _4, _5, _6, _7, _8, _9,_10, \
 		 _11,_12,_13,_14,_15,_16,_17,_18,_19,_20, \
@@ -70,6 +77,33 @@
 //! @endcond
 
 #define HAM_APPLY(f, ...) HAM_IMPL_APPLY(f __VA_OPT__(,) __VA_ARGS__)
+
+//! @cond ignore
+#define HAM_IMPL_REPEAT_0(...)
+#define HAM_IMPL_REPEAT_1(expr) expr
+#define HAM_IMPL_REPEAT_2(expr) expr expr
+#define HAM_IMPL_REPEAT_3(expr) expr expr expr
+#define HAM_IMPL_REPEAT_4(expr) expr expr expr expr
+#define HAM_IMPL_REPEAT_5(expr) expr expr expr expr expr
+#define HAM_IMPL_REPEAT_6(expr) expr expr expr expr expr expr
+#define HAM_IMPL_REPEAT_7(expr) expr expr expr expr expr expr expr
+#define HAM_IMPL_REPEAT_8(expr) expr expr expr expr expr expr expr expr
+#define HAM_IMPL_REPEAT_9(expr) expr expr expr expr expr expr expr expr expr
+#define HAM_IMPL_REPEAT_10(expr) expr expr expr expr expr expr expr expr expr expr
+#define HAM_IMPL_REPEAT_11(expr) HAM_IMPL_REPEAT_10(expr) HAM_IMPL_REPEAT_1(expr)
+#define HAM_IMPL_REPEAT_12(expr) HAM_IMPL_REPEAT_10(expr) HAM_IMPL_REPEAT_2(expr)
+#define HAM_IMPL_REPEAT_13(expr) HAM_IMPL_REPEAT_10(expr) HAM_IMPL_REPEAT_3(expr)
+#define HAM_IMPL_REPEAT_14(expr) HAM_IMPL_REPEAT_10(expr) HAM_IMPL_REPEAT_4(expr)
+#define HAM_IMPL_REPEAT_15(expr) HAM_IMPL_REPEAT_10(expr) HAM_IMPL_REPEAT_5(expr)
+#define HAM_IMPL_REPEAT_16(expr) HAM_IMPL_REPEAT_10(expr) HAM_IMPL_REPEAT_6(expr)
+
+#define HAM_IMPL_REPEAT_N(n, expr) HAM_APPLY(HAM_CONCAT(HAM_IMPL_REPEAT_, n), expr)
+//! @endcond
+
+/**
+ * Repeat \p expr \p n times.
+ */
+#define HAM_REPEAT(n, expr) HAM_IMPL_REPEAT_N(n, expr)
 
 //! @cond ignore
 #define HAM_IMPL_MAP_0(...)

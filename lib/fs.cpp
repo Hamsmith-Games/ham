@@ -16,8 +16,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "ham/memory.h"
 #include "ham/fs.h"
+#include "ham/memory.h"
+#include "ham/log.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -34,11 +35,51 @@
 #endif
 
 #include <errno.h>
+#include <magic.h>
+
+#include <mutex>
 
 using namespace ham::typedefs;
 using namespace ham::literals;
 
 HAM_C_API_BEGIN
+
+static std::mutex ham_impl_magic_mutex;
+static magic_t ham_impl_magic_cookie = nullptr;
+static bool ham_impl_magic_init_flag = false;
+
+static inline void ham_impl_magic_finish(){
+	std::scoped_lock lock(ham_impl_magic_mutex);
+	magic_close(ham_impl_magic_cookie);
+	ham_impl_magic_cookie = nullptr;
+	ham_impl_magic_init_flag = false;
+}
+
+static inline bool ham_impl_magic_init(){
+	std::scoped_lock lock(ham_impl_magic_mutex);
+	if(ham_impl_magic_init_flag) return true;
+
+	if(!ham_impl_magic_cookie){
+		ham_impl_magic_cookie = magic_open(MAGIC_MIME);
+		if(ham_impl_magic_cookie == nullptr){
+			ham_logerrorf("ham_file_info", "Error initializing libmagic: %s", strerror(errno));
+			return false;
+		}
+
+		atexit(ham_impl_magic_finish);
+	}
+
+	if(magic_compile(ham_impl_magic_cookie, ham_null) != 0){
+		ham_logwarnf("ham_file_info", "Error in magic_compile: %s", magic_error(ham_impl_magic_cookie));
+		if(magic_load(ham_impl_magic_cookie, ham_null) != 0){
+			ham_logerrorf("ham_file_info", "Error in magic_load: %s", magic_error(ham_impl_magic_cookie));
+			return false;
+		}
+	}
+
+	ham_impl_magic_init_flag = true;
+	return true;
+}
 
 struct ham_file{
 	const ham_allocator *allocator;
@@ -91,6 +132,16 @@ bool ham_path_file_info_utf8 (ham_str8  path, ham_file_info *ret){
 
 	ret->size = (usize)stat_buf.st_size;
 
+	if(ham_impl_magic_init()){
+		const char *mime_str = magic_file(ham_impl_magic_cookie, path_buf);
+		if(!mime_str){
+			ham_logapiwarnf("Error in magic_file: %s", magic_error(ham_impl_magic_cookie));
+		}
+		else{
+			ret->mime = ham::str8(mime_str);
+		}
+	}
+
 	return true;
 }
 
@@ -111,6 +162,16 @@ bool ham_path_file_info_utf16(ham_str16 path, ham_file_info *ret){
 
 	ret->size = (usize)stat_buf.st_size;
 
+	if(ham_impl_magic_init()){
+		const char *mime_str = magic_file(ham_impl_magic_cookie, path_buf);
+		if(!mime_str){
+			ham_logapiwarnf("Error in magic_file: %s", magic_error(ham_impl_magic_cookie));
+		}
+		else{
+			ret->mime = ham::str8(mime_str);
+		}
+	}
+
 	return true;
 }
 
@@ -130,6 +191,16 @@ bool ham_path_file_info_utf32(ham_str32 path, ham_file_info *ret){
 	}
 
 	ret->size = (usize)stat_buf.st_size;
+
+	if(ham_impl_magic_init()){
+		const char *mime_str = magic_file(ham_impl_magic_cookie, path_buf);
+		if(!mime_str){
+			ham_logapiwarnf("Error in magic_file: %s", magic_error(ham_impl_magic_cookie));
+		}
+		else{
+			ret->mime = ham::str8(mime_str);
+		}
+	}
 
 	return true;
 }
@@ -217,6 +288,16 @@ bool ham_file_get_info(const ham_file *file, ham_file_info *ret){
 	}
 
 	ret->size = (usize)stat_buf.st_size;
+
+	if(ham_impl_magic_init()){
+		const char *mime_str = magic_descriptor(ham_impl_magic_cookie, file->fd);
+		if(!mime_str){
+			ham_logapiwarnf("Error in magic_descriptor: %s", magic_error(ham_impl_magic_cookie));
+		}
+		else{
+			ret->mime = ham::str8(mime_str);
+		}
+	}
 
 	return true;
 }

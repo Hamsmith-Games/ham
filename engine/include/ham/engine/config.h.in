@@ -1,0 +1,21 @@
+#ifndef HAM_ENGINE_CONFIG_H
+#define HAM_ENGINE_CONFIG_H 1
+
+/**
+ * @defgroup HAM_ENGINE_CONFIG Build configuration
+ * @ingroup HAM_ENGINE
+ * @{
+ */
+
+#include "ham/config.h"
+
+#define HAM_ENGINE_CLIENT_PLUGIN_UUID "@HAM_ENGINE_CLIENT_PLUGIN_UUID@"
+#define HAM_ENGINE_SERVER_PLUGIN_UUID "@HAM_ENGINE_SERVER_PLUGIN_UUID@"
+
+#define HAM_ENGINE_PLUGIN_CATEGORY "engine"
+
+/**
+ * @}
+ */
+
+#endif // !HAM_ENGINE_CONFIG_H

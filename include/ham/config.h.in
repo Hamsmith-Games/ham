@@ -35,6 +35,8 @@
 
 #define HAM_VERSION_STR "@HAM_VERSION@"
 
+#define HAM_TARGET_TRIPLE "@HAM_TARGET_TRIPLE@"
+
 #if !defined(__GNUC__) && !defined(__cplusplus)
 #	error "Ham requires GNU C extensions or C++"
 #endif
@@ -49,6 +51,10 @@
 
 #ifndef HAM_MESSAGE_BUFFER_SIZE
 #	define HAM_MESSAGE_BUFFER_SIZE 512
+#endif
+
+#ifndef HAM_UUID_BUFFER_SIZE
+#	define HAM_UUID_BUFFER_SIZE (sizeof("x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x"))
 #endif
 
 #ifdef HAM_UTF32
@@ -67,18 +73,112 @@
 #ifdef __cplusplus
 #	define HAM_C_API_BEGIN extern "C" {
 #	define HAM_C_API_END }
+#	define ham_extern_c extern "C"
 #	define ham_null nullptr
 #	define ham_auto auto
 #	define ham_constexpr constexpr
 #	define ham_thread_local thread_local
-#	define ham_types_compatible(type1, type2) __builtin_types_compatible_p(type1, type2)
+#	define ham_typeof(...) decltype(__VA_ARGS__)
+
+	namespace ham::detail{
+		template<typename T, typename U> struct is_same      { enum{ value = false }; };
+		template<typename T>             struct is_same<T, T>{ enum{ value = true  }; };
+
+		template<typename T, typename U>
+		constexpr inline bool is_same_v = is_same<T, U>::value;
+	}
+
+#	define ham_is_same(type1, type2) (ham::detail::is_same_v<type1, type2>)
 #else
 #	define HAM_C_API_BEGIN
 #	define HAM_C_API_END
+#	define ham_extern_c
 #	define ham_null NULL
 #	define ham_constexpr
-#	define ham_types_compatible(type1, type2) (_Generic((type1*)NULL, type2: true, default: false))
+#	define ham_is_same(type1, type2) (_Generic((type1*)NULL, type2: true, default: false))
 #endif
+
+//
+// Common MIME types
+//
+
+#define HAM_MIME_AAC "audio/aac"
+#define HAM_MIME_ABW "application/x-abiword"
+#define HAM_MIME_ARC "application/x-freearc"
+#define HAM_MIME_AVIF "image/avif"
+#define HAM_MIME_AVI "video/x-msvideo"
+#define HAM_MIME_AZW "application/vnd.amazon.ebook"
+#define HAM_MIME_BIN "application/octet-stream"
+#define HAM_MIME_BMP "image/bmp"
+#define HAM_MIME_BZ "application/x-bzip"
+#define HAM_MIME_BZ2 "application/x-bzip2"
+#define HAM_MIME_CDA "application/x-cdf"
+#define HAM_MIME_CSH "application/x-csh"
+#define HAM_MIME_CSS "text/css"
+#define HAM_MIME_CSV "text/csv"
+#define HAM_MIME_DLL "application/x-dosexec"
+#define HAM_MIME_DOC "application/msword"
+#define HAM_MIME_DOCX "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+#define HAM_MIME_ELF "application/x-elf"
+#define HAM_MIME_EOT "application/vnd.ms-fontobject"
+#define HAM_MIME_EPUB "application/epub+zip"
+#define HAM_MIME_EXE "application/x-msdownload"
+#define HAM_MIME_GZ "application/gzip"
+#define HAM_MIME_GIF "image/gif"
+#define HAM_MIME_HTML "text/html"
+#define HAM_MIME_ICO "image/vnd.microsoft.icon"
+#define HAM_MIME_ICS "text/calendar"
+#define HAM_MIME_JAR "application/java-archive"
+#define HAM_MIME_JPEG "image/jpeg"
+#define HAM_MIME_JS "text/javascript"
+#define HAM_MIME_JSON "application/json"
+#define HAM_MIME_JSONLD "application/ld+json"
+#define HAM_MIME_MID "audio/x-midi"
+#define HAM_MIME_MJS "text/javascript"
+#define HAM_MIME_MP3 "audio/mpeg"
+#define HAM_MIME_MP4 "video/mp4"
+#define HAM_MIME_MPEG "video/mpeg"
+#define HAM_MIME_MPKG "application/vnd.apple.installer+xml"
+#define HAM_MIME_ODP "application/vnd.oasis.opendocument.presentation"
+#define HAM_MIME_ODS "application/vnd.oasis.opendocument.spreadsheet"
+#define HAM_MIME_ODT "application/vnd.oasis.opendocument.text"
+#define HAM_MIME_OGA "audio/ogg"
+#define HAM_MIME_OGV "video/ogg"
+#define HAM_MIME_OGX "application/ogg"
+#define HAM_MIME_OPUS "audio/opus"
+#define HAM_MIME_OTF "font/otf"
+#define HAM_MIME_PNG "image/png"
+#define HAM_MIME_PDF "application/pdf"
+#define HAM_MIME_PHP "application/x-httpd-php"
+#define HAM_MIME_PPT "application/vnd.ms-powerpoint"
+#define HAM_MIME_PPTX "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+#define HAM_MIME_RAR "application/vnd.rar"
+#define HAM_MIME_RTF "application/rtf"
+#define HAM_MIME_SH "application/x-sh"
+#define HAM_MIME_SO "application/x-sharedlib"
+#define HAM_MIME_SVG "image/svg+xml"
+#define HAM_MIME_SWF "application/x-shockwave-flash"
+#define HAM_MIME_TAR "application/x-tar"
+#define HAM_MIME_TIFF "image/tiff"
+#define HAM_MIME_TS "video/mp2t"
+#define HAM_MIME_TTF "font/ttf"
+#define HAM_MIME_TXT "text/plain"
+#define HAM_MIME_VSD "application/vnd.visio"
+#define HAM_MIME_WAV "audio/wav"
+#define HAM_MIME_WEBA "audio/webm"
+#define HAM_MIME_WEBM "video/webm"
+#define HAM_MIME_WEBP "image/webp"
+#define HAM_MIME_WOFF "font/woff"
+#define HAM_MIME_WOFF2 "font/woff2"
+#define HAM_MIME_XHTML "application/xhtml+xml"
+#define HAM_MIME_XLS "application/vnd.ms-excel"
+#define HAM_MIME_XLSX "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+#define HAM_MIME_XML "application/xml"
+#define HAM_MIME_XUL "application/vnd.mozilla.xul+xml"
+#define HAM_MIME_ZIP "application/zip"
+#define HAM_MIME_3GP "video/3gpp"
+#define HAM_MIME_3G2 "video/3gpp2"
+#define HAM_MIME_7Z "application/x-7z-compressed"
 
 //
 // Platform-specific stuff
@@ -89,8 +189,16 @@
 
 #if defined(_WIN32)
 #	define HAM_PLATFORM HAM_PLATFORM_WIN32
+#	define HAM_PLATFORM_EXE_MIME HAM_MIME_EXE
+#	define HAM_PLATFORM_EXE_EXT  ".exe"
+#	define HAM_PLATFORM_DLL_MIME HAM_MIME_DLL
+#	define HAM_PLATFORM_DLL_EXT  ".dll"
 #elif defined(__unix__)
 #	define HAM_PLATFORM HAM_PLATFORM_UNIX
+#	define HAM_PLATFORM_EXE_MIME HAM_MIME_ELF
+#	define HAM_PLATFORM_EXE_EXT
+#	define HAM_PLATFORM_DLL_MIME HAM_MIME_SO
+#	define HAM_PLATFORM_DLL_EXT  ".so"
 #else
 #	error "Unrecognized platform"
 #endif
@@ -132,6 +240,10 @@
 
 #	ifndef ham_thread_local
 #		define ham_thread_local __thread
+#	endif
+
+#	ifndef ham_typeof
+#		define ham_typeof(...) __typeof__(__VA_ARGS__)
 #	endif
 
 #	ifndef ham_popcnt16
@@ -190,6 +302,12 @@
 #	define ham_api ham_public ham_export
 #else
 #	define ham_api ham_public ham_import
+#endif
+
+#ifdef HAM_ENGINE_LIB_IMPLEMENTATION
+#	define ham_engine_api ham_public ham_export
+#else
+#	define ham_engine_api ham_public ham_import
 #endif
 
 /**

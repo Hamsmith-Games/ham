@@ -38,6 +38,7 @@ typedef enum ham_file_open_flags{
 
 typedef struct ham_file_info{
 	ham_usize size;
+	ham_str8 mime;
 } ham_file_info;
 
 typedef struct ham_file ham_file;

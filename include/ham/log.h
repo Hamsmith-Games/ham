@@ -123,6 +123,9 @@ static inline void ham_logf(ham_log_level level, const char *api, const char *fm
 #define ham_logapierrorf(fmt_str, ...)   ham_logapif(HAM_LOG_ERROR,   fmt_str __VA_OPT__(,) __VA_ARGS__)
 #define ham_logapifatalf(fmt_str, ...)   ham_logapif(HAM_LOG_FATAL,   fmt_str __VA_OPT__(,) __VA_ARGS__)
 
+// TODO: implement this correctly
+//#define ham_logcall(api, fn_name, ...) (ham_logverbosef(api, "%s" HAM_REPEAT(HAM_NARGS(__VA_ARGS__), " %s")), (fn_name)(__VA_ARGS__))
+
 HAM_C_API_END
 
 /**
