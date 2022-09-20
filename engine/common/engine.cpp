@@ -18,7 +18,7 @@
 
 #include "ham/engine.h"
 #include "ham/engine-vtable.h"
-#include "ham/log.h"
+#include "ham/check.h"
 #include "ham/fs.h"
 
 #include <unistd.h>
@@ -171,6 +171,100 @@ static struct option ham_impl_long_options[] = {
 	{ 0,            0,                  0, 0 },
 };
 
+ham_uptr ham_impl_engine_thread_main(void *user){
+	const auto ctx    = reinterpret_cast<ham_engine_context*>(user);
+	const auto vtable = ctx->vtable;
+
+	const auto engine_name = ham_super(vtable)->name();
+
+	ham_logapidebugf("Posting engine semaphore...");
+
+	if(!ham_sem_post(ctx->sem)){
+		ham_logerrorf(engine_name.ptr, "Error posting engine semaphore");
+		ctx->status = 1;
+		return 1;
+	}
+
+	ham_logapidebugf("Waiting for engine mutex...");
+
+	if(!ham_mutex_lock(ctx->mut)){
+		ham_logerrorf(engine_name.ptr, "Error locking engine mutex");
+		ctx->status = 1;
+		return 1;
+	}
+
+	if(!ham_super(vtable)->on_load()){
+		ham_logerrorf(engine_name.ptr, "Error loading plugin");
+		ctx->status = 1;
+		ham_mutex_unlock(ctx->mut);
+		return 1;
+	}
+
+	ham_logapiinfof("Loaded %s", engine_name.ptr);
+
+	if(!vtable->context_init(ctx)){
+		ham_logerrorf(engine_name.ptr, "Error initializing context");
+
+		ham_super(vtable)->on_unload();
+		ham_logapiinfof("Unloaded %.*s", (int)engine_name.len, engine_name.ptr);
+
+		ctx->status = 1;
+		ham_mutex_unlock(ctx->mut);
+		return 1;
+	}
+
+	ham_logapidebugf("Waiting for engine semaphore posts...");
+
+	if(!ham_sem_wait(ctx->sem)){
+		ham_logerrorf(engine_name.ptr, "Error in ham_sem_wait");
+
+		vtable->context_finish(ctx);
+		ham_logapiinfof("Finished %.*s context", (int)engine_name.len, engine_name.ptr);
+
+		ham_super(vtable)->on_unload();
+		ham_logapiinfof("Unloaded %.*s", (int)engine_name.len, engine_name.ptr);
+
+		ctx->status = 1;
+		ham_mutex_unlock(ctx->mut);
+		return 1;
+	}
+
+	ham_mutex_unlock(ctx->mut);
+
+	if(!ham_sem_wait(ctx->sem)){
+		ham_logerrorf(engine_name.ptr, "Error in ham_sem_wait");
+
+		vtable->context_finish(ctx);
+		ham_logapiinfof("Finished %.*s context", (int)engine_name.len, engine_name.ptr);
+
+		ham_super(vtable)->on_unload();
+		ham_logapiinfof("Unloaded %.*s", (int)engine_name.len, engine_name.ptr);
+
+		ctx->status = 1;
+		return 1;
+	}
+
+	ham_logapidebugf("Running main loop");
+
+	ham_ticker ticker;
+	ham_ticker_reset(&ticker);
+
+	while(ctx->running.load(std::memory_order_relaxed)){
+		const ham_f64 dt = ham_ticker_tick(&ticker, ctx->min_dt.load(std::memory_order_relaxed));
+		(void)dt;
+
+		vtable->context_loop(ctx, dt);
+	}
+
+	vtable->context_finish(ctx);
+	ham_logapiinfof("Finished %.*s context", (int)engine_name.len, engine_name.ptr);
+
+	ham_super(vtable)->on_unload();
+	ham_logapiinfof("Unloaded %.*s", (int)engine_name.len, engine_name.ptr);
+
+	return 0;
+}
+
 ham_engine_context *ham_engine_create(const char *vtable_id, int argc, char **argv){
 	ham_path_buffer path_buf;
 
@@ -281,24 +375,13 @@ ham_engine_context *ham_engine_create(const char *vtable_id, int argc, char **ar
 		data.dll_handle = self_dll;
 	}
 
-	if(!ham_super(data.vtable)->on_load()){
-		ham_logapierrorf("Failure while loading plugin: %s", path_buf);
-		ham_dll_close(data.dll_handle);
-		return ham_null;
-	}
-
 	const auto engine_name = ham_super(data.vtable)->name();
-	ham_logapiinfof("Loaded %.*s", (int)engine_name.len, engine_name.ptr);
 
 	const auto allocator = ham_current_allocator();
 
 	const auto ctx = data.vtable->context_alloc(allocator);
 	if(!ctx){
 		ham_logapierrorf("Failed to allocate memory for context");
-
-		ham_super(data.vtable)->on_unload();
-		ham_logapiinfof("Unloaded %.*s", (int)engine_name.len, engine_name.ptr);
-
 		ham_dll_close(data.dll_handle);
 		return ham_null;
 	}
@@ -309,42 +392,113 @@ ham_engine_context *ham_engine_create(const char *vtable_id, int argc, char **ar
 	ctx->dll_handle = data.dll_handle;
 	ctx->vtable     = data.vtable;
 	ctx->status     = 0;
+	ctx->mut        = ham_mutex_create();
+	ctx->sem        = ham_sem_create(0);
 
-	memcpy(ctx->game_dir, game_path_str.ptr(), game_path_str.len());
-	ctx->game_dir[game_path_str.len()] = '\0';
+	if(!ctx->mut || !ctx->sem){
+		if(!ctx->mut){
+			ham_logapierrorf("Error creating engine mutex");
+		}
+		else{
+			ham_mutex_destroy(ctx->mut);
+		}
 
-	if(!data.vtable->context_init(ctx)){
-		ham_logapierrorf("Failed to initialize context");
+		if(!ctx->sem){
+			ham_logapierrorf("Error creating engine semaphore");
+		}
+		else{
+			ham_sem_destroy(ctx->sem);
+		}
 
 		data.vtable->context_free(ctx);
 		ham_logapidebugf("Freed %.*s context (%p)", (int)engine_name.len, engine_name.ptr, ctx);
-
-		ham_super(data.vtable)->on_unload();
-		ham_logapiinfof("Unloaded %.*s", (int)engine_name.len, engine_name.ptr);
 
 		ham_dll_close(data.dll_handle);
 		return ham_null;
 	}
 
-	ham_logapiinfof("Initialized %.*s context", (int)engine_name.len, engine_name.ptr);
+	memcpy(ctx->game_dir, game_path_str.ptr(), game_path_str.len());
+	ctx->game_dir[game_path_str.len()] = '\0';
+
+	ctx->thd = ham_thread_create(ham_impl_engine_thread_main, ctx);
+	if(!ctx->thd){
+		ham_logapierrorf("Error creating engine thread");
+
+		ham_mutex_destroy(ctx->mut);
+		ham_sem_destroy(ctx->sem);
+
+		data.vtable->context_free(ctx);
+		ham_logapidebugf("Freed %.*s context (%p)", (int)engine_name.len, engine_name.ptr, ctx);
+
+		ham_dll_close(data.dll_handle);
+		return ham_null;
+	}
+
+	ham_sem_wait(ctx->sem);
 
 	return ctx;
+}
+
+bool ham_engine_request_exit(ham_engine_context *ctx){
+	if(!ham_check(ctx != NULL)) return false;
+	ctx->running.store(false, std::memory_order_relaxed);
+	return true;
 }
 
 int ham_engine_exec(ham_engine_context *ctx){
 	if(!ctx) return -1;
 
-	const int result = ctx->status;
+	if(!ham_sem_post(ctx->sem)){
+		ham_logapierrorf("Error posting engine semaphore");
+		ctx->status = -1;
+	}
+	else if(!ham_mutex_lock(ctx->mut)){
+		ham_logapierrorf("Error locking engine mutex");
+		ctx->status = -1;
+	}
+
+	if(ctx->status == 0){
+		ctx->running.store(true, std::memory_order_relaxed);
+		if(!ham_sem_post(ctx->sem)){
+			ctx->running.store(false, std::memory_order_relaxed);
+			ctx->status = 1;
+		}
+	}
 
 	const auto dll_handle = ctx->dll_handle;
 	const auto vtable = ctx->vtable;
 
-	vtable->context_finish(ctx);
+	ham_ticker ticker;
+	ham_ticker_reset(&ticker);
+
+	while(ctx->running.load(std::memory_order_relaxed)){
+		const ham_f64 dt = ham_ticker_tick(&ticker, ctx->min_dt.load(std::memory_order_relaxed));
+		(void)dt;
+
+		// TODO
+	}
+
+	ham_mutex_unlock(ctx->mut);
+
+	ham_uptr engine_ret;
+	if(!ham_thread_join(ctx->thd, &engine_ret)){
+		ham_logapierrorf("Error joining engine thread");
+		engine_ret = (ham_uptr)-1;
+	}
+	else if(engine_ret != 0){
+		ham_logapierrorf("Error in running engine thread");
+		if(ctx->status == 0) ctx->status = 1;
+	}
+
+	const int result = ctx->status;
+
+	ham_thread_destroy(ctx->thd);
+	ham_mutex_destroy(ctx->mut);
+	ham_sem_destroy(ctx->sem);
+
 	vtable->context_free(ctx);
 
 	const auto engine_name = ham_super(vtable)->name();
-
-	ham_logapiinfof("Finalized %.*s context", (int)engine_name.len, engine_name.ptr);
 
 	ham_logapidebugf("Freed %.*s context (%p)", (int)engine_name.len, engine_name.ptr, ctx);
 

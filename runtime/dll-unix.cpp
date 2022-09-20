@@ -63,7 +63,16 @@ ham_usize ham_dll_iterate_symbols(ham_dll_handle handle, ham_dll_iterate_symbols
 	ham_path_buffer abs_path_buf;
 	if(!*abs_path){
 		// get self executable location
-		ssize_t readlink_res = readlink("/proc/self/exe", abs_path_buf, sizeof(abs_path_buf)-1);
+		ssize_t readlink_res = readlink(
+		#ifdef __FreeBSD__
+			"/proc/curproc/file",
+		#else
+			"/proc/self/exe",
+		#endif
+			abs_path_buf,
+			sizeof(abs_path_buf)-1
+		);
+
 		if(readlink_res == -1){
 			ham_logapierrorf("Error in readlink: %s", strerror(errno));
 			return (ham_usize)-1;

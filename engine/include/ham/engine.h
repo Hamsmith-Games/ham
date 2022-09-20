@@ -44,6 +44,8 @@ ham_engine_api ham_engine_context *ham_engine_create(const char *vtable_id, int 
 
 ham_engine_api void ham_engine_destroy(ham_engine_context *ctx);
 
+ham_engine_api bool ham_engine_request_exit(ham_engine_context *ctx);
+
 ham_engine_api int ham_engine_exec(ham_engine_context *ctx);
 
 /**

@@ -26,6 +26,8 @@
 
 struct ham_engine_client_context{
 	ham_derive(ham_engine_context)
+
+	SDL_Window *window;
 };
 
 static inline bool ham_engine_client_on_load(){
@@ -42,18 +44,41 @@ static inline void ham_engine_client_on_unload(){
 }
 
 static inline bool ham_engine_client_init(ham_engine_client_context *ctx){
-	(void)ctx;
+	ctx->window = SDL_CreateWindow(
+		HAM_ENGINE_CLIENT_API_NAME,
+		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+		1024, 768,
+		SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN
+	);
+	if(!ctx->window){
+		ham_logerrorf(HAM_ENGINE_CLIENT_API_NAME, "Error in SDL_CreateWindow: %s", SDL_GetError());
+		return false;
+	}
+
+	ham_logapiverbosef("Created window 1024x768");
+
 	return true;
 }
 
 static inline void ham_engine_client_finish(ham_engine_client_context *ctx){
-	(void)ctx;
+	SDL_DestroyWindow(ctx->window);
+}
+
+static inline void ham_engine_client_loop(ham_engine_client_context *ctx, ham_f64 dt){
+	(void)ctx; (void)dt;
+
+	SDL_Event ev;
+	while(SDL_PollEvent(&ev)){
+		if(ev.type == SDL_QUIT){
+			ham_engine_request_exit(ham_super(ctx));
+		}
+	}
 }
 
 HAM_ENGINE_VTABLE(
 	ham_engine_client_context,
 	HAM_ENGINE_CLIENT_PLUGIN_UUID,
-	"ham-engine-client",
+	HAM_ENGINE_CLIENT_API_NAME,
 	HAM_VERSION,
 	"Ham World Engine Client",
 	"Hamsmith Ltd.",
@@ -62,11 +87,11 @@ HAM_ENGINE_VTABLE(
 	ham_engine_client_on_load,
 	ham_engine_client_on_unload,
 	ham_engine_client_init,
-	ham_engine_client_finish
+	ham_engine_client_finish,
+	ham_engine_client_loop
 )
 
 int main(int argc, char *argv[]){
 	const auto engine = ham_engine_create("ham-engine-client", argc, argv);
-
 	return ham_engine_exec(engine);
 }

@@ -16,9 +16,12 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+
 find_package(GMP REQUIRED)
 find_package(MPFR REQUIRED)
 find_package(Magic REQUIRED)
+find_package(Threads REQUIRED)
 
 set(
 	HAM_SOURCES
@@ -33,10 +36,22 @@ set(
 	parse.cpp
 )
 
+if(NOT CMAKE_USE_PTHREADS_INIT)
+	message(FATLA_ERROR "Async currently only available with pthread support")
+endif()
+
 if(WIN32)
-	list(APPEND HAM_SOURCES dll-win32.cpp)
+	list(
+		APPEND HAM_SOURCES
+		dll-win32.cpp
+		async-pthread.cpp
+	)
 elseif(UNIX)
-	list(APPEND HAM_SOURCES dll-unix.cpp)
+	list(
+		APPEND HAM_SOURCES
+		dll-unix.cpp
+		async-pthread.cpp
+	)
 else()
 	message(FATAL_ERROR "Unsupported platform")
 endif()
@@ -65,6 +80,7 @@ target_include_directories(
 target_link_libraries(
 	ham
 	PUBLIC
+		Threads::Threads
 	    gmp::gmp
 		mpfr::mpfr
 		magic::magic
