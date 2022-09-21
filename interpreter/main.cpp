@@ -1,5 +1,5 @@
-/**
- * The Ham Programming Language Interpreter
+/*
+ * Ham Programming Language Interpreter
  * Copyright (C) 2022  Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify

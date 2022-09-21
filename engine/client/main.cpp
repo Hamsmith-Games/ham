@@ -1,5 +1,5 @@
-/**
- * The Ham World Engine
+/*
+ * The Ham World Engine Client
  * Copyright (C) 2022  Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify

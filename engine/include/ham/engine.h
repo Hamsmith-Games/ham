@@ -1,4 +1,4 @@
-/**
+/*
  * The Ham World Engine
  * Copyright (C) 2022  Hamsmith Ltd.
  *

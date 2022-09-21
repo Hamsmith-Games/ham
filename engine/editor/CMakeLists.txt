@@ -1,5 +1,5 @@
 #
-# The Ham World Engine
+# Ham World Engine Editor
 # Copyright (C) 2022  Hamsmith Ltd.
 #
 # This program is free software: you can redistribute it and/or modify

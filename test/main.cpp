@@ -1,5 +1,5 @@
-/**
- * The Ham Programming Language
+/*
+ * Ham Programming Language Tests
  * Copyright (C) 2022  Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
