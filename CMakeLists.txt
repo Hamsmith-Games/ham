@@ -156,6 +156,11 @@ install(
 )
 
 install(
+	FILES runtime/LICENSE.md
+	DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/libham
+)
+
+install(
 	TARGETS ham
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -163,12 +168,27 @@ install(
 
 if(HAM_INSTALL_TOOLS)
 	install(
+		FILES interpreter/LICENSE.md
+		DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/hami
+	)
+
+	install(
+		FILES compiler/LICENSE.md
+		DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/hamc
+	)
+
+	install(
 		TARGETS hamc hami
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	)
 endif()
 
 if(HAM_INSTALL_TEST)
+	install(
+		FILES test/LICENSE.md
+		DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/ham-test
+	)
+
 	install(
 		TARGETS ham-test
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

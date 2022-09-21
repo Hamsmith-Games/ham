@@ -17,13 +17,18 @@
 #
 
 ##
-# The Ham World Engine
+# Configuration
 ##
 
 set(HAM_ENGINE_CLIENT_PLUGIN_UUID "94d6f295-4e71-4b60-a7e5-a9fdc8bef7d2")
 set(HAM_ENGINE_SERVER_PLUGIN_UUID "db70e897-5f3f-4d38-a506-3445a20c1b5f")
 
-configure_file(include/ham/engine/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/ham/engine/config.h @ONLY)
+configure_file(
+	include/ham/engine/config.h.in
+	${CMAKE_CURRENT_BINARY_DIR}/include/ham/engine/config.h
+	@ONLY
+	NEWLINE_STYLE UNIX
+)
 
 set(HAM_ENGINE_SOURCE_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 set(HAM_ENGINE_BINARY_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
@@ -36,16 +41,38 @@ set(
 	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine-vtable.h
 )
 
+##
+# Subdirs
+##
+
 add_subdirectory(common)
 add_subdirectory(server)
 add_subdirectory(client)
 add_subdirectory(editor)
 
+##
+# Installation
+##
+
 if(HAM_INSTALL_ENGINE)
 	install(
-		TARGETS ham-engine ham-engine-client ham-engine-server ham-engine-editor
-		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+		FILES LICENSE.md
+		DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/libham-engine
+	)
+
+	install(
+		FILES LICENSE.md
+		DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/ham-engine-server
+	)
+
+	install(
+		FILES LICENSE.md
+		DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/ham-engine-client
+	)
+
+	install(
+		FILES LICENSE.md
+		DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/ham-engine-editor
 	)
 
 	install(
@@ -62,5 +89,11 @@ if(HAM_INSTALL_ENGINE)
 		FILES_MATCHING
 			PATTERN "*.h"
 			PATTERN "*.hpp"
+	)
+
+	install(
+		TARGETS ham-engine ham-engine-client ham-engine-server ham-engine-editor
+		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	)
 endif()
