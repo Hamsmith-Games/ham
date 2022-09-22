@@ -15,17 +15,6 @@ This project is intended as a general purpose environment for developing games a
 
 <br/>
 <br/>
-
-<h2 align="center">
-Featuring
-<br/>
-<br/>
-</h2>
-
-- Ham Runtime (`libham`)
-- Ham Language (`hamc`, `hami`)
-- Ham World Engine (`ham-engine-client`, `ham-engine-server` and `libham-engine`)
-
 <br/>
 <br/>
 
@@ -39,6 +28,10 @@ Ham Runtime
 
 The Ham runtime is the backbone of all other components in the project.
 
+- Runtime library (`libham`)
+
+<br/>
+<br/>
 <br/>
 <br/>
 
@@ -52,6 +45,11 @@ Ham Language
 
 The Ham Language is currently a POC and should not be used.
 
+- Interpreter (`hami`)
+- Compiler (`hamc`)
+
+<br/>
+<br/>
 <br/>
 <br/>
 
@@ -64,6 +62,11 @@ Ham World Engine
 > GPLv3+
 
 A creative environment for developing games and immersive experiences.
+
+- Runtime library (`libham-engine`)
+- Client (`ham-engine-client`)
+- Server (`ham-engine-server` and `ham-engine-server-manager`)
+- Editor (`ham-engine-editor`)
 
 <br/>
 <br/>
