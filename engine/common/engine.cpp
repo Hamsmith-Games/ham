@@ -27,29 +27,6 @@
 
 HAM_C_API_BEGIN
 
-[[noreturn]]
-static inline void ham_impl_display_version(){
-	printf("Ham World Engine v" HAM_VERSION_STR "\n");
-	exit(EXIT_SUCCESS);
-}
-
-[[noreturn]]
-static void ham_impl_print_help(const char *argv0){
-	printf(
-		"Ham World Engine v" HAM_VERSION_STR "\n"
-		"\n"
-		"    Usage: %s [OPTIONS]\n"
-		"\n"
-		"    Possible options:\n"
-		"        -h|--help:          Print this help message\n"
-		"        -g|--game-dir DIR:  Set the game/app directory\n"
-		"\n"
-		,
-		argv0
-	);
-	exit(EXIT_SUCCESS);
-}
-
 struct ham_impl_engine_data{
 	ham::str8 vtable_id;
 	ham_dll_handle dll_handle = nullptr;
@@ -165,12 +142,6 @@ static inline const ham_engine_vtable *ham_impl_find_engine_plugin(ham::str8 pat
 	return data->vtable;
 }
 
-static struct option ham_impl_long_options[] = {
-	{ "help",		no_argument,		0, 0 },
-	{ "game-dir",	required_argument,	0, 0 },
-	{ 0,            0,                  0, 0 },
-};
-
 ham_uptr ham_impl_engine_thread_main(void *user){
 	const auto ctx    = reinterpret_cast<ham_engine_context*>(user);
 	const auto vtable = ctx->vtable;
@@ -265,6 +236,53 @@ ham_uptr ham_impl_engine_thread_main(void *user){
 	return 0;
 }
 
+ham_nothrow ham_version ham_engine_version(){ return HAM_ENGINE_VERSION; }
+
+#define HAM_ENGINE_VERSION_LINE "Ham World Engine - " HAM_ENGINE_BUILD_TYPE_STR " - v" HAM_ENGINE_VERSION_STR "\n"
+
+ham_nothrow const char *ham_engine_version_line(){ return HAM_ENGINE_VERSION_LINE; }
+
+[[noreturn]]
+static inline void ham_impl_show_version(){
+	printf(HAM_ENGINE_VERSION_LINE);
+	exit(EXIT_SUCCESS);
+}
+
+[[noreturn]]
+static void ham_impl_show_help(const char *argv0){
+	const char *exec_name = argv0;
+
+	const auto argv0_str = ham::str8(argv0);
+	const auto new_beg = argv0_str.rfind("/");
+	if(new_beg != ham::str8::npos){
+		exec_name += new_beg;
+	}
+
+	printf(
+		HAM_ENGINE_VERSION_LINE
+		"\n"
+		"    Usage: %s [OPTIONS...] [-- [SERVER-ARGS...]]\n"
+		"\n"
+		"    Possible options:\n"
+		"        -h|--help:             Print this help message and exit\n"
+		"        -v|--version:          Print the version string and exit\n"
+		"        -V|--verbose:          Print more log messages\n"
+		"        -g|--game-dir DIR:     Set the game directory\n"
+		"\n"
+		,
+		exec_name
+	);
+	exit(EXIT_SUCCESS);
+}
+
+static struct option ham_impl_long_options[] = {
+	{ "help",		no_argument,		0, 0 },
+	{ "version",	no_argument,		0, 0 },
+	{ "verbose",	no_argument,		0, 0 },
+	{ "game-dir",	required_argument,	0, 0 },
+	{ 0,            0,                  0, 0 },
+};
+
 ham_engine_context *ham_engine_create(const char *vtable_id, int argc, char **argv){
 	ham_path_buffer path_buf;
 
@@ -272,7 +290,7 @@ ham_engine_context *ham_engine_create(const char *vtable_id, int argc, char **ar
 
 	while(1){
 		int option_index = 0;
-		const int getopt_res = getopt_long(argc, argv, "hg:", ham_impl_long_options, &option_index);
+		const int getopt_res = getopt_long(argc, argv, "hvVg:", ham_impl_long_options, &option_index);
 
 		if(getopt_res == -1){
 			break;
@@ -280,21 +298,36 @@ ham_engine_context *ham_engine_create(const char *vtable_id, int argc, char **ar
 
 		switch(getopt_res){
 			case 0:{
-				if(option_index == 0){
-					ham_impl_print_help(argv[0]);
-				}
-				else if(option_index == 1){
-					game_dir = optarg;
-				}
-				else{
-					fprintf(stderr, "Error in getopt_long: unexpected long option at index %d\n", option_index);
-					exit(1);
+				switch(option_index){
+					case 0: ham_impl_show_help(argv[0]);
+					case 1: ham_impl_show_version();
+
+					case 2:{
+						ham_log_set_verbose(true);
+						break;
+					}
+
+					case 3:{
+						game_dir = optarg;
+						break;
+					}
+
+					default:{
+						fprintf(stderr, "Error in getopt_long: unexpected long option at index %d\n", option_index);
+						exit(1);
+					}
 				}
 
 				break;
 			}
 
-			case 'h': ham_impl_print_help(argv[0]);
+			case 'h': ham_impl_show_help(argv[0]);
+			case 'v': ham_impl_show_version();
+
+			case 'V':{
+				ham_log_set_verbose(true);
+				break;
+			}
 
 			case 'g':{
 				game_dir = optarg;

@@ -16,7 +16,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-add_executable(ham-engine-server main.cpp)
+##
+# Server executable
+##
+
+add_executable(ham-engine-server server.h server.cpp)
 
 set_target_properties(
 	ham-engine-server PROPERTIES
@@ -33,3 +37,17 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 endif()
 
 target_link_libraries(ham-engine-server PRIVATE ham::engine)
+
+##
+# Manager/Console
+##
+
+find_package(NCURSES REQUIRED)
+
+add_executable(ham-engine-server-manager manager.h manager.cpp)
+
+target_compile_features(ham-engine-server-manager PRIVATE c_std_17 cxx_std_20)
+
+target_compile_definitions(ham-engine-server-manager PRIVATE HAM_ENGINE_SERVER_MANAGER_IMPLEMENTATION)
+
+target_link_libraries(ham-engine-server-manager PRIVATE ham::engine ncurses::ncurses)

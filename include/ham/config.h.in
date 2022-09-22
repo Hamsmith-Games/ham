@@ -35,6 +35,14 @@
 
 #define HAM_VERSION_STR "@HAM_VERSION@"
 
+#define HAM_BUILD_RELEASE          0
+#define HAM_BUILD_DEBUG            1
+#define HAM_BUILD_RELWITHDEBINFO   2
+#define HAM_BUILD_MINSIZEREL       3
+
+#define HAM_BUILD_TYPE HAM_BUILD_@HAM_BUILD_TYPE@
+#define HAM_BUILD_TYPE_STR "@HAM_BUILD_TYPE_STR@"
+
 #define HAM_TARGET_TRIPLE "@HAM_TARGET_TRIPLE@"
 
 #if !defined(__GNUC__) && !defined(__cplusplus)
@@ -102,83 +110,98 @@
 // Common MIME types
 //
 
-#define HAM_MIME_AAC "audio/aac"
-#define HAM_MIME_ABW "application/x-abiword"
-#define HAM_MIME_ARC "application/x-freearc"
-#define HAM_MIME_AVIF "image/avif"
-#define HAM_MIME_AVI "video/x-msvideo"
-#define HAM_MIME_AZW "application/vnd.amazon.ebook"
-#define HAM_MIME_BIN "application/octet-stream"
-#define HAM_MIME_BMP "image/bmp"
-#define HAM_MIME_BZ "application/x-bzip"
-#define HAM_MIME_BZ2 "application/x-bzip2"
-#define HAM_MIME_CDA "application/x-cdf"
-#define HAM_MIME_CSH "application/x-csh"
-#define HAM_MIME_CSS "text/css"
-#define HAM_MIME_CSV "text/csv"
-#define HAM_MIME_DLL "application/x-dosexec"
-#define HAM_MIME_DOC "application/msword"
-#define HAM_MIME_DOCX "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-#define HAM_MIME_ELF "application/x-elf"
-#define HAM_MIME_EOT "application/vnd.ms-fontobject"
-#define HAM_MIME_EPUB "application/epub+zip"
-#define HAM_MIME_EXE "application/x-msdownload"
-#define HAM_MIME_GZ "application/gzip"
-#define HAM_MIME_GIF "image/gif"
-#define HAM_MIME_HTML "text/html"
-#define HAM_MIME_ICO "image/vnd.microsoft.icon"
-#define HAM_MIME_ICS "text/calendar"
-#define HAM_MIME_JAR "application/java-archive"
-#define HAM_MIME_JPEG "image/jpeg"
-#define HAM_MIME_JS "text/javascript"
-#define HAM_MIME_JSON "application/json"
-#define HAM_MIME_JSONLD "application/ld+json"
-#define HAM_MIME_MID "audio/x-midi"
-#define HAM_MIME_MJS "text/javascript"
-#define HAM_MIME_MP3 "audio/mpeg"
-#define HAM_MIME_MP4 "video/mp4"
-#define HAM_MIME_MPEG "video/mpeg"
-#define HAM_MIME_MPKG "application/vnd.apple.installer+xml"
-#define HAM_MIME_ODP "application/vnd.oasis.opendocument.presentation"
-#define HAM_MIME_ODS "application/vnd.oasis.opendocument.spreadsheet"
-#define HAM_MIME_ODT "application/vnd.oasis.opendocument.text"
-#define HAM_MIME_OGA "audio/ogg"
-#define HAM_MIME_OGV "video/ogg"
-#define HAM_MIME_OGX "application/ogg"
-#define HAM_MIME_OPUS "audio/opus"
-#define HAM_MIME_OTF "font/otf"
-#define HAM_MIME_PNG "image/png"
-#define HAM_MIME_PDF "application/pdf"
-#define HAM_MIME_PHP "application/x-httpd-php"
-#define HAM_MIME_PPT "application/vnd.ms-powerpoint"
-#define HAM_MIME_PPTX "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-#define HAM_MIME_RAR "application/vnd.rar"
-#define HAM_MIME_RTF "application/rtf"
-#define HAM_MIME_SH "application/x-sh"
-#define HAM_MIME_SO "application/x-sharedlib"
-#define HAM_MIME_SVG "image/svg+xml"
-#define HAM_MIME_SWF "application/x-shockwave-flash"
-#define HAM_MIME_TAR "application/x-tar"
-#define HAM_MIME_TIFF "image/tiff"
-#define HAM_MIME_TS "video/mp2t"
-#define HAM_MIME_TTF "font/ttf"
-#define HAM_MIME_TXT "text/plain"
-#define HAM_MIME_VSD "application/vnd.visio"
-#define HAM_MIME_WAV "audio/wav"
-#define HAM_MIME_WEBA "audio/webm"
-#define HAM_MIME_WEBM "video/webm"
-#define HAM_MIME_WEBP "image/webp"
-#define HAM_MIME_WOFF "font/woff"
-#define HAM_MIME_WOFF2 "font/woff2"
-#define HAM_MIME_XHTML "application/xhtml+xml"
-#define HAM_MIME_XLS "application/vnd.ms-excel"
-#define HAM_MIME_XLSX "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-#define HAM_MIME_XML "application/xml"
-#define HAM_MIME_XUL "application/vnd.mozilla.xul+xml"
-#define HAM_MIME_ZIP "application/zip"
-#define HAM_MIME_3GP "video/3gpp"
-#define HAM_MIME_3G2 "video/3gpp2"
-#define HAM_MIME_7Z "application/x-7z-compressed"
+#define HAM_MIME_ENCODING(encoding_str) "charset=" encoding_str
+
+#define HAM_MIME_ENCODING_BINARY HAM_MIME_ENCODING("binary")
+#define HAM_MIME_ENCODING_ASCII HAM_MIME_ENCODING("us-ascii")
+
+#define HAM_MIME_ENCODING_UTF_(n) HAM_MIME_ENCODING("utf-" #n)
+#define HAM_MIME_ENCODING_UTF(n) HAM_MIME_ENCODING_UTF_(n)
+
+#define HAM_MIME_ENCODING_UTF8  HAM_MIME_ENCODING_UTF_(8)
+#define HAM_MIME_ENCODING_UTF16 HAM_MIME_ENCODING_UTF_(16)
+#define HAM_MIME_ENCODING_UTF32 HAM_MIME_ENCODING_UTF_(32)
+
+#define HAM_MIME_TYPE_AAC "audio/aac"
+#define HAM_MIME_TYPE_ABW "application/x-abiword"
+#define HAM_MIME_TYPE_ARC "application/x-freearc"
+#define HAM_MIME_TYPE_AVIF "image/avif"
+#define HAM_MIME_TYPE_AVI "video/x-msvideo"
+#define HAM_MIME_TYPE_AZW "application/vnd.amazon.ebook"
+#define HAM_MIME_TYPE_BIN "application/octet-stream"
+#define HAM_MIME_TYPE_BMP "image/bmp"
+#define HAM_MIME_TYPE_BZ "application/x-bzip"
+#define HAM_MIME_TYPE_BZ2 "application/x-bzip2"
+#define HAM_MIME_TYPE_C "text/x-c"
+#define HAM_MIME_TYPE_CDA "application/x-cdf"
+#define HAM_MIME_TYPE_CSH "application/x-csh"
+#define HAM_MIME_TYPE_CSS "text/css"
+#define HAM_MIME_TYPE_CSV "text/csv"
+#define HAM_MIME_TYPE_DLL "application/x-dosexec"
+#define HAM_MIME_TYPE_DOC "application/msword"
+#define HAM_MIME_TYPE_DOCX "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+#define HAM_MIME_TYPE_ELF "application/x-elf"
+#define HAM_MIME_TYPE_EOT "application/vnd.ms-fontobject"
+#define HAM_MIME_TYPE_EPUB "application/epub+zip"
+#define HAM_MIME_TYPE_EXE "application/x-msdownload"
+#define HAM_MIME_TYPE_GZ "application/gzip"
+#define HAM_MIME_TYPE_GIF "image/gif"
+#define HAM_MIME_TYPE_HTML "text/html"
+#define HAM_MIME_TYPE_ICO "image/vnd.microsoft.icon"
+#define HAM_MIME_TYPE_ICS "text/calendar"
+#define HAM_MIME_TYPE_JAR "application/java-archive"
+#define HAM_MIME_TYPE_JPEG "image/jpeg"
+#define HAM_MIME_TYPE_JS "text/javascript"
+#define HAM_MIME_TYPE_JSON "application/json"
+#define HAM_MIME_TYPE_JSONLD "application/ld+json"
+#define HAM_MIME_TYPE_MID "audio/x-midi"
+#define HAM_MIME_TYPE_MJS "text/javascript"
+#define HAM_MIME_TYPE_MP3 "audio/mpeg"
+#define HAM_MIME_TYPE_MP4 "video/mp4"
+#define HAM_MIME_TYPE_MPEG "video/mpeg"
+#define HAM_MIME_TYPE_MPKG "application/vnd.apple.installer+xml"
+#define HAM_MIME_TYPE_ODP "application/vnd.oasis.opendocument.presentation"
+#define HAM_MIME_TYPE_ODS "application/vnd.oasis.opendocument.spreadsheet"
+#define HAM_MIME_TYPE_ODT "application/vnd.oasis.opendocument.text"
+#define HAM_MIME_TYPE_OGA "audio/ogg"
+#define HAM_MIME_TYPE_OGV "video/ogg"
+#define HAM_MIME_TYPE_OGX "application/ogg"
+#define HAM_MIME_TYPE_OPUS "audio/opus"
+#define HAM_MIME_TYPE_OTF "font/otf"
+#define HAM_MIME_TYPE_PNG "image/png"
+#define HAM_MIME_TYPE_PDF "application/pdf"
+#define HAM_MIME_TYPE_PHP "application/x-httpd-php"
+#define HAM_MIME_TYPE_PPT "application/vnd.ms-powerpoint"
+#define HAM_MIME_TYPE_PPTX "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+#define HAM_MIME_TYPE_RAR "application/vnd.rar"
+#define HAM_MIME_TYPE_RTF "application/rtf"
+#define HAM_MIME_TYPE_SH "application/x-sh"
+#define HAM_MIME_TYPE_SO "application/x-sharedlib"
+#define HAM_MIME_TYPE_SVG "image/svg+xml"
+#define HAM_MIME_TYPE_SWF "application/x-shockwave-flash"
+#define HAM_MIME_TYPE_TAR "application/x-tar"
+#define HAM_MIME_TYPE_TIFF "image/tiff"
+#define HAM_MIME_TYPE_TS "video/mp2t"
+#define HAM_MIME_TYPE_TTF "font/ttf"
+#define HAM_MIME_TYPE_TXT "text/plain"
+#define HAM_MIME_TYPE_VSD "application/vnd.visio"
+#define HAM_MIME_TYPE_WAV "audio/wav"
+#define HAM_MIME_TYPE_WEBA "audio/webm"
+#define HAM_MIME_TYPE_WEBM "video/webm"
+#define HAM_MIME_TYPE_WEBP "image/webp"
+#define HAM_MIME_TYPE_WOFF "font/woff"
+#define HAM_MIME_TYPE_WOFF2 "font/woff2"
+#define HAM_MIME_TYPE_XHTML "application/xhtml+xml"
+#define HAM_MIME_TYPE_XLS "application/vnd.ms-excel"
+#define HAM_MIME_TYPE_XLSX "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+#define HAM_MIME_TYPE_XML "application/xml"
+#define HAM_MIME_TYPE_XUL "application/vnd.mozilla.xul+xml"
+#define HAM_MIME_TYPE_ZIP "application/zip"
+#define HAM_MIME_TYPE_3GP "video/3gpp"
+#define HAM_MIME_TYPE_3G2 "video/3gpp2"
+#define HAM_MIME_TYPE_7Z "application/x-7z-compressed"
+
+#define HAM_MIME(type_, encoding_) type_ "; " encoding_
 
 //
 // Platform-specific stuff
@@ -189,15 +212,15 @@
 
 #if defined(_WIN32)
 #	define HAM_PLATFORM HAM_PLATFORM_WIN32
-#	define HAM_PLATFORM_EXE_MIME HAM_MIME_EXE
-#	define HAM_PLATFORM_EXE_EXT  ".exe"
-#	define HAM_PLATFORM_DLL_MIME HAM_MIME_DLL
+#	define HAM_PLATFORM_EXEC_MIME HAM_MIME(HAM_MIME_TYPE_EXE, HAM_MIME_ENCODING_BINARY)
+#	define HAM_PLATFORM_EXEC_EXT  ".exe"
+#	define HAM_PLATFORM_DLL_MIME HAM_MIME(HAM_MIME_TYPE_DLL, HAM_MIME_ENCODING_BINARY)
 #	define HAM_PLATFORM_DLL_EXT  ".dll"
 #elif defined(__unix__)
 #	define HAM_PLATFORM HAM_PLATFORM_UNIX
-#	define HAM_PLATFORM_EXE_MIME HAM_MIME_ELF
-#	define HAM_PLATFORM_EXE_EXT
-#	define HAM_PLATFORM_DLL_MIME HAM_MIME_SO
+#	define HAM_PLATFORM_EXEC_MIME HAM_MIME(HAM_MIME_TYPE_ELF, HAM_MIME_ENCODING_BINARY)
+#	define HAM_PLATFORM_EXEC_EXT
+#	define HAM_PLATFORM_DLL_MIME HAM_MIME(HAM_MIME_TYPE_SO, HAM_MIME_ENCODING_BINARY)
 #	define HAM_PLATFORM_DLL_EXT  ".so"
 #else
 #	error "Unrecognized platform"
@@ -223,12 +246,21 @@
 // Compiler stuff
 //
 
+#ifndef NDEBUG
+#	define HAM_DEBUG
+#else
+#	define HAM_RELEASE
+#endif
+
 #ifdef __GNUC__
 
 #	define ham_public __attribute__((visibility("default")))
 #	define ham_private __attribute__((visibility("hidden")))
 
 #	define ham_nonnull_args(...) __attribute__((nonnull(__VA_ARGS__)))
+
+#	define ham_likely(cond_)   __builtin_expect(!!(cond_), 1)
+#	define ham_unlikely(cond_) __builtin_expect(!!(cond_), 0)
 
 #	ifndef ham_nothrow
 #		define ham_nothrow __attribute__((nothrow))
@@ -278,6 +310,9 @@
 
 #	define ham_public
 #	define ham_private
+
+#	define ham_likely(cond_) (cond_)
+#	define ham_unlikely(cond_) (cond_)
 
 #	define ham_min(a, b) \
 		([](const auto a_; const auto b_) constexpr{ \

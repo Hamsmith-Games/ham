@@ -53,6 +53,13 @@ static const ham_logger ham_impl_default_logger_inst{
 	.user = nullptr,
 };
 
+bool ham_impl_verbose_flag =
+#ifdef HAM_DEBUG
+	true;
+#else
+	false;
+#endif
+
 const ham_logger *const ham_impl_default_logger = &ham_impl_default_logger_inst;
 const ham_logger *ham_impl_global_logger = &ham_impl_default_logger_inst;
 ham_thread_local ham_message_buffer ham_impl_message_buf = { 0 };

@@ -18,9 +18,8 @@
 
 #define HAM_ENGINE_CLIENT_API_NAME "ham-engine-client"
 
-#include "ham/dll.h"
-#include "ham/log.h"
 #include "ham/engine-vtable.h"
+#include "ham/log.h"
 
 #include "SDL.h"
 
@@ -92,6 +91,6 @@ HAM_ENGINE_VTABLE(
 )
 
 int main(int argc, char *argv[]){
-	const auto engine = ham_engine_create("ham-engine-client", argc, argv);
+	const auto engine = ham_engine_create(HAM_ENGINE_CLIENT_API_NAME, argc, argv);
 	return ham_engine_exec(engine);
 }

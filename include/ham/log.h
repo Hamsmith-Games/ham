@@ -62,12 +62,21 @@ typedef struct ham_logger{
 } ham_logger;
 
 //! @cond ignore
+ham_api extern bool ham_impl_verbose_flag;
 ham_api extern const ham_logger *const ham_impl_default_logger;
 ham_api extern const ham_logger *ham_impl_global_logger;
 ham_api extern ham_thread_local ham_message_buffer ham_impl_message_buf;
 ham_api extern ham_thread_local const ham_logger *ham_impl_thread_logger;
 ham_api extern ham_thread_local const ham_logger *const *ham_impl_current_logger;
 //! @endcond
+
+ham_nothrow static inline bool ham_log_is_verbose(){
+	return ham_impl_verbose_flag;
+}
+
+ham_nothrow static inline void ham_log_set_verbose(bool enabled){
+	ham_impl_verbose_flag = enabled;
+}
 
 ham_nothrow static inline const ham_logger *ham_current_logger(){
 	return *ham_impl_current_logger;
@@ -89,7 +98,11 @@ static inline void ham_logf(ham_log_level level, const char *api, const char *fm
 	ham_timepoint log_tp = (ham_timepoint){ 0, 0 };
 
 	if(!ham_timepoint_now(&log_tp, CLOCK_REALTIME)){
-		// bad place for this to happed :/
+		// bad place for this to happen :/
+	}
+
+	if(level == HAM_LOG_VERBOSE && !ham_log_is_verbose()){
+		return;
 	}
 
 	va_list va0;
@@ -111,14 +124,26 @@ static inline void ham_logf(ham_log_level level, const char *api, const char *fm
 
 #define ham_loginfof(api, fmt_str, ...)    (ham_logf(HAM_LOG_INFO,    api, fmt_str __VA_OPT__(,) __VA_ARGS__))
 #define ham_logverbosef(api, fmt_str, ...) (ham_logf(HAM_LOG_VERBOSE, api, fmt_str __VA_OPT__(,) __VA_ARGS__))
-#define ham_logdebugf(api, fmt_str, ...)   (ham_logf(HAM_LOG_DEBUG,   api, fmt_str __VA_OPT__(,) __VA_ARGS__))
+
+#ifdef HAM_DEBUG
+#	define ham_logdebugf(api, fmt_str, ...) (ham_logf(HAM_LOG_DEBUG,   api, fmt_str __VA_OPT__(,) __VA_ARGS__))
+#else
+#	define ham_logdebugf(api, fmt_str, ...)
+#endif
+
 #define ham_logwarnf(api, fmt_str, ...)    (ham_logf(HAM_LOG_WARNING, api, fmt_str __VA_OPT__(,) __VA_ARGS__))
 #define ham_logerrorf(api, fmt_str, ...)   (ham_logf(HAM_LOG_ERROR,   api, fmt_str __VA_OPT__(,) __VA_ARGS__))
 #define ham_logfatalf(api, fmt_str, ...)   (ham_logf(HAM_LOG_FATAL,   api, fmt_str __VA_OPT__(,) __VA_ARGS__))
 
 #define ham_logapiinfof(fmt_str, ...)    ham_logapif(HAM_LOG_INFO,    fmt_str __VA_OPT__(,) __VA_ARGS__)
 #define ham_logapiverbosef(fmt_str, ...) ham_logapif(HAM_LOG_VERBOSE, fmt_str __VA_OPT__(,) __VA_ARGS__)
-#define ham_logapidebugf(fmt_str, ...)   ham_logapif(HAM_LOG_DEBUG,   fmt_str __VA_OPT__(,) __VA_ARGS__)
+
+#ifdef HAM_DEBUG
+#	define ham_logapidebugf(fmt_str, ...) ham_logapif(HAM_LOG_DEBUG,   fmt_str __VA_OPT__(,) __VA_ARGS__)
+#else
+#	define ham_logapidebugf(fmt_str, ...)
+#endif
+
 #define ham_logapiwarnf(fmt_str, ...)    ham_logapif(HAM_LOG_WARNING, fmt_str __VA_OPT__(,) __VA_ARGS__)
 #define ham_logapierrorf(fmt_str, ...)   ham_logapif(HAM_LOG_ERROR,   fmt_str __VA_OPT__(,) __VA_ARGS__)
 #define ham_logapifatalf(fmt_str, ...)   ham_logapif(HAM_LOG_FATAL,   fmt_str __VA_OPT__(,) __VA_ARGS__)

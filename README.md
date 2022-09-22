@@ -1,4 +1,11 @@
-# <div align="center">🥩 Ham 🥩<br><br>The Hamsmith Development Environment<br><br></div>
+<div align="center"><h1>
+🥩 Ham 🥩
+<br>
+<br>
+The Hamsmith Development Environment
+<br>
+<br>
+</h1></div>
 
 > **NOTE** This is a work in progress and currently has a tumoltuous development cycle with many things changing and breaking constantly. Use at your own peril.
 
@@ -10,7 +17,7 @@ This project is intended as a general purpose environment for developing games a
 <hr/>
 <br/>
 
-## <div align="center">Featuring</div>
+<h2 align="center">Featuring</h2>
 
 - Ham Runtime (`libham`)
 - Ham Language (`hamc`, `hami`)
@@ -20,7 +27,7 @@ This project is intended as a general purpose environment for developing games a
 <hr/>
 <br/>
 
-### <div align="center">Ham Runtime</div>
+<h2 align="center">Ham Runtime</h2>
 
 > LGPLv3+
 
@@ -30,7 +37,7 @@ The Ham runtime is the backbone of all other components in the project.
 <hr/>
 <br/>
 
-### <div align="center">Ham Language</div>
+<h2 align="center">Ham Language</h2>
 
 > GPLv3+
 
@@ -40,7 +47,7 @@ The Ham Language is currently a POC and should not be used.
 <hr/>
 <br/>
 
-### <div align="center">Ham World Engine</div>
+<h2 align="center">Ham World Engine</h2>
 
 > GPLv3+
 

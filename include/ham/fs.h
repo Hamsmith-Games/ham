@@ -36,7 +36,17 @@ typedef enum ham_file_open_flags{
 	HAM_OPEN_RDWR = HAM_OPEN_READ | HAM_OPEN_WRITE,
 } ham_file_open_flags;
 
+typedef enum ham_file_kind{
+	HAM_FILE_REGULAR,
+	HAM_FILE_DIRECTORY,
+	HAM_FILE_LINK,
+	HAM_FILE_UNKNOWN,
+
+	HAM_FILE_KIND_COUNT,
+} ham_file_kind;
+
 typedef struct ham_file_info{
+	ham_file_kind kind;
 	ham_usize size;
 	ham_str8 mime;
 } ham_file_info;

@@ -401,13 +401,13 @@ typedef struct ham_str32{ const ham_char32 *ptr; ham_uptr len; } ham_str32;
 #	define HAM_IMPL_STR_CMP(a, b) \
 		({	const ham_auto a_ = (a); const ham_auto b_ = (b);\
 			const ham_usize max_len_ = a_.len > b_.len ? b_.len : a_.len; \
-			ham_usize i_ = 0; \
+			int i_ = 0; \
 			int res_ = 0; \
 			for(; i_ < max_len_; i_++){ \
 				res_ = a_.ptr[i_] - b_.ptr[i_]; \
 				if(res_ != 0) break;\
 			} \
-			if(res_ != 0){ \
+			if(res_ == 0 && i_ != max_len_){ \
 				res_ = (max_len_ == a_.len) ? b_.ptr[max_len_] : a_.ptr[max_len_]; \
 			} \
 			res_; })
@@ -1045,6 +1045,7 @@ namespace ham{
 
 			constexpr usize find(const basic_str &str_, usize pos = 0) const noexcept{
 				if(str_.len() == 0) return pos;
+				else if(str_.len() > len()) return npos;
 
 				while(pos < len() && (len() - pos >= str_.len())){
 					const auto sub = basic_str(m_val.ptr + pos, str_.len());
@@ -1055,15 +1056,13 @@ namespace ham{
 				return npos;
 			}
 
-			constexpr usize rfind(const basic_str &str_, usize pos = 0) const noexcept{
+			constexpr usize rfind(const basic_str &str_, usize pos = HAM_USIZE_MAX) const noexcept{
 				if(str_.len() == 0) return pos;
+				else if(str_.len() > len()) return pos;
+
+				pos = ham_min(pos, len() - str_.len());
 
 				while(pos != npos){
-					if(len() - pos < str_.len()){
-						--pos;
-						continue;
-					}
-
 					const auto sub = basic_str(m_val.ptr + pos, str_.len());
 					if(sub == str_) return pos;
 					--pos;

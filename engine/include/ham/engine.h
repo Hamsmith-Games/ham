@@ -25,9 +25,15 @@
  */
 
 #include "ham/engine/config.h"
-#include "ham/memory.h"
+#include "ham/typedefs.h"
+
+#define HAM_ENGINE_VERSION ((ham_version){HAM_ENGINE_VERSION_MAJOR,HAM_ENGINE_VERSION_MINOR,HAM_ENGINE_VERSION_PATCH})
 
 HAM_C_API_BEGIN
+
+ham_engine_api ham_nothrow ham_version ham_engine_version();
+
+ham_engine_api ham_nothrow const char *ham_engine_version_line();
 
 typedef struct ham_screen{
 	ham_u32 w, h, refresh;

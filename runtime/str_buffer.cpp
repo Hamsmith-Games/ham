@@ -65,6 +65,33 @@ namespace ham{
 		}
 
 		template<typename Char>
+		inline bool str_buffer_impl_append(str_buffer_ctype_t<Char> *buf, str_ctype_t<Char> str){
+			if(!buf || !str_buffer_impl_reserve<Char>(buf, buf->stored + str.len)) return false;
+
+			if(!str.len) return true;
+			else if(!str.ptr) return false;
+
+			memcpy(buf->mem + buf->stored, str.ptr, str.len);
+			buf->stored += str.len;
+			buf->mem[buf->stored] = '\0';
+			return true;
+		}
+
+		template<typename Char>
+		inline bool str_buffer_impl_prepend(str_buffer_ctype_t<Char> *buf, str_ctype_t<Char> str){
+			if(!buf || !str_buffer_impl_reserve<Char>(buf, buf->stored + str.len)) return false;
+
+			if(!str.len) return true;
+			else if(!str.ptr) return false;
+
+			memmove(buf->mem + str.len, buf->mem, buf->stored);
+			memcpy(buf->mem, str.ptr, str.len);
+			buf->stored += str.len;
+			buf->mem[buf->stored] = '\0';
+			return true;
+		}
+
+		template<typename Char>
 		inline str_buffer_ctype_t<Char> *str_buffer_impl_create_allocator(const ham_allocator *allocator_, str_ctype_t<Char> str){
 			using ctype = str_buffer_ctype_t<Char>;
 
@@ -165,6 +192,14 @@ bool ham_str_buffer_reserve_utf32(ham_str_buffer_utf32 *str_buf, ham_usize req_c
 bool ham_str_buffer_resize_utf8 (ham_str_buffer_utf8  *str_buf, ham_usize req_size, ham_char8  fill){ return ham::detail::str_buffer_impl_resize<ham_char8> (str_buf, req_size, fill); }
 bool ham_str_buffer_resize_utf16(ham_str_buffer_utf16 *str_buf, ham_usize req_size, ham_char16 fill){ return ham::detail::str_buffer_impl_resize<ham_char16>(str_buf, req_size, fill); }
 bool ham_str_buffer_resize_utf32(ham_str_buffer_utf32 *str_buf, ham_usize req_size, ham_char32 fill){ return ham::detail::str_buffer_impl_resize<ham_char32>(str_buf, req_size, fill); }
+
+bool ham_str_buffer_append_utf8 (ham_str_buffer_utf8  *str_buf, ham_str8  str){ return ham::detail::str_buffer_impl_append<ham_char8> (str_buf, str); }
+bool ham_str_buffer_append_utf16(ham_str_buffer_utf16 *str_buf, ham_str16 str){ return ham::detail::str_buffer_impl_append<ham_char16>(str_buf, str); }
+bool ham_str_buffer_append_utf32(ham_str_buffer_utf32 *str_buf, ham_str32 str){ return ham::detail::str_buffer_impl_append<ham_char32>(str_buf, str); }
+
+bool ham_str_buffer_prepend_utf8 (ham_str_buffer_utf8  *str_buf, ham_str8  str){ return ham::detail::str_buffer_impl_prepend<ham_char8> (str_buf, str); }
+bool ham_str_buffer_prepend_utf16(ham_str_buffer_utf16 *str_buf, ham_str16 str){ return ham::detail::str_buffer_impl_prepend<ham_char16>(str_buf, str); }
+bool ham_str_buffer_prepend_utf32(ham_str_buffer_utf32 *str_buf, ham_str32 str){ return ham::detail::str_buffer_impl_prepend<ham_char32>(str_buf, str); }
 
 ham_char8  *ham_str_buffer_ptr_utf8 (ham_str_buffer_utf8  *str_buf){ return str_buf ? str_buf->mem : nullptr; }
 ham_char16 *ham_str_buffer_ptr_utf16(ham_str_buffer_utf16 *str_buf){ return str_buf ? str_buf->mem : nullptr; }

@@ -46,14 +46,6 @@ ham_api void ham_str_buffer_destroy_utf8 (ham_str_buffer_utf8  *str_buf);
 ham_api void ham_str_buffer_destroy_utf16(ham_str_buffer_utf16 *str_buf);
 ham_api void ham_str_buffer_destroy_utf32(ham_str_buffer_utf32 *str_buf);
 
-ham_api bool ham_str_buffer_reserve_utf8 (ham_str_buffer_utf8  *str_buf, ham_usize req_capacity);
-ham_api bool ham_str_buffer_reserve_utf16(ham_str_buffer_utf16 *str_buf, ham_usize req_capacity);
-ham_api bool ham_str_buffer_reserve_utf32(ham_str_buffer_utf32 *str_buf, ham_usize req_capacity);
-
-ham_api bool ham_str_buffer_resize_utf8 (ham_str_buffer_utf8  *str_buf, ham_usize req_size, ham_char8  fill);
-ham_api bool ham_str_buffer_resize_utf16(ham_str_buffer_utf16 *str_buf, ham_usize req_size, ham_char16 fill);
-ham_api bool ham_str_buffer_resize_utf32(ham_str_buffer_utf32 *str_buf, ham_usize req_size, ham_char32 fill);
-
 ham_api ham_char8  *ham_str_buffer_ptr_utf8 (ham_str_buffer_utf8  *str_buf);
 ham_api ham_char16 *ham_str_buffer_ptr_utf16(ham_str_buffer_utf16 *str_buf);
 ham_api ham_char32 *ham_str_buffer_ptr_utf32(ham_str_buffer_utf32 *str_buf);
@@ -69,6 +61,22 @@ ham_api ham_str32 ham_str_buffer_get_utf32(const ham_str_buffer_utf32 *str_buf);
 ham_api bool ham_str_buffer_set_utf8 (ham_str_buffer_utf8  *str_buf, ham_str8  str);
 ham_api bool ham_str_buffer_set_utf16(ham_str_buffer_utf16 *str_buf, ham_str16 str);
 ham_api bool ham_str_buffer_set_utf32(ham_str_buffer_utf32 *str_buf, ham_str32 str);
+
+ham_api bool ham_str_buffer_reserve_utf8 (ham_str_buffer_utf8  *str_buf, ham_usize req_capacity);
+ham_api bool ham_str_buffer_reserve_utf16(ham_str_buffer_utf16 *str_buf, ham_usize req_capacity);
+ham_api bool ham_str_buffer_reserve_utf32(ham_str_buffer_utf32 *str_buf, ham_usize req_capacity);
+
+ham_api bool ham_str_buffer_resize_utf8 (ham_str_buffer_utf8  *str_buf, ham_usize req_size, ham_char8  fill);
+ham_api bool ham_str_buffer_resize_utf16(ham_str_buffer_utf16 *str_buf, ham_usize req_size, ham_char16 fill);
+ham_api bool ham_str_buffer_resize_utf32(ham_str_buffer_utf32 *str_buf, ham_usize req_size, ham_char32 fill);
+
+ham_api bool ham_str_buffer_append_utf8 (ham_str_buffer_utf8  *str_buf, ham_str8  str);
+ham_api bool ham_str_buffer_append_utf16(ham_str_buffer_utf16 *str_buf, ham_str16 str);
+ham_api bool ham_str_buffer_append_utf32(ham_str_buffer_utf32 *str_buf, ham_str32 str);
+
+ham_api bool ham_str_buffer_prepend_utf8 (ham_str_buffer_utf8  *str_buf, ham_str8  str);
+ham_api bool ham_str_buffer_prepend_utf16(ham_str_buffer_utf16 *str_buf, ham_str16 str);
+ham_api bool ham_str_buffer_prepend_utf32(ham_str_buffer_utf32 *str_buf, ham_str32 str);
 
 //
 // Default aliases
@@ -131,6 +139,22 @@ namespace ham{
 			meta::static_fn<ham_str_buffer_resize_utf8>,
 			meta::static_fn<ham_str_buffer_resize_utf16>,
 			meta::static_fn<ham_str_buffer_resize_utf32>
+		>{};
+
+		template<typename Char>
+		constexpr inline auto str_buffer_ctype_append = utf_conditional_t<
+			Char,
+			meta::static_fn<ham_str_buffer_append_utf8>,
+			meta::static_fn<ham_str_buffer_append_utf16>,
+			meta::static_fn<ham_str_buffer_append_utf32>
+		>{};
+
+		template<typename Char>
+		constexpr inline auto str_buffer_ctype_prepend = utf_conditional_t<
+			Char,
+			meta::static_fn<ham_str_buffer_prepend_utf8>,
+			meta::static_fn<ham_str_buffer_prepend_utf16>,
+			meta::static_fn<ham_str_buffer_prepend_utf32>
 		>{};
 
 		template<typename Char>
@@ -212,12 +236,34 @@ namespace ham{
 			bool operator> (const basic_str<Char> &other) const noexcept{ return get() >  other; }
 			bool operator>=(const basic_str<Char> &other) const noexcept{ return get() >= other; }
 
+			basic_str_buffer &operator+=(const basic_str<Char> &str){
+				if(!append(str)){
+					// TODO: throw exception?
+				}
+
+				return *this;
+			}
+
+			basic_str_buffer operator+(const basic_str<Char> &str) const{
+				basic_str_buffer ret = *this;
+				ret += str;
+				return ret;
+			}
+
 			bool reserve(usize req_capacity){
 				return detail::str_buffer_ctype_reserve<Char>(m_handle.get(), req_capacity);
 			}
 
 			bool resize(usize req_size, char_type fill = char_type(' ')){
 				return detail::str_buffer_ctype_resize<Char>(m_handle.get(), req_size, fill);
+			}
+
+			bool append(const basic_str<Char> &str){
+				return detail::str_buffer_ctype_append<Char>(m_handle.get(), str);
+			}
+
+			bool prepend(const basic_str<Char> &str){
+				return detail::str_buffer_ctype_prepend<Char>(m_handle.get(), str);
 			}
 
 			str_type get() const noexcept{

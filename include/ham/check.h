@@ -31,7 +31,7 @@ HAM_C_API_BEGIN
 
 //! @cond ignore
 #define ham_impl_check_msg(cond_, fmt_str_, ...) \
-	((cond_) ? true : (ham_logapierrorf((fmt_str_) __VA_OPT__(,) __VA_ARGS__), false))
+	(ham_likely(cond_) ? true : (ham_logapierrorf((fmt_str_) __VA_OPT__(,) __VA_ARGS__), false))
 //! @endcond
 
 #define ham_check_msg(cond_, fmt_str_, ...) ham_impl_check_msg(cond_, fmt_str_ __VA_OPT__(,) __VA_ARGS__)

@@ -114,6 +114,75 @@ bool ham_path_exists_utf32(ham_str32 path){
 	return access(path_buf, F_OK) == 0;
 }
 
+static inline bool ham_impl_fstat(int fd, ham_file_info *ret){
+	struct stat stat_buf;
+	const int res = fstat(fd, &stat_buf);
+	if(res != 0){
+		ham_logapierrorf("Error in fstat: %s\n", strerror(errno));
+		return false;
+	}
+
+	switch(stat_buf.st_mode & S_IFMT){
+		case S_IFDIR:{
+			ret->kind = HAM_FILE_DIRECTORY;
+			break;
+		}
+
+		case S_IFREG:{
+			ret->kind = HAM_FILE_REGULAR;
+			break;
+		}
+
+		case S_IFLNK:{
+			ret->kind = HAM_FILE_LINK;
+			break;
+		}
+
+		default:{
+			ret->kind = HAM_FILE_UNKNOWN;
+			break;
+		}
+	}
+
+	ret->size = (usize)stat_buf.st_size;
+
+	if(ham_impl_magic_init()){
+		const char *mime_str = magic_descriptor(ham_impl_magic_cookie, fd);
+		if(!mime_str){
+			ham_logapiwarnf("Error in magic_descriptor: %s", magic_error(ham_impl_magic_cookie));
+			ret->mime = HAM_EMPTY_STR8;
+		}
+		else{
+			ret->mime = ham::str8(mime_str);
+		}
+	}
+	else{
+		ham_logapiwarnf("Failed to initialize libmagic, no mime info returned.");
+		ret->mime = HAM_EMPTY_STR8;
+	}
+
+	return true;
+}
+
+static inline bool ham_impl_stat(const char *path, ham_file_info *ret){
+	const int fd = open(path, O_RDONLY);
+	if(fd == -1){
+		ham_logapierrorf("Error in open: %s\n", strerror(errno));
+		return false;
+	}
+
+	if(!ham_impl_fstat(fd, ret)){
+		return false;
+	}
+
+	const int res = close(fd);
+	if(res != 0){
+		ham_logapiwarnf("Error in close: %s\n", strerror(errno));
+	}
+
+	return true;
+}
+
 bool ham_path_file_info_utf8 (ham_str8  path, ham_file_info *ret){
 	if(!path.ptr || !path.len || !ret) return false;
 
@@ -123,23 +192,9 @@ bool ham_path_file_info_utf8 (ham_str8  path, ham_file_info *ret){
 	memcpy(path_buf, path.ptr, path.len);
 	path_buf[path.len] = '\0';
 
-	struct stat stat_buf;
-	const int res = stat(path_buf, &stat_buf);
-	if(res != 0){
-		// TODO: signal error
+	if(!ham_impl_stat(path_buf, ret)){
+		ham_logapierrorf("Internal error in ham_impl_stat");
 		return false;
-	}
-
-	ret->size = (usize)stat_buf.st_size;
-
-	if(ham_impl_magic_init()){
-		const char *mime_str = magic_file(ham_impl_magic_cookie, path_buf);
-		if(!mime_str){
-			ham_logapiwarnf("Error in magic_file: %s", magic_error(ham_impl_magic_cookie));
-		}
-		else{
-			ret->mime = ham::str8(mime_str);
-		}
 	}
 
 	return true;
@@ -153,23 +208,9 @@ bool ham_path_file_info_utf16(ham_str16 path, ham_file_info *ret){
 	const usize path_len = ham_str_conv_utf16_utf8(path, path_buf, sizeof(path_buf)-1);
 	if(path_len == (usize)-1) return false;
 
-	struct stat stat_buf;
-	const int res = stat(path_buf, &stat_buf);
-	if(res != 0){
-		// TODO: signal error
+	if(!ham_impl_stat(path_buf, ret)){
+		ham_logapierrorf("Internal error in ham_impl_stat");
 		return false;
-	}
-
-	ret->size = (usize)stat_buf.st_size;
-
-	if(ham_impl_magic_init()){
-		const char *mime_str = magic_file(ham_impl_magic_cookie, path_buf);
-		if(!mime_str){
-			ham_logapiwarnf("Error in magic_file: %s", magic_error(ham_impl_magic_cookie));
-		}
-		else{
-			ret->mime = ham::str8(mime_str);
-		}
 	}
 
 	return true;
@@ -183,23 +224,9 @@ bool ham_path_file_info_utf32(ham_str32 path, ham_file_info *ret){
 	const usize path_len = ham_str_conv_utf32_utf8(path, path_buf, sizeof(path_buf)-1);
 	if(path_len == (usize)-1) return false;
 
-	struct stat stat_buf;
-	const int res = stat(path_buf, &stat_buf);
-	if(res != 0){
-		// TODO: signal error
+	if(!ham_impl_stat(path_buf, ret)){
+		ham_logapierrorf("Internal error in ham_impl_stat");
 		return false;
-	}
-
-	ret->size = (usize)stat_buf.st_size;
-
-	if(ham_impl_magic_init()){
-		const char *mime_str = magic_file(ham_impl_magic_cookie, path_buf);
-		if(!mime_str){
-			ham_logapiwarnf("Error in magic_file: %s", magic_error(ham_impl_magic_cookie));
-		}
-		else{
-			ret->mime = ham::str8(mime_str);
-		}
 	}
 
 	return true;
@@ -280,23 +307,9 @@ void ham_file_close(ham_file *file){
 bool ham_file_get_info(const ham_file *file, ham_file_info *ret){
 	if(!file || !ret) return false;
 
-	struct stat stat_buf;
-	const int res = fstat(file->fd, &stat_buf);
-	if(res != 0){
-		// TODO: signal error
+	if(!ham_impl_fstat(file->fd, ret)){
+		ham_logapierrorf("Internal error in ham_impl_stat");
 		return false;
-	}
-
-	ret->size = (usize)stat_buf.st_size;
-
-	if(ham_impl_magic_init()){
-		const char *mime_str = magic_descriptor(ham_impl_magic_cookie, file->fd);
-		if(!mime_str){
-			ham_logapiwarnf("Error in magic_descriptor: %s", magic_error(ham_impl_magic_cookie));
-		}
-		else{
-			ret->mime = ham::str8(mime_str);
-		}
 	}
 
 	return true;
