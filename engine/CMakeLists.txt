@@ -17,6 +17,24 @@
 #
 
 ##
+# Dependencies
+##
+
+FetchContent_Declare(
+	gns_content
+	GIT_REPOSITORY https://github.com/ValveSoftware/GameNetworkingSockets.git
+	GIT_TAG        e0d33386903202d9af61e76d69c54e46ece2f457
+)
+
+FetchContent_GetProperties(gns_content)
+if(NOT gns_content_POPULATED)
+	FetchContent_Populate(gns_content)
+
+	set(USE_STEAMWEBRTC ON CACHE BOOL "" FORCE)
+	add_subdirectory(${gns_content_SOURCE_DIR} ${gns_content_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
+##
 # Configuration
 ##
 
@@ -28,7 +46,20 @@ set(HAM_ENGINE_VERSION       ${HAM_VERSION})
 set(HAM_ENGINE_BUILD_TYPE     ${HAM_BUILD_TYPE})
 set(HAM_ENGINE_BUILD_TYPE_STR ${HAM_BUILD_TYPE_STR})
 
+set(HAM_NET_DEFAULT_PLUGIN "ham-net-gns")
+
+# UUID namespaces
+
 set(HAM_ENGINE_UUID_NAMESPACE "94d6f295-4e71-4b60-a7e5-a9fdc8bef7d2")
+
+string(
+	UUID HAM_NET_UUID_NAMESPACE
+	NAMESPACE ${HAM_ENGINE_UUID_NAMESPACE}
+	NAME "net"
+	TYPE SHA1
+)
+
+# Plugin UUIDs
 
 string(
 	UUID HAM_ENGINE_CLIENT_PLUGIN_UUID
@@ -44,12 +75,23 @@ string(
 	TYPE SHA1
 )
 
+string(
+	UUID HAM_NET_DEFAULT_PLUGIN_UUID
+	NAMESPACE ${HAM_NET_UUID_NAMESPACE}
+	NAME "default"
+	TYPE SHA1
+)
+
 configure_file(
 	include/ham/engine/config.h.in
 	${CMAKE_CURRENT_BINARY_DIR}/include/ham/engine/config.h
 	@ONLY
 	NEWLINE_STYLE UNIX
 )
+
+##
+# Headers and include dirs
+##
 
 set(HAM_ENGINE_SOURCE_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 set(HAM_ENGINE_BINARY_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
@@ -60,8 +102,6 @@ set(
 
 	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine.h
 	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine-vtable.h
-
-	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/net.h
 )
 
 ##

@@ -36,6 +36,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	target_link_options(ham-engine-server PRIVATE "-rdynamic")
 endif()
 
+target_link_libraries(ham-engine-server PRIVATE ${HAM_CPU_LIBS})
 target_link_libraries(ham-engine-server PRIVATE ham::engine)
 
 ##
@@ -50,4 +51,5 @@ target_compile_features(ham-engine-server-manager PRIVATE c_std_17 cxx_std_20)
 
 target_compile_definitions(ham-engine-server-manager PRIVATE HAM_ENGINE_SERVER_MANAGER_IMPLEMENTATION)
 
+target_link_libraries(ham-engine-server-manager PRIVATE ${HAM_CPU_LIBS})
 target_link_libraries(ham-engine-server-manager PRIVATE ham::engine ncurses::ncurses)

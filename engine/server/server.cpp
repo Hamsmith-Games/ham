@@ -21,8 +21,12 @@
 #include "ham/engine-vtable.h"
 #include "ham/log.h"
 
+#include "ham/net.h"
+
 struct ham_engine_server_context{
 	ham_derive(ham_engine_context)
+
+	ham_net_context *net;
 };
 
 static inline bool ham_engine_server_on_load(){ return true; }
@@ -30,16 +34,22 @@ static inline void ham_engine_server_on_unload(){}
 
 static inline bool ham_engine_server_init(ham_engine_server_context *ctx){
 	(void)ctx;
+
+	ctx->net = ham_net_context_create(HAM_NET_DEFAULT_PLUGIN_NAME);
+	if(!ctx->net){
+		ham_logapierrorf("Error in ham_net_context_create");
+		return false;
+	}
+
 	return true;
 }
 
 static inline void ham_engine_server_finish(ham_engine_server_context *ctx){
-	(void)ctx;
+	ham_net_context_destroy(ctx->net);
 }
 
 static inline void ham_engine_server_loop(ham_engine_server_context *ctx, ham_f64 dt){
-	(void)dt;
-
+	ham_net_context_loop(ctx->net, dt);
 	ham_engine_request_exit(ham_super(ctx));
 }
 

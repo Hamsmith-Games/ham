@@ -39,11 +39,24 @@ include(GNUInstallDirs)
 include(FetchContent)
 
 include(StrHelpers)
+include(CPUFeatures)
+
+if(PROJECT_IS_TOP_LEVEL)
+	set(CMAKE_SKIP_INSTALL_RPATH ON)
+endif()
 
 set(HAM_VERSION_MAJOR ${ham_VERSION_MAJOR})
 set(HAM_VERSION_MINOR ${ham_VERSION_MINOR})
 set(HAM_VERSION_PATCH ${ham_VERSION_PATCH})
 set(HAM_VERSION ${ham_VERSION})
+
+check_target_arch(HAM_TARGET_ARCH)
+
+if(HAM_TARGET_ARCH STREQUAL "x86_64")
+	set(HAM_CPU_LIBS cpu::x86-64-v2)
+else()
+	set(HAM_CPU_LIBS)
+endif()
 
 string_camel_to_snake("${CMAKE_BUILD_TYPE}" HAM_BUILD_TYPE)
 string(TOUPPER ${HAM_BUILD_TYPE} HAM_BUILD_TYPE)
@@ -77,6 +90,7 @@ set(
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/typedefs.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/typesys.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/math.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/str_buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/hash.h
@@ -100,12 +114,14 @@ set(
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-option(HAM_BUILD_DOCS   "Whether to build documentation"    ${PROJECT_IS_TOP_LEVEL})
-option(HAM_BUILD_TESTS  "Whether to build library tests"    ${PROJECT_IS_TOP_LEVEL})
-option(HAM_BUILD_TOOLS  "Whether to build tools"            ${PROJECT_IS_TOP_LEVEL})
-option(HAM_BUILD_ENGINE "Whether to build the world engine" ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_DOCS    "Whether to build documentation"       ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_PLUGINS "Whether to build the default plugins" ON)
+option(HAM_BUILD_TESTS   "Whether to build library tests"       ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_TOOLS   "Whether to build tools"               ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_ENGINE  "Whether to build the world engine"    ${PROJECT_IS_TOP_LEVEL})
 
 option(HAM_INSTALL_DOCS   "Whether to install generated documentation" ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_TOOLS  "Whether to install default plugins"         ON)
 option(HAM_INSTALL_TOOLS  "Whether to install compiled tools"          ${PROJECT_IS_TOP_LEVEL})
 option(HAM_INSTALL_TESTS  "Whether to install the tests"               OFF)
 option(HAM_INSTALL_ENGINE "Whether to install the world engine"        OFF)
@@ -123,10 +139,46 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(robin_hood_content)
 
 ##
-# Targets
+# Runtime library, required for all other components
 ##
 
 add_subdirectory(runtime)
+
+macro(ham_add_executable TGT)
+	add_executable(${TGT} ${ARGN})
+	target_compile_features(${TGT} PRIVATE c_std_17 cxx_std_20)
+	target_link_libraries(${TGT} PUBLIC ham::ham)
+	target_link_libraries(${TGT} PRIVATE ${HAM_CPU_FLAGS})
+	set_target_properties(
+		${TGT} PROPERTIES
+		C_VISIBILITY_PRESET hidden
+		CXX_VISIBILITY_PRESET hidden
+		VISIBILITY_INLINES_HIDDEN ON
+	)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+		target_link_options(${TGT} PRIVATE "-Wl,--enable-new-dtags")
+	endif()
+endmacro()
+
+macro(ham_add_library TGT)
+	add_library(${TGT} ${ARGN})
+	target_compile_features(${TGT} PRIVATE c_std_17 cxx_std_20)
+	target_link_libraries(${TGT} PRIVATE ham::ham ${HAM_CPU_FLAGS})
+	set_target_properties(
+		${TGT} PROPERTIES
+		C_VISIBILITY_PRESET hidden
+		CXX_VISIBILITY_PRESET hidden
+		VISIBILITY_INLINES_HIDDEN ON
+	)
+endmacro()
+
+##
+# Targets
+##
+
+if(HAM_BUILD_PLUGINS)
+	add_subdirectory(plugins)
+endif()
 
 if(HAM_BUILD_TOOLS)
 	add_subdirectory(interpreter)

@@ -34,6 +34,7 @@ set(
 	plugin.cpp
 	lex.cpp
 	parse.cpp
+	net.cpp
 )
 
 if(NOT CMAKE_USE_PTHREADS_INIT)
@@ -90,6 +91,7 @@ target_link_libraries(
 	ham
 	PRIVATE
 	    ${CMAKE_DL_LIBS}
+	    ${HAM_CPU_LIBS}
 		bfd
 		robin_hood::robin_hood
 )

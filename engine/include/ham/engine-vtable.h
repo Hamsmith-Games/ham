@@ -56,7 +56,7 @@ typedef bool(*ham_engine_context_init_fn)(ham_engine_context *ctx);
 typedef void(*ham_engine_context_finish_fn)(ham_engine_context *ctx);
 typedef void(*ham_engine_context_loop_fn)(ham_engine_context *ctx, ham_f64 dt);
 
-typedef struct ham_engine_vtable{
+struct ham_engine_vtable{
 	ham_derive(ham_plugin_vtable)
 
 	ham_engine_context_alloc_fn context_alloc;
@@ -65,7 +65,7 @@ typedef struct ham_engine_vtable{
 	ham_engine_context_init_fn context_init;
 	ham_engine_context_finish_fn context_finish;
 	ham_engine_context_loop_fn context_loop;
-} ham_engine_vtable;
+};
 
 //! @cond ignore
 #define HAM_IMPL_ENGINE_VTABLE_NAME_PREFIX ham_impl_engine_vtable_
@@ -92,40 +92,40 @@ typedef struct ham_engine_vtable{
 	derived_finish_fn_name, finish_fn, \
 	derived_loop_fn_name, loop_fn \
 ) \
-static_assert(ham_is_same(ham_typeof(ham_super((derived_ctx*)ham_null)), ham_engine_context*), #derived_ctx " is not derived from ham_engine_context"); \
-static inline ham_engine_context *derived_alloc_name(const ham_allocator *allocator){ \
-	void *const mem = ham_allocator_new(allocator, derived_ctx); \
-	if(!mem) return ham_null; \
-	derived_ctx *const ptr = (derived_ctx*)mem; \
-	return ham_super(ptr); \
-} \
-static inline void derived_free_name(ham_engine_context *ctx_super){ \
-	derived_ctx *const ctx = (derived_ctx*)ctx_super; \
-	ham_allocator_delete(ctx_super->allocator, ctx); \
-} \
-static inline bool derived_init_fn_name(ham_engine_context *ctx_super){ return (init_fn)((derived_ctx*)ctx_super); } \
-static inline void derived_finish_fn_name(ham_engine_context *ctx_super){ (finish_fn)((derived_ctx*)ctx_super); } \
-static inline void derived_loop_fn_name(ham_engine_context *ctx_super, ham_f64 dt){ (loop_fn)((derived_ctx*)ctx_super, dt); } \
-HAM_PLUGIN_VTABLE(\
-	ham_engine_vtable, \
-	uuid_str, \
-	name_str, \
-	version, \
-	display_name_str, \
-	author_str, \
-	license_str, \
-	HAM_ENGINE_PLUGIN_CATEGORY, \
-	desc_str, \
-	on_load_fn, \
-	on_unload_fn, \
-	( \
-		.context_alloc = derived_alloc_name, \
-		.context_free = derived_free_name, \
-		.context_init = derived_init_fn_name, \
-		.context_finish = derived_finish_fn_name, \
-		.context_loop = derived_loop_fn_name, \
-	) \
-)
+	static_assert(ham_is_same(ham_typeof(ham_super((derived_ctx*)ham_null)), ham_engine_context*), #derived_ctx " is not derived from ham_engine_context"); \
+	static inline ham_engine_context *derived_alloc_name(const ham_allocator *allocator){ \
+		void *const mem = ham_allocator_new(allocator, derived_ctx); \
+		if(!mem) return ham_null; \
+		derived_ctx *const ptr = (derived_ctx*)mem; \
+		return ham_super(ptr); \
+	} \
+	static inline void derived_free_name(ham_engine_context *ctx_super){ \
+		derived_ctx *const ctx = (derived_ctx*)ctx_super; \
+		ham_allocator_delete(ctx_super->allocator, ctx); \
+	} \
+	static inline bool derived_init_fn_name(ham_engine_context *ctx_super){ return (init_fn)((derived_ctx*)ctx_super); } \
+	static inline void derived_finish_fn_name(ham_engine_context *ctx_super){ (finish_fn)((derived_ctx*)ctx_super); } \
+	static inline void derived_loop_fn_name(ham_engine_context *ctx_super, ham_f64 dt){ (loop_fn)((derived_ctx*)ctx_super, dt); } \
+	HAM_PLUGIN_VTABLE(\
+		ham_engine_vtable, \
+		uuid_str, \
+		name_str, \
+		version, \
+		display_name_str, \
+		author_str, \
+		license_str, \
+		HAM_ENGINE_PLUGIN_CATEGORY, \
+		desc_str, \
+		on_load_fn, \
+		on_unload_fn, \
+		( \
+			.context_alloc = derived_alloc_name, \
+			.context_free = derived_free_name, \
+			.context_init = derived_init_fn_name, \
+			.context_finish = derived_finish_fn_name, \
+			.context_loop = derived_loop_fn_name, \
+		) \
+	)
 //! @endcond
 
 #define HAM_ENGINE_VTABLE( \

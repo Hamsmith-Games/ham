@@ -18,10 +18,13 @@
 
 #include "ham/plugin.h"
 #include "ham/memory.h"
-#include "ham/log.h"
+#include "ham/check.h"
+#include "ham/fs.h"
 #include "ham/str_buffer.h"
 
 #include "robin_hood.h"
+
+#include <dirent.h>
 
 using namespace ham::typedefs;
 
@@ -31,6 +34,130 @@ struct ham_plugin{
 	const ham_allocator *allocator = nullptr;
 	robin_hood::unordered_flat_map<ham::uuid, const ham_plugin_vtable*> vtable_map;
 };
+
+bool ham_plugin_find(const char *id, ham_str8 path, ham_plugin **plugin_ret, ham_dll_handle *dll_ret, const ham_plugin_vtable **vtable_ret){
+	if(
+		!ham_check(id != NULL) ||
+		!ham_check(plugin_ret != NULL) ||
+		!ham_check(dll_ret != NULL) ||
+		!ham_check(vtable_ret != NULL) ||
+		!ham_check(!path.len || path.ptr)
+	){
+		return false;
+	}
+
+	ham_path_buffer_utf8 cwd_buf;
+
+	if(!path.len){
+		path.ptr = getcwd(cwd_buf, sizeof(cwd_buf));
+		path.len = strlen(path.ptr);
+	}
+
+	constexpr ham::str8 plugin_mime = HAM_PLATFORM_DLL_MIME;
+	constexpr ham::str8 minimum_subpath = "/libx" HAM_PLATFORM_DLL_EXT;
+
+	if((path.len + minimum_subpath.len()) >= HAM_PATH_BUFFER_SIZE){
+		ham_logapierrorf("Dir path too long: %zu, max %zu", path.len, HAM_PATH_BUFFER_SIZE - (minimum_subpath.len() + 1));
+		return false;
+	}
+
+	ham_path_buffer_utf8 path_buf;
+	memcpy(path_buf, path.ptr, path.len);
+	path_buf[path.len] = '\0';
+
+	DIR *plugin_dir = opendir(path_buf);
+	if(!plugin_dir){
+		ham_logapierrorf("Error in opendir: %s", strerror(errno));
+		return false;
+	}
+
+	path_buf[path.len] = '/';
+
+	char *plugin_name_subpath = path_buf + path.len + 1;
+
+	struct plugin_iter_data{
+		const char *id = nullptr;
+		const char *category = nullptr;
+		const ham_plugin_vtable *vtable = nullptr;
+	};
+
+	plugin_iter_data data;
+	data.id = id;
+
+	for(const struct dirent *plugin_dirent = readdir(plugin_dir); plugin_dirent != nullptr; plugin_dirent = readdir(plugin_dir)){
+		if(plugin_dirent->d_type != DT_REG){
+			continue;
+		}
+
+		ham::str8 plugin_name = plugin_dirent->d_name;
+
+		if(path.len + plugin_name.len() + 1 >= HAM_PATH_BUFFER_SIZE){
+			ham_logapiwarnf("Plugin path too long: %zu, max %d", path.len + plugin_name.len() + 1, HAM_PATH_BUFFER_SIZE-1);
+			continue;
+		}
+
+		memcpy(plugin_name_subpath, plugin_name.ptr(), plugin_name.len());
+		plugin_name_subpath[plugin_name.len()] = '\0';
+
+		ham_file_info file_info;
+		if(!ham_path_file_info_utf8(ham::str8((const char*)path_buf), &file_info)){
+			ham_logapiwarnf("Could not get file info: %s", path_buf);
+			continue;
+		}
+		else if(ham::str8(file_info.mime).substr(0, plugin_mime.len()) != plugin_mime){
+			ham_logapiwarnf("Non-plugin found in plugins folder: %s", path_buf);
+			continue;
+		}
+
+		const ham_dll_handle plugin_dll = ham_dll_open_c(plugin_dirent->d_name);
+		if(!plugin_dll){
+			ham_logapiwarnf("Failed to open plugin: %s", path_buf);
+			continue;
+		}
+
+		ham_plugin *const plugin = ham_plugin_load(plugin_dll);
+		if(!plugin){
+			ham_logapiwarnf("Failed to load opened plugin: %s", path_buf);
+			ham_dll_close(plugin_dll);
+			continue;
+		}
+
+		const ham_usize num_vtables = ham_plugin_iterate_vtables(
+			plugin,
+			[](const ham_plugin_vtable *vtable, void *user){
+				const auto data = reinterpret_cast<plugin_iter_data*>(user);
+
+				if(
+					(vtable->name()         == ham::str8(data->id)) ||
+					(vtable->display_name() == ham::str8(data->id))
+				){
+					data->vtable = vtable;
+					return false;
+				}
+
+				return true;
+			},
+			&data
+		);
+
+		if(num_vtables == (ham_usize)-1){
+			ham_logapiwarnf("Failed to iterate plugin vtables");
+		}
+		else if(data.vtable != nullptr){
+			*plugin_ret = plugin;
+			*dll_ret = plugin_dll;
+			*vtable_ret = data.vtable;
+			closedir(plugin_dir);
+			return true;
+		}
+
+		ham_plugin_unload(plugin);
+		ham_dll_close(plugin_dll);
+	}
+
+	closedir(plugin_dir);
+	return false;
+}
 
 ham_plugin *ham_plugin_load(ham_dll_handle dll){
 	if(!dll){

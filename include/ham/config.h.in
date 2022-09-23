@@ -25,6 +25,10 @@
  * @{
  */
 
+#if !defined(__GNUC__) && !defined(__cplusplus)
+#	error "Ham requires GNU C extensions or C++"
+#endif
+
 //
 // Configuration macros
 //
@@ -45,16 +49,17 @@
 
 #define HAM_TARGET_TRIPLE "@HAM_TARGET_TRIPLE@"
 
-#if !defined(__GNUC__) && !defined(__cplusplus)
-#	error "Ham requires GNU C extensions or C++"
-#endif
+#define HAM_NET_DEFAULT_PLUGIN_NAME "@HAM_NET_DEFAULT_PLUGIN@"
+#define HAM_NET_DEFAULT_PLUGIN_UUID "@HAM_NET_DEFAULT_PLUGIN_UUID"
+
+#define HAM_NET_PLUGIN_CATEGORY "net"
 
 #ifndef HAM_NAME_BUFFER_SIZE
 #	define HAM_NAME_BUFFER_SIZE 128
 #endif
 
 #ifndef HAM_PATH_BUFFER_SIZE
-#	define HAM_PATH_BUFFER_SIZE 256
+#	define HAM_PATH_BUFFER_SIZE 512
 #endif
 
 #ifndef HAM_MESSAGE_BUFFER_SIZE
@@ -337,12 +342,6 @@
 #	define ham_api ham_public ham_export
 #else
 #	define ham_api ham_public ham_import
-#endif
-
-#ifdef HAM_ENGINE_LIB_IMPLEMENTATION
-#	define ham_engine_api ham_public ham_export
-#else
-#	define ham_engine_api ham_public ham_import
 #endif
 
 /**

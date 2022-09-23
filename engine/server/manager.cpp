@@ -6,6 +6,8 @@
 #include "manager.h"
 
 #include <sys/wait.h>
+#include <alloca.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <getopt.h>
 #include <ncurses.h>
@@ -35,17 +37,21 @@ struct ham_engine_server_manager{
 
 	int server_fds[2];
 
-	WINDOW *nc_win;
+	WINDOW *nc_win, *input_win, *log_win;
 	int w, h;
 
 	ham::str_buffer_utf8 input_line;
+	ham::str_buffer_utf8 log_buf;
+
+	ham_f64 startup_delay = 1.0;
+	ham_f64 startup_counter = 0.0;
 
 	ham_f64 shutdown_timeout = 10.0;
 	ham_f64 shutdown_counter = 0.0;
 
 	bool shutdown_flag = false;
-	bool autostart_flag = false;
 	bool wants_exit = false;
+	bool autostart_flag = true;
 
 	pid_t server_pid = (pid_t)-1;
 };
@@ -70,15 +76,25 @@ ham_engine_server_manager *ham_server_manager_create(const char *server_exec_pat
 	}
 
 	int server_fds[2];
-	const int res = pipe(server_fds);
+	int res = pipe(server_fds);
 	if(res != 0){
 		ham_logapierrorf("Error in pipe: %s", strerror(errno));
+		return nullptr;
+	}
+
+	res = fcntl(server_fds[0], F_SETFL, O_NONBLOCK);
+	if(res == -1){
+		ham_logapierrorf("Error in fcntl: %s", strerror(errno));
+		close(server_fds[0]);
+		close(server_fds[1]);
 		return nullptr;
 	}
 
 	WINDOW *const nc_win = initscr();
 	if(!nc_win){
 		ham_logapierrorf("Error in initscr");
+		close(server_fds[0]);
+		close(server_fds[1]);
 		return nullptr;
 	}
 
@@ -89,6 +105,8 @@ ham_engine_server_manager *ham_server_manager_create(const char *server_exec_pat
 	const auto ptr = ham_allocator_new(allocator, ham_engine_server_manager);
 	if(!ptr){
 		endwin();
+		close(server_fds[0]);
+		close(server_fds[1]);
 		return nullptr;
 	}
 
@@ -99,6 +117,11 @@ ham_engine_server_manager *ham_server_manager_create(const char *server_exec_pat
 	memcpy(ptr->server_fds, server_fds, sizeof(server_fds));
 
 	ptr->nc_win = nc_win;
+
+	getmaxyx(nc_win, ptr->h, ptr->w);
+
+	ptr->log_win = newwin(ptr->h - 4, (2 * ptr->w) / 3, 1, 1);
+	ptr->input_win = newwin(1, ptr->w - 2, ptr->h - 2, 1);
 
 	return ptr;
 }
@@ -138,6 +161,42 @@ void ham_server_manager_destroy(ham_engine_server_manager *manager){
 #define HAM_NCURSES_PAIR_STATUS_ERROR 5
 #define HAM_NCURSES_PAIR_STATUS_WARN  6
 
+void ham_server_start_server_exec(ham_engine_server_manager *manager){
+	if(manager->server_pid != (pid_t)-1) return;
+
+	const pid_t fork_res = fork();
+	if(fork_res == 0){
+		// child process
+
+		// redirect stdout/stderr
+		dup2(manager->server_fds[1], STDOUT_FILENO);
+		dup2(manager->server_fds[1], STDERR_FILENO);
+
+		// Child doesn't read
+		//close(manager->server_fds[0]);
+
+		// not gonna be able to free this, gotta use alloca
+		const auto new_args = (char**)alloca(sizeof(void*) * (manager->server_argc + 2));
+
+		memcpy(&new_args[1], &manager->server_argv[0], sizeof(void*) * manager->server_argc);
+		new_args[0] = const_cast<char*>(manager->server_exec_path.c_str()); // fuckin argv
+		new_args[manager->server_argc + 1] = nullptr;
+
+		if(execv(manager->server_exec_path.c_str(), new_args) == -1){
+			// error *executing* server executable
+			ham_logapierrorf("Error in execv: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+	else if(fork_res == -1){
+		// error in fork
+		ham_logapierrorf("Error in fork: %s", strerror(errno));
+		return;
+	}
+
+	manager->server_pid = fork_res;
+}
+
 int ham_server_manager_exec(ham_engine_server_manager *manager){
 	if(!ham_check(manager != NULL)) return false;
 
@@ -158,46 +217,103 @@ int ham_server_manager_exec(ham_engine_server_manager *manager){
 	curs_set(0);
 
 	cbreak();
+	nodelay(manager->input_win, true);
+
+	ham_message_buffer_utf8 message_buf;
 
 	while(true){
 		const ham_f64 dt = ham_ticker_tick(&ticker, 1.0/20.0);
 		(void)dt;
 
-		if(manager->shutdown_flag && manager->server_pid != (pid_t)-1){
-			manager->shutdown_counter += dt;
-
+		if(manager->server_pid != (pid_t)-1){
 			int status;
-			const int wait_pid = waitpid(manager->server_pid, &status, WNOHANG);
-			if(
-				(wait_pid == 0 && manager->shutdown_counter > manager->shutdown_timeout) ||
-				(wait_pid == -1)
-			){
-				kill(manager->server_pid, SIGKILL);
-				manager->server_pid = (pid_t)-1;
+			int wait_res = waitpid(manager->server_pid, &status, WNOHANG);
+			if(wait_res == manager->server_pid){
+				// TODO: check status
+				manager->server_pid = -1;
 				manager->shutdown_flag = false;
+				manager->shutdown_counter = 0.0;
+			}
+			else if(wait_res == -1){
+				ham_logapierrorf("Error in waitpid: %s", strerror(errno));
+			}
+			else if(wait_res == 0){
+				// child is good, we should process input
+
+				const ssize_t read_res = read(manager->server_fds[0], message_buf, sizeof(message_buf)-1);
+				if(read_res > 0){
+					manager->log_buf.append(ham::str8(message_buf, read_res));
+				}
+				else if(errno != EAGAIN && errno != EWOULDBLOCK){
+					ham_logapierrorf("Error in read: %s", strerror(errno));
+					kill(manager->server_pid, SIGKILL);
+					manager->server_pid = (pid_t)-1;
+				}
+			}
+
+			if(manager->shutdown_flag){
+				manager->shutdown_counter += dt;
+
+				wait_res = waitpid(manager->server_pid, &status, WNOHANG);
+				if(
+					(wait_res == 0 && manager->shutdown_counter > manager->shutdown_timeout) ||
+					(wait_res == -1)
+				){
+					kill(manager->server_pid, SIGKILL);
+					manager->server_pid = (pid_t)-1;
+					manager->shutdown_flag = false;
+				}
 			}
 		}
-		else if(!manager->wants_exit && manager->autostart_flag && manager->server_pid == (pid_t)-1){
-			// TODO: start server executable
+		else if(!manager->wants_exit && manager->autostart_flag){
+			manager->startup_counter += dt;
+			if(manager->startup_counter >= manager->startup_delay){
+				ham_server_start_server_exec(manager);
+				manager->startup_counter = 0.0;
+			}
 		}
-
-		if(manager->wants_exit && manager->server_pid == (pid_t)-1){
+		else{ // manager->wants_exit && manager->server_pid == (pid_t)-1
 			break;
 		}
 
-		getmaxyx(manager->nc_win, manager->h, manager->w);
+		int new_h, new_w;
+		getmaxyx(manager->nc_win, new_h, new_w);
+
+		if(new_h != manager->h || new_w != manager->w){
+			mvwin(manager->input_win, new_h - 2, 1);
+			wresize(manager->log_win, (2 * new_w) / 3, new_h - 4);
+			wresize(manager->input_win, 1, new_w - 2);
+			manager->h = new_h;
+			manager->w = new_w;
+		}
 
 		ham_server_manager_redraw(manager);
 
-		int ch = wgetch(manager->nc_win);
-		if(isgraph(ch)){
-
-		}
+		int ch = wgetch(manager->input_win);
 
 		switch(ch){
-			//case 'q': ham_server_manager_exit(manager); break;
+			case KEY_CLOSE: ham_server_manager_exit(manager); break;
 
-			default: break;
+			case KEY_BACKSPACE:
+			case KEY_DC:
+			case 127:{
+				const auto old_len = manager->input_line.len();
+				if(old_len > 0){
+					manager->input_line.resize(old_len-1);
+				}
+
+				break;
+			}
+
+			default:{
+				if(isprint(ch)){
+					// TODO: process user input
+					const char chstr[] = { (char)ch, '\0' };
+					manager->input_line.append(chstr);
+				}
+
+				break;
+			}
 		}
 	}
 
@@ -209,6 +325,11 @@ int ham_server_manager_exec(ham_engine_server_manager *manager){
 bool ham_server_manager_redraw_border(ham_engine_server_manager *manager){
 	if(!ham_check(manager != NULL)) return false;
 
+	//
+	// Borders and dividers
+	//
+
+	// main border
 	wattron(manager->nc_win, COLOR_PAIR(HAM_NCURSES_PAIR_BORDER));
 	wborder(
 		manager->nc_win,
@@ -222,6 +343,19 @@ bool ham_server_manager_redraw_border(ham_engine_server_manager *manager){
 		ACS_LRCORNER  // bottom right
 	);
 	wattroff(manager->nc_win, COLOR_PAIR(HAM_NCURSES_PAIR_BORDER));
+
+	// border around user input
+	wattron(manager->nc_win, COLOR_PAIR(HAM_NCURSES_PAIR_BORDER));
+	wmove(manager->nc_win, manager->h - 3, 0);
+	waddch(manager->nc_win, ACS_LTEE);
+	whline(manager->nc_win, ACS_HLINE, manager->w - 2);
+	wmove(manager->nc_win, manager->h - 3, manager->w - 1);
+	waddch(manager->nc_win, ACS_RTEE);
+	wattroff(manager->nc_win, COLOR_PAIR(HAM_NCURSES_PAIR_BORDER));
+
+	//
+	// Inline information in border
+	//
 
 	wattron(manager->nc_win, COLOR_PAIR(HAM_NCURSES_PAIR_HIGHLIGHT));
 	mvwprintw(manager->nc_win, 0, 2, " Ham Server Manager v" HAM_ENGINE_VERSION_STR " ");
@@ -253,6 +387,32 @@ bool ham_server_manager_redraw(ham_engine_server_manager *manager){
 	ham_server_manager_redraw_border(manager);
 
 	wrefresh(manager->nc_win);
+
+	//
+	// Server logs
+	//
+
+	const auto log_buf_str = manager->log_buf.c_str();
+	if(log_buf_str){
+		wattron(manager->nc_win, COLOR_PAIR(HAM_NCURSES_PAIR_STATUS_GOOD));
+		mvwprintw(manager->log_win, 0, 0, "%s", log_buf_str);
+		wattroff(manager->nc_win, COLOR_PAIR(HAM_NCURSES_PAIR_STATUS_GOOD));
+		//wrefresh(manager->log_win);
+	}
+
+	//
+	// User input
+	//
+
+	wmove(manager->input_win, 0, 0);
+
+	const auto input_line_str = manager->input_line.c_str();
+	if(input_line_str){
+		wprintw(manager->input_win, "> %s", input_line_str);
+	}
+	else{
+		wprintw(manager->input_win, "> ");
+	}
 
 	return true;
 }

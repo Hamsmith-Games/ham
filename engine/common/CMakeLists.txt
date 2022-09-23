@@ -40,6 +40,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	target_link_options(ham-engine PRIVATE "-Wl,--enable-new-dtags")
 endif()
 
+target_link_libraries(ham-engine PRIVATE ${HAM_CPU_LIBS})
 target_link_libraries(ham-engine PUBLIC ham::ham)
 
 target_include_directories(

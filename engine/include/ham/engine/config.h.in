@@ -40,6 +40,12 @@
 
 #define HAM_ENGINE_PLUGIN_CATEGORY "engine"
 
+#ifdef HAM_ENGINE_LIB_IMPLEMENTATION
+#	define ham_engine_api ham_public ham_export
+#else
+#	define ham_engine_api ham_public ham_import
+#endif
+
 /**
  * @}
  */
