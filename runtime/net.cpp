@@ -1,4 +1,4 @@
-#include "ham/net-vtable.h"
+#include "ham/net-object.h"
 
 #include "ham/plugin.h"
 #include "ham/memory.h"
@@ -13,21 +13,20 @@ ham_net *ham_net_create(const char *plugin_id, const char *obj_id){
 
 	ham_plugin *plugin = nullptr;
 	ham_dso_handle dll = nullptr;
-	const ham_plugin_vtable *plugin_vtable = nullptr;
 
 	if(!ham_plugin_find(plugin_id, HAM_EMPTY_STR8, &plugin, &dll)){
 		ham_logapierrorf("Error finding net plugin with id: %s", plugin_id);
 		return nullptr;
 	}
 
-	if(ham_plugin_category(plugin) != ham::str8("net")){
-		const auto plugin_name = plugin_vtable->name();
+	if(ham_plugin_category(plugin) != ham::str8(HAM_NET_PLUGIN_CATEGORY)){
+		const auto plugin_name = ham_plugin_name(plugin);
 		ham_logapiwarnf("Plugin is not a networking plugin: %.*s", (int)plugin_name.len, plugin_name.ptr);
 	}
 
 	const ham_object_vtable *obj_vt = ham_plugin_object(plugin, ham::str8(obj_id));
 	if(!obj_vt){
-		const auto plugin_name = plugin_vtable->name();
+		const auto plugin_name = ham_plugin_name(plugin);
 		ham_logapierrorf("Could not get object '%s' from plugin '%s'", obj_id, plugin_name.ptr);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dll);
@@ -35,7 +34,7 @@ ham_net *ham_net_create(const char *plugin_id, const char *obj_id){
 	}
 
 	if(!ham_plugin_init(plugin)){
-		const auto plugin_name = plugin_vtable->name();
+		const auto plugin_name = ham_plugin_name(plugin);
 		ham_logapierrorf("Error loading plugin: %.*s", (int)plugin_name.len, plugin_name.ptr);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dll);

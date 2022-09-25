@@ -25,6 +25,7 @@
  */
 
 #include "ham/engine/config.h"
+
 #include "ham/typedefs.h"
 
 #define HAM_ENGINE_VERSION ((ham_version){HAM_ENGINE_VERSION_MAJOR,HAM_ENGINE_VERSION_MINOR,HAM_ENGINE_VERSION_PATCH})
@@ -52,11 +53,41 @@ ham_engine_api ham_engine *ham_engine_create(
 	int argc, char **argv
 );
 
-ham_engine_api void ham_engine_destroy(ham_engine *engine);
+// ham_engine_api ham_nothrow void ham_engine_destroy(ham_engine *engine);
 
-ham_engine_api bool ham_engine_request_exit(ham_engine *engine);
+ham_engine_api ham_nothrow bool ham_engine_request_exit(ham_engine *engine);
 
 ham_engine_api int ham_engine_exec(ham_engine *engine);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup HAM_ENGINE_SYS Sub-systems
+ * @{
+ */
+
+typedef struct ham_engine_subsys ham_engine_subsys;
+
+typedef bool(*ham_engine_subsys_init_fn)(ham_engine *engine, void *user);
+typedef void(*ham_engine_subsys_fini_fn)(ham_engine *engine, void *user);
+typedef void(*ham_engine_subsys_loop_fn)(ham_engine *engine, ham_f64 dt, void *user);
+
+ham_engine_api ham_engine_subsys *ham_engine_subsys_create(
+	ham_engine *engine,
+	ham_str8 name,
+	ham_engine_subsys_init_fn init_fn,
+	ham_engine_subsys_fini_fn fini_fn,
+	ham_engine_subsys_loop_fn loop_fn,
+	void *user
+);
+
+ham_engine_api ham_nothrow bool ham_engine_subsys_running(ham_engine_subsys *subsys);
+
+ham_engine_api ham_nothrow bool ham_engine_subsys_set_min_dt(ham_engine_subsys *subsys, ham_f64 min_dt);
+
+ham_engine_api ham_nothrow bool ham_engine_subsys_launch(ham_engine_subsys *subsys);
 
 /**
  * @}

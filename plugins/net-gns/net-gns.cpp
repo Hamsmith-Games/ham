@@ -1,4 +1,4 @@
-#include "ham/net-vtable.h"
+#include "ham/net-object.h"
 #include "ham/plugin.h"
 #include "ham/log.h"
 

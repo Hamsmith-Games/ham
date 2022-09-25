@@ -107,24 +107,24 @@ typedef struct ham_plugin_vtable{
 #define HAM_IMPL_PLUGIN_VTABLE_NAME(derived) HAM_CONCAT(HAM_IMPL_PLUGIN_VTABLE_NAME_PREFIX, derived)
 
 #define HAM_IMPL_PLUGIN(id_, uuid_str_, name_, version_, display_name_, author_, license_, category_, desc_, init_fn_, fini_fn_) \
-	static inline ham_uuid HAM_CONCAT(ham_impl_vtable_uuid_, id_)(){ return ham_str_to_uuid_utf8(HAM_LIT_UTF8(uuid_str_)); } \
-	static inline ham_str8 HAM_CONCAT(ham_impl_vtable_name_, id_)(){ return HAM_LIT_UTF8(name_); } \
-	static inline ham_version HAM_CONCAT(ham_impl_vtable_version_, id_)(){ return version_; } \
-	static inline ham_str8 HAM_CONCAT(ham_impl_vtable_display_name_, id_)(){ return HAM_LIT_UTF8(display_name_); } \
-	static inline ham_str8 HAM_CONCAT(ham_impl_vtable_author_, id_)(){ return HAM_LIT_UTF8(author_); } \
-	static inline ham_str8 HAM_CONCAT(ham_impl_vtable_license_, id_)(){ return HAM_LIT_UTF8(license_); } \
-	static inline ham_str8 HAM_CONCAT(ham_impl_vtable_category_, id_)(){ return HAM_LIT_UTF8(category_); } \
-	static inline ham_str8 HAM_CONCAT(ham_impl_vtable_description_, id_)(){ return HAM_LIT_UTF8(desc_); } \
+	static inline ham_uuid    HAM_CONCAT(ham_impl_vtfn_uuid_, id_)(){ return ham_str_to_uuid_utf8(HAM_LIT_UTF8(uuid_str_)); } \
+	static inline ham_str8    HAM_CONCAT(ham_impl_vtfn_name_, id_)(){ return HAM_LIT_UTF8(name_); } \
+	static inline ham_version HAM_CONCAT(ham_impl_vtfn_version_, id_)(){ return version_; } \
+	static inline ham_str8    HAM_CONCAT(ham_impl_vtfn_display_name_, id_)(){ return HAM_LIT_UTF8(display_name_); } \
+	static inline ham_str8    HAM_CONCAT(ham_impl_vtfn_author_, id_)(){ return HAM_LIT_UTF8(author_); } \
+	static inline ham_str8    HAM_CONCAT(ham_impl_vtfn_license_, id_)(){ return HAM_LIT_UTF8(license_); } \
+	static inline ham_str8    HAM_CONCAT(ham_impl_vtfn_category_, id_)(){ return HAM_LIT_UTF8(category_); } \
+	static inline ham_str8    HAM_CONCAT(ham_impl_vtfn_description_, id_)(){ return HAM_LIT_UTF8(desc_); } \
 	ham_extern_c ham_public ham_export const ham_plugin_vtable *HAM_IMPL_PLUGIN_VTABLE_NAME(id_)(){ \
 		static const ham_plugin_vtable ret = (ham_plugin_vtable){ \
-			.uuid         = HAM_CONCAT(ham_impl_vtable_uuid_, id_), \
-			.name         = HAM_CONCAT(ham_impl_vtable_name_, id_), \
-			.version      = HAM_CONCAT(ham_impl_vtable_version_, id_), \
-			.display_name = HAM_CONCAT(ham_impl_vtable_display_name_, id_), \
-			.author       = HAM_CONCAT(ham_impl_vtable_author_, id_), \
-			.license      = HAM_CONCAT(ham_impl_vtable_license_, id_), \
-			.category     = HAM_CONCAT(ham_impl_vtable_category_, id_), \
-			.description  = HAM_CONCAT(ham_impl_vtable_description_, id_), \
+			.uuid         = HAM_CONCAT(ham_impl_vtfn_uuid_, id_), \
+			.name         = HAM_CONCAT(ham_impl_vtfn_name_, id_), \
+			.version      = HAM_CONCAT(ham_impl_vtfn_version_, id_), \
+			.display_name = HAM_CONCAT(ham_impl_vtfn_display_name_, id_), \
+			.author       = HAM_CONCAT(ham_impl_vtfn_author_, id_), \
+			.license      = HAM_CONCAT(ham_impl_vtfn_license_, id_), \
+			.category     = HAM_CONCAT(ham_impl_vtfn_category_, id_), \
+			.description  = HAM_CONCAT(ham_impl_vtfn_description_, id_), \
 			.init         = (init_fn_), \
 			.fini         = (fini_fn_), \
 		}; \

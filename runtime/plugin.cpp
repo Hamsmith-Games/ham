@@ -124,7 +124,7 @@ bool ham_plugin_find(const char *id, ham_str8 path, ham_plugin **plugin_ret, ham
 			continue;
 		}
 
-		const ham_dso_handle plugin_dso = ham_dso_open_c(plugin_dirent->d_name, HAM_DSO_GLOBAL | HAM_DSO_NOW);
+		const ham_dso_handle plugin_dso = ham_dso_open_c(path_buf, HAM_DSO_GLOBAL | HAM_DSO_NOW);
 		if(!plugin_dso){
 			ham_logapiwarnf("Failed to open plugin: %s", path_buf);
 			continue;

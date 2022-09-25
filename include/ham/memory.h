@@ -56,7 +56,7 @@ static inline void ham_allocator_free(const ham_allocator *allocator, void *mem)
 }
 
 #ifdef __cplusplus
-#	define ham_allocator_new(allocator, t) (new(ham_allocator_alloc((allocator), alignof(t), sizeof(t))) t)
+#	define ham_allocator_new(allocator, t, ...) (new(ham_allocator_alloc((allocator), alignof(t), sizeof(t))) t(__VA_ARGS__))
 #	define ham_allocator_delete(allocator, ptr) (std::destroy_at((ptr)), ham_allocator_free((allocator), (ptr)))
 #else
 #	define ham_allocator_new(allocator t) ((t*)ham_allocator_alloc((allocator), alignof(t), sizeof(t)))

@@ -22,25 +22,45 @@
 
 find_package(Steamworks)
 
-set(HAM_PLUGINS "")
+##
+# Configuration
+##
+
+set(HAM_PLUGIN_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+
+macro(ham_add_plugin TGT)
+	ham_add_library(${TGT} SHARED ${ARGN})
+	set(HAM_PLUGINS "${TGT};${HAM_PLUGINS}" PARENT_SCOPE)
+	set_target_properties(
+		${TGT} PROPERTIES
+		RUNTIME_OUTPUT_DIRECTORY ${HAM_PLUGIN_BINARY_DIR}
+		LIBRARY_OUTPUT_DIRECTORY ${HAM_PLUGIN_BINARY_DIR}
+	)
+endmacro()
 
 ##
 # Networking plugins
 ##
 
 add_subdirectory(net-gns)
-list(APPEND HAM_PLUGINS ham-net-gns)
 
 if(STEAMWORKS_FOUND)
 	add_subdirectory(net-steam)
-	list(APPEND HAM_PLUGINS ham-net-steam)
 endif()
 
-set(HAM_PLUGINS "${HAM_PLUGINS}" PARENT_SCOPE)
+##
+# Renderer plugins
+##
+
+add_subdirectory(renderer-vulkan)
 
 ##
 # Installation
 ##
+
+message(STATUS "Plugins: ${HAM_PLUGINS}")
+
+set(HAM_PLUGINS "${HAM_PLUGINS}" PARENT_SCOPE)
 
 if(NOT HAM_INSTALL_PLUGINS)
 	return()

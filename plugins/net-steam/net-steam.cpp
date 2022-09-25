@@ -1,4 +1,4 @@
-#include "ham/net-vtable.h"
+#include "ham/net-object.h"
 #include "ham/plugin.h"
 #include "ham/log.h"
 
@@ -12,22 +12,41 @@ struct ham_net_steam{
 	ham_derive(ham_net)
 };
 
-static ham_net_steam *ham_net_ctor_steam(ham_net_steam *net, va_list va){
+static ham_net_steam *ham_net_steam_ctor(ham_net_steam *net, va_list va){
 	(void)va;
 	return new(net) ham_net_steam;
 }
 
-static void ham_net_dtor_steam(ham_net_steam *net){
+static void ham_net_steam_dtor(ham_net_steam *net){
 	std::destroy_at(net);
 }
 
-static void ham_net_loop_steam(ham_net *net, ham_f64 dt){
+static bool ham_net_steam_init(ham_net *net){
+	(void)net;
+	return true;
+}
+
+static void ham_net_steam_fini(ham_net *net){
+	(void)net;
+}
+
+static void ham_net_steam_loop(ham_net *net, ham_f64 dt){
 	(void)net; (void)dt;
 
 	SteamAPI_RunCallbacks();
 }
 
-ham_define_object_x(2, ham_net_steam, 1, ham_net_vtable, ham_net_ctor_steam, ham_net_dtor_steam, ( .loop = ham_net_loop_steam ))
+ham_define_object_x(
+	2, ham_net_steam,
+	1, ham_net_vtable,
+	ham_net_steam_ctor,
+	ham_net_steam_dtor,
+	(
+		.init = ham_net_steam_init,
+		.fini = ham_net_steam_fini,
+		.loop = ham_net_steam_loop,
+	)
+)
 
 static void ham_impl_steam_debug(ESteamNetworkingSocketsDebugOutputType type, const char *msg){
 	switch(type){
@@ -68,7 +87,7 @@ static void ham_net_on_unload_steam(){
 HAM_C_API_END
 
 HAM_PLUGIN(
-	ham_net_context_steam,
+	ham_net_steam,
 	HAM_NET_STEAMWORKS_PLUGIN_UUID,
 	HAM_NET_STEAMWORKS_PLUGIN_NAME,
 	HAM_VERSION,

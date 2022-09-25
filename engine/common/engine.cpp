@@ -17,7 +17,7 @@
  */
 
 #include "ham/engine.h"
-#include "ham/engine-vtable.h"
+#include "ham/engine-object.h"
 #include "ham/memory.h"
 #include "ham/plugin.h"
 #include "ham/check.h"
@@ -317,7 +317,7 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 	const auto plugin_display_name = ham_plugin_display_name(data.plugin);
 	const auto plugin_version      = ham_plugin_version(data.plugin);
 
-	ham_logapiverbosef("Engine plugin: %s v%d.%d.%d", plugin_display_name.ptr, plugin_version.major, plugin_version.minor, plugin_version.patch);
+	ham_logapiinfof("Engine plugin: %s v%d.%d.%d", plugin_display_name.ptr, plugin_version.major, plugin_version.minor, plugin_version.patch);
 
 	const auto engine_info = ham_super(data.vtable)->info();
 	const auto engine_name = engine_info->type_id;
@@ -349,7 +349,7 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 	engine->plugin     = data.plugin;
 	engine->dso_handle = data.dso_handle;
 	engine->status     = 0;
-	engine->mut        = ham_mutex_create();
+	engine->mut        = ham_mutex_create(HAM_MUTEX_NORMAL);
 	engine->sem        = ham_sem_create(0);
 
 	if(!engine->mut || !engine->sem){
@@ -399,7 +399,7 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 	return engine;
 }
 
-bool ham_engine_request_exit(ham_engine *engine){
+ham_nothrow bool ham_engine_request_exit(ham_engine *engine){
 	if(!ham_check(engine != NULL)) return false;
 	engine->running.store(false, std::memory_order_relaxed);
 	return true;
@@ -422,6 +422,15 @@ int ham_engine_exec(ham_engine *engine){
 		if(!ham_sem_post(engine->sem)){
 			engine->running.store(false, std::memory_order_relaxed);
 			engine->status = 1;
+		}
+		else{
+			ham::scoped_lock lock(engine->subsys_mut);
+			for(int i = 0; i < engine->num_subsystems; i++){
+				const auto subsys = engine->subsystems[i];
+				if(!ham_engine_subsys_launch(subsys)){
+					ham_logapierrorf("Failed to launch subsystem %d", i);
+				}
+			}
 		}
 	}
 
@@ -464,6 +473,7 @@ int ham_engine_exec(ham_engine *engine){
 	ham_logapidebugf("Destroyed engine object '%s' (%p)", engine_name, engine);
 
 	ham_dso_close(dso_handle);
+
 	return result;
 }
 

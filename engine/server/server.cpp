@@ -19,10 +19,12 @@
 #define HAM_ENGINE_SERVER_API_NAME "ham-engine-server"
 #define HAM_ENGINE_SERVER_OBJ_NAME "ham_engine_server"
 
-#include "ham/engine-vtable.h"
+#include "ham/engine-object.h"
 #include "ham/log.h"
 
 #include "ham/net.h"
+
+ham_extern_c ham_public ham_export ham_nothrow ham_u32 ham_net_steam_appid(){ return 480; }
 
 static inline bool ham_engine_server_on_load(){ return true; }
 static inline void ham_engine_server_on_unload(){}
@@ -35,7 +37,7 @@ HAM_PLUGIN(
 	"Ham World Engine Server",
 	"Hamsmith Ltd.",
 	"GPLv3+",
-	HAM_NET_PLUGIN_CATEGORY,
+	HAM_ENGINE_PLUGIN_CATEGORY,
 	"Ham World Engine Server",
 	ham_engine_server_on_load,
 	ham_engine_server_on_unload
@@ -59,7 +61,7 @@ static inline void ham_engine_server_destroy(ham_engine_server *ptr){
 static inline bool ham_engine_server_init(ham_engine *engine_base){
 	const auto engine = (ham_engine_server*)engine_base;
 
-	engine->net = ham_net_create(HAM_NET_DEFAULT_PLUGIN_NAME, HAM_NET_DEFAULT_OBJECT_NAME);
+	engine->net = ham_net_create(HAM_NET_STEAMWORKS_PLUGIN_NAME, HAM_NET_STEAMWORKS_OBJECT_NAME);
 	if(!engine->net){
 		ham_logapierrorf("Error in ham_net_create");
 		return false;

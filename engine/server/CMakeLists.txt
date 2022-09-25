@@ -20,23 +20,17 @@
 # Server executable
 ##
 
-add_executable(ham-engine-server server.h server.cpp)
+ham_add_executable(ham-engine-server server.h server.cpp)
 
 set_target_properties(
 	ham-engine-server PROPERTIES
 	ENABLE_EXPORTS ON
-	C_VISIBILITY_PRESET hidden
-	CXX_VISIBILITY_PRESET hidden
-	VISIBILITY_INLINES_HIDDEN ON
 )
-
-target_compile_features(ham-engine-server PRIVATE c_std_17 cxx_std_20)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	target_link_options(ham-engine-server PRIVATE "-rdynamic")
 endif()
 
-target_link_libraries(ham-engine-server PRIVATE ${HAM_CPU_LIBS})
 target_link_libraries(ham-engine-server PRIVATE ham::engine)
 
 ##
@@ -45,11 +39,8 @@ target_link_libraries(ham-engine-server PRIVATE ham::engine)
 
 find_package(NCURSES REQUIRED)
 
-add_executable(ham-engine-server-manager manager.h manager.cpp)
-
-target_compile_features(ham-engine-server-manager PRIVATE c_std_17 cxx_std_20)
+ham_add_executable(ham-engine-server-manager manager.h manager.cpp)
 
 target_compile_definitions(ham-engine-server-manager PRIVATE HAM_ENGINE_SERVER_MANAGER_IMPLEMENTATION)
 
-target_link_libraries(ham-engine-server-manager PRIVATE ${HAM_CPU_LIBS})
 target_link_libraries(ham-engine-server-manager PRIVATE ham::engine ncurses::ncurses)

@@ -30,12 +30,12 @@ set(
 	memory.cpp
 	log.cpp
 	str_buffer.cpp
-	thread.cpp
 	fs.cpp
 	plugin.cpp
 	lex.cpp
 	parse.cpp
 	net.cpp
+	renderer.cpp
 )
 
 if(NOT CMAKE_USE_PTHREADS_INIT)

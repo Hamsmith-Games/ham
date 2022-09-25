@@ -46,6 +46,8 @@ set(HAM_ENGINE_VERSION       ${HAM_VERSION})
 set(HAM_ENGINE_BUILD_TYPE     ${HAM_BUILD_TYPE})
 set(HAM_ENGINE_BUILD_TYPE_STR ${HAM_BUILD_TYPE_STR})
 
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/steam_appid.txt "${HAM_BUILD_STEAM_APPID}")
+
 # UUID namespaces
 
 string(
@@ -90,7 +92,7 @@ set(
 	${HAM_ENGINE_BINARY_INCLUDE_DIR}/ham/engine/config.h
 
 	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine.h
-	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine-vtable.h
+	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine-object.h
 )
 
 ##
@@ -98,9 +100,35 @@ set(
 ##
 
 add_subdirectory(common)
-add_subdirectory(server)
 add_subdirectory(client)
+add_subdirectory(server)
 add_subdirectory(editor)
+
+set_target_properties(
+	ham-engine PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+	LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+set_target_properties(
+	ham-engine-client PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+set_target_properties(
+	ham-engine-server PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+set_target_properties(
+	ham-engine-server-manager PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+set_target_properties(
+	ham-engine-editor PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
 
 ##
 # Installation

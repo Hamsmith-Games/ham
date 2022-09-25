@@ -1,0 +1,10 @@
+{
+	"app-info": {
+		"id": "480",
+		"name": "test-game",
+		"author": "Hamsmith Ltd.",
+		"version": [0, 0, 1],
+		"license": "GPLv3+",
+		"desc": "Testing game for the Ham World Engine."
+	}
+}

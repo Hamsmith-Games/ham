@@ -16,6 +16,16 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-ham_add_plugin(ham-net-gns net-gns.cpp)
+find_package(Vulkan REQUIRED)
 
-target_link_libraries(ham-net-gns PRIVATE GameNetworkingSockets::shared)
+FetchContent_Declare(
+	VulkanMemoryAllocator_content
+	GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+	GIT_TAG        a6bfc237255a6bac1513f7c1ebde6d8aed6b5191
+)
+
+FetchContent_MakeAvailable(VulkanMemoryAllocator_content)
+
+ham_add_plugin(ham-renderer-vulkan renderer.cpp)
+
+target_link_libraries(ham-renderer-vulkan PRIVATE Vulkan::Vulkan VulkanMemoryAllocator)

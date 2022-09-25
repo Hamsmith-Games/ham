@@ -781,6 +781,7 @@ HAM_C_API_END
 
 #include <ostream>
 #include <type_traits>
+#include <exception>
 
 namespace ham{
 	namespace typedefs{
@@ -829,6 +830,14 @@ namespace ham{
 
 	using namespace typedefs;
 
+	class exception: public std::exception{
+		public:
+			virtual const char *api() const noexcept = 0;
+
+		private:
+			const char *m_api;
+	};
+
 	template<typename Handle, auto Destroyer, auto NullHandle = Handle(0)>
 	class unique_handle{
 		public:
@@ -868,6 +877,23 @@ namespace ham{
 	namespace meta{
 		template<typename T>
 		struct id{ using type = T; };
+
+		template<typename T, T ... Vals>
+		struct seq{};
+
+		namespace detail{
+			template<usize N, usize ... Built>
+			struct index_seq_builder: index_seq_builder<N-1, Built..., N-1>{};
+
+			template<usize ... Built>
+			struct index_seq_builder<0, Built...>{ using type = seq<usize, Built...>; };
+		}
+
+		template<usize ... Is>
+		using index_seq = seq<usize, Is...>;
+
+		template<usize N>
+		using make_index_seq = typename detail::index_seq_builder<N>::type;
 
 		template<typename T, T Value>
 		struct constant_value{

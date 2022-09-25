@@ -16,32 +16,17 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-add_library(
+ham_add_library(
 	ham-engine SHARED
 	${HAM_ENGINE_SOURCE_HEADERS}
 	engine.cpp
+	subsys.cpp
 	sys.cpp
 )
 
 add_library(ham::engine ALIAS ham-engine)
 
-set_target_properties(
-	ham-engine PROPERTIES
-	C_VISIBILITY_PRESET hidden
-	CXX_VISIBILITY_PRESET hidden
-	VISIBILITY_INLINES_HIDDEN ON
-)
-
-target_compile_features(ham-engine PUBLIC c_std_17 cxx_std_20)
-
 target_compile_definitions(ham-engine PRIVATE HAM_ENGINE_LIB_IMPLEMENTATION)
-
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-	target_link_options(ham-engine PRIVATE "-Wl,--enable-new-dtags")
-endif()
-
-target_link_libraries(ham-engine PRIVATE ${HAM_CPU_LIBS})
-target_link_libraries(ham-engine PUBLIC ham::ham)
 
 target_include_directories(
 	ham-engine PUBLIC

@@ -17,22 +17,21 @@
 #
 
 find_package(SDL2 CONFIG REQUIRED)
+find_package(Vulkan REQUIRED) # only for headers in client
 
-add_executable(ham-engine-client main.cpp)
+ham_add_executable(ham-engine-client main.cpp)
 
 set_target_properties(
 	ham-engine-client PROPERTIES
 	ENABLE_EXPORTS ON
-	C_VISIBILITY_PRESET hidden
-	CXX_VISIBILITY_PRESET hidden
-	VISIBILITY_INLINES_HIDDEN ON
 )
-
-target_compile_features(ham-engine-client PUBLIC c_std_17 cxx_std_20)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	target_link_options(ham-engine-client PRIVATE "-rdynamic")
 endif()
 
-target_link_libraries(ham-engine-client PRIVATE ${HAM_CPU_LIBS})
-target_link_libraries(ham-engine-client PRIVATE SDL2::SDL2 ham::engine)
+target_link_libraries(
+	ham-engine-client PRIVATE
+	ham::engine
+	SDL2::SDL2
+)

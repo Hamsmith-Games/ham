@@ -16,15 +16,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef HAM_ENGINE_VTABLE_H
-#define HAM_ENGINE_VTABLE_H 1
+#ifndef HAM_ENGINE_OBJECT_H
+#define HAM_ENGINE_OBJECT_H 1
 
 #include "engine.h"
 
 #include "ham/object.h"
 #include "ham/memory.h"
 #include "ham/async.h"
-#include "ham/thread.h"
 #include "ham/plugin.h"
 
 #include <atomic>
@@ -48,6 +47,10 @@ struct ham_engine{
 	ham_thread *thd = nullptr;
 
 	ham_path_buffer_utf8 game_dir = { 0 };
+
+	ham::mutex subsys_mut;
+	ham_u8 num_subsystems = 0;
+	ham_engine_subsys *subsystems[HAM_ENGINE_MAX_SUBSYSTEMS] = { nullptr };
 };
 
 struct ham_engine_vtable{
@@ -60,4 +63,4 @@ struct ham_engine_vtable{
 
 HAM_C_API_END
 
-#endif // !HAM_ENGINE_VTABLE_H
+#endif // !HAM_ENGINE_OBJECT_H

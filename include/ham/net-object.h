@@ -1,5 +1,5 @@
-#ifndef HAM_NET_VTABLE_H
-#define HAM_NET_VTABLE_H 1
+#ifndef HAM_NET_OBJECT_H
+#define HAM_NET_OBJECT_H 1
 
 /**
  * @defgroup HAM_NET_VTABLE Networking plugin vtables
@@ -30,7 +30,7 @@ struct ham_net_vtable{
 	ham_derive(ham_object_vtable)
 
 	bool(*init)(ham_net *net);
-	bool(*fini)(ham_net *net);
+	void(*fini)(ham_net *net);
 	void(*loop)(ham_net *net, ham_f64 dt);
 };
 
@@ -40,4 +40,4 @@ HAM_C_API_END
  * @}
  */
 
-#endif // !HAM_NET_VTABLE_H
+#endif // !HAM_NET_OBJECT_H

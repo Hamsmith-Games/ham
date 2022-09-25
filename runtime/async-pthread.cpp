@@ -52,7 +52,7 @@ ham_sem *ham_sem_create(ham_u32 initial_val){
 	return ptr;
 }
 
-void ham_sem_destroy(ham_sem *sem){
+ham_nothrow void ham_sem_destroy(ham_sem *sem){
 	if(!ham_check(sem != NULL)) return;
 
 	const auto allocator = sem->allocator;
@@ -65,7 +65,7 @@ void ham_sem_destroy(ham_sem *sem){
 	ham_allocator_delete(allocator, sem);
 }
 
-bool ham_sem_post(ham_sem *sem){
+ham_nothrow bool ham_sem_post(ham_sem *sem){
 	if(!ham_check(sem != NULL)) return false;
 
 	const int res = sem_post(&sem->sem);
@@ -77,7 +77,7 @@ bool ham_sem_post(ham_sem *sem){
 	return true;
 }
 
-bool ham_sem_wait(ham_sem *sem){
+ham_nothrow bool ham_sem_wait(ham_sem *sem){
 	if(!ham_check(sem != NULL)) return false;
 
 	const int res = sem_wait(&sem->sem);
@@ -89,7 +89,7 @@ bool ham_sem_wait(ham_sem *sem){
 	return true;
 }
 
-ham_i32 ham_sem_try_wait(ham_sem *sem){
+ham_nothrow ham_i32 ham_sem_try_wait(ham_sem *sem){
 	if(!ham_check(sem != NULL)) return -1;
 
 	const int res = sem_trywait(&sem->sem);
@@ -112,7 +112,7 @@ struct ham_mutex{
 	pthread_mutex_t mut;
 };
 
-ham_mutex *ham_mutex_create(){
+ham_mutex *ham_mutex_create(ham_mutex_kind kind){
 	const auto allocator = ham_current_allocator();
 
 	const auto ptr = ham_allocator_new(allocator, ham_mutex);
@@ -128,13 +128,29 @@ ham_mutex *ham_mutex_create(){
 		return nullptr;
 	}
 
-#ifndef NDEBUG
-	ptr->mut = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
-	pthread_mutexattr_settype(&mut_attr, PTHREAD_MUTEX_ERRORCHECK);
-#else
-	ptr->mut = PTHREAD_MUTEX_INITIALIZER;
-	pthread_mutexattr_settype(&mut_attr, PTHREAD_MUTEX_NORMAL);
-#endif
+	switch (kind) {
+		case HAM_MUTEX_RECURSIVE:{
+			ptr->mut = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+			pthread_mutexattr_settype(&mut_attr, PTHREAD_MUTEX_RECURSIVE_NP);
+			break;
+		}
+
+		case HAM_MUTEX_ERRORCHECK:{
+			ptr->mut = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
+			pthread_mutexattr_settype(&mut_attr, PTHREAD_MUTEX_ERRORCHECK_NP);
+			break;
+		}
+
+		default:{
+			ham_logapiwarnf("Unrecognized ham_mutex_kind (0x%x) using HAM_MUTEX_NORMAL", kind);
+		}
+
+		case HAM_MUTEX_NORMAL:{
+			ptr->mut = PTHREAD_MUTEX_INITIALIZER;
+			pthread_mutexattr_settype(&mut_attr, PTHREAD_MUTEX_NORMAL);
+			break;
+		}
+	}
 
 	res = pthread_mutex_init(&ptr->mut, &mut_attr);
 	if(res != 0){
@@ -157,7 +173,7 @@ ham_mutex *ham_mutex_create(){
 	return ptr;
 }
 
-void ham_mutex_destroy(ham_mutex *mut){
+ham_nothrow void ham_mutex_destroy(ham_mutex *mut){
 	if(!ham_check(mut != NULL)) return;
 
 	const auto allocator = mut->allocator;
@@ -170,7 +186,7 @@ void ham_mutex_destroy(ham_mutex *mut){
 	ham_allocator_delete(allocator, mut);
 }
 
-bool ham_mutex_lock(ham_mutex *mut){
+ham_nothrow bool ham_mutex_lock(ham_mutex *mut){
 	if(!ham_check(mut != NULL)) return false;
 
 	const int res = pthread_mutex_lock(&mut->mut);
@@ -182,7 +198,7 @@ bool ham_mutex_lock(ham_mutex *mut){
 	return true;
 }
 
-ham_i32 ham_mutex_try_lock(ham_mutex *mut){
+ham_nothrow ham_i32 ham_mutex_try_lock(ham_mutex *mut){
 	if(!ham_check(mut != NULL)) return -1;
 
 	const int res = pthread_mutex_trylock(&mut->mut);
@@ -198,7 +214,7 @@ ham_i32 ham_mutex_try_lock(ham_mutex *mut){
 	}
 }
 
-bool ham_mutex_unlock(ham_mutex *mut){
+ham_nothrow bool ham_mutex_unlock(ham_mutex *mut){
 	if(!ham_check(mut != NULL)) return false;
 
 	const int res = pthread_mutex_unlock(&mut->mut);
@@ -237,7 +253,7 @@ ham_cond *ham_cond_create(){
 	return ptr;
 }
 
-void ham_cond_destroy(ham_cond *cond){
+ham_nothrow void ham_cond_destroy(ham_cond *cond){
 	if(!ham_check(cond != NULL)) return;
 
 	const auto allocator = cond->allocator;
@@ -250,12 +266,140 @@ void ham_cond_destroy(ham_cond *cond){
 	ham_allocator_delete(allocator, cond);
 }
 
-bool ham_cond_wait(ham_cond *cond, ham_mutex *mut){
+ham_nothrow bool ham_cond_signal(ham_cond *cond){
+	if(!ham_check(cond != NULL)) return false;
+
+	const int res = pthread_cond_signal(&cond->cond);
+	if(res != 0){
+		ham_logapierrorf("Error in pthread_cond_signal: %s", strerror(res));
+		return false;
+	}
+
+	return true;
+}
+
+ham_nothrow bool ham_cond_broadcast(ham_cond *cond){
+	if(!ham_check(cond != NULL)) return false;
+
+	const int res = pthread_cond_broadcast(&cond->cond);
+	if(res != 0){
+		ham_logapierrorf("Error in pthread_cond_broadcast: %s", strerror(res));
+		return false;
+	}
+
+	return true;
+}
+
+ham_nothrow bool ham_cond_wait(ham_cond *cond, ham_mutex *mut){
 	if(!ham_check(cond != NULL)) return false;
 
 	const int res = pthread_cond_wait(&cond->cond, &mut->mut);
 	if(res != 0){
 		ham_logapierrorf("Error in pthread_cond_wait: %s", strerror(res));
+		return false;
+	}
+
+	return true;
+}
+
+//
+// Threads
+//
+
+struct ham_thread{
+	const ham_allocator *allocator;
+	pthread_t pthd;
+	ham_thread_fn fn;
+	void *user;
+};
+
+static void *ham_impl_thread_routine(void *data){
+	const auto thd = reinterpret_cast<ham_thread*>(data);
+
+	const ham_uptr res = thd->fn(thd->user);
+
+	void *ret;
+	memcpy(&ret, &res, sizeof(void*));
+
+	return ret;
+}
+
+ham_thread *ham_thread_create(ham_thread_fn fn, void *user){
+	if(!fn) return nullptr;
+
+	const ham::allocator<ham_thread> allocator;
+
+	const auto mem = allocator.allocate(1);
+	if(!mem) return nullptr;
+
+	const auto ptr = allocator.construct(mem);
+	if(!ptr){
+		allocator.deallocate(mem);
+		return nullptr;
+	}
+
+	ptr->fn = fn;
+	ptr->user = user;
+
+	int res = pthread_create(&ptr->pthd, nullptr, ham_impl_thread_routine, ptr);
+	if(res != 0){
+		// TODO: signal error
+		allocator.destroy(ptr);
+		allocator.deallocate(mem);
+		return nullptr;
+	}
+
+	return ptr;
+}
+
+ham_nothrow void ham_thread_destroy(ham_thread *thd){
+	if(!thd) return;
+
+	const ham::allocator<ham_thread> allocator = thd->allocator;
+
+	int res = pthread_join(thd->pthd, nullptr);
+	if(res != 0){
+		// TODO: signal error
+		(void)res;
+	}
+
+	allocator.destroy(thd);
+	allocator.deallocate(thd);
+}
+
+ham_nothrow bool ham_thread_join(ham_thread *thd, ham_uptr *ret){
+	if(!thd) return false;
+
+	void *result;
+
+	const int res = pthread_join(thd->pthd, &result);
+	if(res != 0){
+		// TODO: signal error
+		return false;
+	}
+
+	if(ret) memcpy(ret, &result, sizeof(void*));
+
+	return true;
+}
+
+ham_nothrow bool ham_thread_set_name(ham_thread *thd, ham_str8 name){
+	if(
+	   !thd ||
+	   !name.ptr ||
+	   !name.len ||
+	   name.len >= HAM_NAME_BUFFER_SIZE
+	){
+		return false;
+	}
+
+	ham_name_buffer_utf8 name_buf;
+	memcpy(name_buf, name.ptr, name.len);
+	name_buf[name.len] = '\0';
+
+	const int res = pthread_setname_np(thd->pthd, name_buf);
+	if(res != 0){
+		// TODO: signal error
 		return false;
 	}
 

@@ -1,7 +1,6 @@
 #include "ham/check.h"
 #include "ham/fs.h"
 #include "ham/str_buffer.h"
-#include "ham/std_vector.hpp"
 
 #include "manager.h"
 
