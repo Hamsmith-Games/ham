@@ -20,11 +20,19 @@
 #define HAM_H 1
 
 /**
- * @defgroup HAM Ham Language API
+ * @defgroup HAM Ham Runtime API
  * @{
  */
 
-#include "ham/parse.h"
+#include "ham/typedefs.h"
+
+HAM_C_API_BEGIN
+
+ham_api ham_version ham_linked_version();
+
+ham_api bool ham_init();
+
+HAM_C_API_END
 
 /**
  * @}

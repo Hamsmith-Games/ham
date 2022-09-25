@@ -75,6 +75,6 @@ bool ham_test_meta(){
 	static_assert(ham::meta::type_name_v<ham::basic_str_buffer<char16>> == "ham::basic_str_buffer<char16_t>");
 	static_assert(ham::meta::type_name_v<ham::basic_str_buffer<char32>> == "ham::basic_str_buffer<char32_t>");
 
-	std::cout << "DONE\n";
+	std::cout << HAM_TEST_PASSED_STR "\n";
 	return true;
 }

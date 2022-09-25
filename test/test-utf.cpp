@@ -39,7 +39,7 @@ bool ham_test_utf(){
 	while(off < (sizeof(u8str)-1)){
 		const auto nchars = ham_str_next_codepoint_utf8(&cp, u8str + off, sizeof(u8str) - (off+1));
 		if(nchars == (usize)-1 || u32str[u32idx] != cp){
-			std::cout << "FAILED\n" << std::flush;
+			std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
 
 			std::cerr << "    Test failed at character " << off << " '" << u8str[u32idx] << "'\n" << std::flush;
 			return false;
@@ -49,6 +49,6 @@ bool ham_test_utf(){
 		++u32idx;
 	}
 
-	std::cout << "DONE\n";
+	std::cout << HAM_TEST_PASSED_STR "\n";
 	return true;
 }

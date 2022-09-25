@@ -20,6 +20,7 @@ add_executable(
 	ham-test
 	tests.hpp
 	test-meta.cpp
+	test-object.cpp
 	test-utf.cpp
 	test-lex.cpp
 	test-parse.cpp

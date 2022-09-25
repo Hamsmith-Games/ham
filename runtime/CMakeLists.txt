@@ -26,6 +26,7 @@ find_package(Threads REQUIRED)
 set(
 	HAM_SOURCES
 	${HAM_HEADERS}
+	object.cpp
 	memory.cpp
 	log.cpp
 	str_buffer.cpp
@@ -44,13 +45,13 @@ endif()
 if(WIN32)
 	list(
 		APPEND HAM_SOURCES
-		dll-win32.cpp
+		dso-win32.cpp
 		async-pthread.cpp
 	)
 elseif(UNIX)
 	list(
 		APPEND HAM_SOURCES
-		dll-unix.cpp
+		dso-unix.cpp
 		async-pthread.cpp
 	)
 else()

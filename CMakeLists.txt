@@ -63,8 +63,10 @@ string(TOUPPER ${HAM_BUILD_TYPE} HAM_BUILD_TYPE)
 
 set(HAM_BUILD_TYPE_STR ${CMAKE_BUILD_TYPE})
 
+
 set(HAM_SOURCE_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 set(HAM_BINARY_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
+
 
 if(NOT HAM_TARGET_TRIPLE)
 	execute_process(
@@ -77,12 +79,42 @@ if(NOT HAM_TARGET_TRIPLE)
 	)
 endif()
 
+set(HAM_UUID_NAMESPACE "94d6f295-4e71-4b60-a7e5-a9fdc8bef7d2")
+
+set(HAM_NET_GNS_PLUGIN ham-net-gns)
+set(HAM_NET_STEAMWORKS_PLUGIN ham-net-steam)
+
+string(
+	UUID HAM_NET_UUID_NAMESPACE
+	NAMESPACE ${HAM_UUID_NAMESPACE}
+	NAME "net"
+	TYPE SHA1
+)
+
+string(
+	UUID HAM_NET_GNS_PLUGIN_UUID
+	NAMESPACE ${HAM_NET_UUID_NAMESPACE}
+	NAME ${HAM_NET_GNS_PLUGIN}
+	TYPE SHA1
+)
+
+string(
+	UUID HAM_NET_STEAMWORKS_PLUGIN_UUID
+	NAMESPACE ${HAM_NET_UUID_NAMESPACE}
+	NAME ${HAM_NET_STEAMWORKS_PLUGIN}
+	TYPE SHA1
+)
+
+set(HAM_NET_DEFAULT_PLUGIN ${HAM_NET_GNS_PLUGIN})
+set(HAM_NET_DEFAULT_PLUGIN_UUID ${HAM_NET_GNS_PLUGIN_UUID})
+
 configure_file(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/config.h.in
 	${HAM_BINARY_INCLUDE_DIR}/ham/config.h
 	@ONLY
 	NEWLINE_STYLE UNIX
 )
+
 
 set(
 	HAM_HEADERS
@@ -97,11 +129,12 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/log.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/thread.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/fs.h
-	${HAM_SOURCE_INCLUDE_DIR}/ham/dll.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/dso.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/plugin.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/lex.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/parse.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/memory.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/net.h
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/meta.hpp
 	${HAM_SOURCE_INCLUDE_DIR}/ham/std_vector.hpp
@@ -120,11 +153,13 @@ option(HAM_BUILD_TESTS   "Whether to build library tests"       ${PROJECT_IS_TOP
 option(HAM_BUILD_TOOLS   "Whether to build tools"               ${PROJECT_IS_TOP_LEVEL})
 option(HAM_BUILD_ENGINE  "Whether to build the world engine"    ${PROJECT_IS_TOP_LEVEL})
 
-option(HAM_INSTALL_DOCS   "Whether to install generated documentation" ${PROJECT_IS_TOP_LEVEL})
-option(HAM_INSTALL_TOOLS  "Whether to install default plugins"         ON)
-option(HAM_INSTALL_TOOLS  "Whether to install compiled tools"          ${PROJECT_IS_TOP_LEVEL})
-option(HAM_INSTALL_TESTS  "Whether to install the tests"               OFF)
-option(HAM_INSTALL_ENGINE "Whether to install the world engine"        OFF)
+option(HAM_INSTALL_DOCS    "Whether to install generated documentation" ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_PLUGINS "Whether to install the default plugins"     ON)
+option(HAM_INSTALL_TOOLS   "Whether to install compiled tools"          ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_TESTS   "Whether to install the tests"               OFF)
+option(HAM_INSTALL_ENGINE  "Whether to install the world engine"        OFF)
+
+set(HAM_OBJECT_INSTANCE_MANAGER_MAX_BLOCKS 16 CACHE STRING "Maximum number of storage blocks for each instance manager before an out of memory error")
 
 ##
 # Dependencies
@@ -139,6 +174,16 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(robin_hood_content)
 
 ##
+# Third-party/Licensed dependencies
+##
+
+find_file(
+	STEAMWORKS_SDK_PATH
+	NAMES steamworks_sdk_155.zip
+	PATHS ${CMAKE_CURRENT_LIST_DIR}/third_party
+)
+
+##
 # Runtime library, required for all other components
 ##
 
@@ -151,7 +196,11 @@ macro(ham_add_executable TGT)
 	target_link_libraries(${TGT} PRIVATE ${HAM_CPU_FLAGS})
 	set_target_properties(
 		${TGT} PROPERTIES
+		C_STANDARD 17
+		C_EXTENSIONS ON
 		C_VISIBILITY_PRESET hidden
+		CXX_STANDARD 20
+		CXX_EXTENSIONS ON
 		CXX_VISIBILITY_PRESET hidden
 		VISIBILITY_INLINES_HIDDEN ON
 	)
@@ -166,7 +215,11 @@ macro(ham_add_library TGT)
 	target_link_libraries(${TGT} PRIVATE ham::ham ${HAM_CPU_FLAGS})
 	set_target_properties(
 		${TGT} PROPERTIES
+		C_STANDARD 17
+		C_EXTENSIONS ON
 		C_VISIBILITY_PRESET hidden
+		CXX_STANDARD 20
+		CXX_EXTENSIONS ON
 		CXX_VISIBILITY_PRESET hidden
 		VISIBILITY_INLINES_HIDDEN ON
 	)
@@ -187,6 +240,9 @@ endif()
 
 if(HAM_BUILD_ENGINE)
 	add_subdirectory(engine)
+	if(HAM_BUILD_PLUGINS)
+		add_dependencies(ham-engine ${HAM_PLUGINS})
+	endif()
 endif()
 
 if(HAM_BUILD_TESTS)

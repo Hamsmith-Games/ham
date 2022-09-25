@@ -36,9 +36,10 @@ int main(int argc, char *argv[]){
 	};
 
 	run_test(ham_test_meta);
+	run_test(ham_test_object);
 	run_test(ham_test_utf);
 	run_test(ham_test_lex);
-	run_test(ham_test_parse);
+	//run_test(ham_test_parse);
 
 	std::cout << passed_tests << "/" << num_tests << " tests passed\n";
 

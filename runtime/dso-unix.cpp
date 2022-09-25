@@ -16,9 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "ham/dll.h"
+#include "ham/dso.h"
 #include "ham/log.h"
-#include "ham/memory.h"
 
 #ifndef PACKAGE
 #	define PACKAGE
@@ -36,20 +35,33 @@ static bool ham_impl_bfd_init_flag = false;
 
 HAM_C_API_BEGIN
 
-ham_dll_handle ham_dll_open_c(const char *path){
-	void *const ret = dlopen(path, RTLD_LAZY);
+ham_dso_handle ham_dso_open_c(const char *path, ham_u32 flags){
+	int mode = RTLD_LAZY;
+
+	if(flags & HAM_DSO_NOW){
+		mode = RTLD_NOW;
+	}
+
+	if(flags & HAM_DSO_GLOBAL){
+		mode |= RTLD_GLOBAL;
+	}
+	else if(flags & HAM_DSO_LOCAL){
+		mode |= RTLD_LOCAL;
+	}
+
+	void *const ret = dlopen(path, mode);
 	if(!ret) ham_logapierrorf("Error in dlopen: %s", dlerror());
 	return ret;
 }
 
-void ham_dll_close(ham_dll_handle handle){
+void ham_dso_close(ham_dso_handle handle){
 	if(!handle) return;
 
 	const int res = dlclose(handle);
 	if(res != 0) ham_logapierrorf("Error in dlclose: %s", dlerror());
 }
 
-void *ham_dll_symbol_c(ham_dll_handle handle, const char *id){
+void *ham_dso_symbol_c(ham_dso_handle handle, const char *id){
 	if(!handle) return ham_null;
 
 	void *const ret = dlsym(handle, id);
@@ -57,7 +69,7 @@ void *ham_dll_symbol_c(ham_dll_handle handle, const char *id){
 	return ret;
 }
 
-ham_usize ham_dll_iterate_symbols(ham_dll_handle handle, ham_dll_iterate_symbols_fn fn, void *user){
+ham_usize ham_dso_iterate_symbols(ham_dso_handle handle, ham_dso_iterate_symbols_fn fn, void *user){
 	if(!handle) return (ham_usize)-1;
 
 	struct link_map *lm;

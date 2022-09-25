@@ -1,84 +1,103 @@
 #include "ham/net-vtable.h"
 
+#include "ham/plugin.h"
+#include "ham/memory.h"
 #include "ham/check.h"
 
 HAM_C_API_BEGIN
 
-extern const ham_net_vtable *HAM_IMPL_PLUGIN_VTABLE_NAME(ham_net_vtable)();
+ham_net *ham_net_create(const char *plugin_id, const char *obj_id){
+	if(!ham_check(obj_id != NULL)) return nullptr;
 
-ham_net_context *ham_net_context_create(const char *plugin_id){
 	if(!plugin_id) plugin_id = HAM_NET_DEFAULT_PLUGIN_NAME;
 
 	ham_plugin *plugin = nullptr;
-	ham_dll_handle dll = nullptr;
+	ham_dso_handle dll = nullptr;
 	const ham_plugin_vtable *plugin_vtable = nullptr;
 
-	if(!ham_plugin_find(plugin_id, HAM_EMPTY_STR8, &plugin, &dll, &plugin_vtable)){
+	if(!ham_plugin_find(plugin_id, HAM_EMPTY_STR8, &plugin, &dll)){
 		ham_logapierrorf("Error finding net plugin with id: %s", plugin_id);
 		return nullptr;
 	}
 
-	if(plugin_vtable->category() != ham::str8("net")){
+	if(ham_plugin_category(plugin) != ham::str8("net")){
 		const auto plugin_name = plugin_vtable->name();
-		ham_logapierrorf("Plugin is not a networking plugin: %.*s", (int)plugin_name.len, plugin_name.ptr);
-		ham_plugin_unload(plugin);
-		ham_dll_close(dll);
+		ham_logapiwarnf("Plugin is not a networking plugin: %.*s", (int)plugin_name.len, plugin_name.ptr);
 	}
 
-	if(!plugin_vtable->on_load()){
+	const ham_object_vtable *obj_vt = ham_plugin_object(plugin, ham::str8(obj_id));
+	if(!obj_vt){
+		const auto plugin_name = plugin_vtable->name();
+		ham_logapierrorf("Could not get object '%s' from plugin '%s'", obj_id, plugin_name.ptr);
+		ham_plugin_unload(plugin);
+		ham_dso_close(dll);
+		return nullptr;
+	}
+
+	if(!ham_plugin_init(plugin)){
 		const auto plugin_name = plugin_vtable->name();
 		ham_logapierrorf("Error loading plugin: %.*s", (int)plugin_name.len, plugin_name.ptr);
 		ham_plugin_unload(plugin);
-		ham_dll_close(dll);
+		ham_dso_close(dll);
+		return nullptr;
 	}
 
-	const auto vtable = (const ham_net_vtable*)plugin_vtable;
+	const auto obj_info = obj_vt->info();
 
 	const auto allocator = ham_current_allocator();
 
-	const auto ptr = vtable->context_alloc(allocator);
-	if(!ptr){
-		const auto plugin_name = plugin_vtable->name();
-		ham_logapierrorf("Failed to allocate context for plugin: %.*s", (int)plugin_name.len, plugin_name.ptr);
-		plugin_vtable->on_unload();
+	const auto mem = (ham_object*)ham_allocator_alloc(allocator, obj_info->alignment, obj_info->size);
+	if(!mem){
+		ham_logapierrorf("Failed to allocate memory for object '%s'", obj_info->type_id);
 		ham_plugin_unload(plugin);
-		ham_dll_close(dll);
+		ham_dso_close(dll);
+	}
+
+	mem->vtable = obj_vt;
+
+	const auto ptr = (ham_net*)obj_vt->construct((ham_object*)mem, nullptr);
+	if(!ptr){
+		ham_logapierrorf("Failed to construct object '%s'", obj_info->type_id);
+		ham_allocator_free(allocator, mem);
+		ham_plugin_unload(plugin);
+		ham_dso_close(dll);
 	}
 
 	ptr->allocator = allocator;
-	ptr->dll = dll;
-	ptr->vtable = vtable;
+	ptr->dso = dll;
 
-	if(!vtable->context_init(ptr)){
-		const auto plugin_name = plugin_vtable->name();
-		ham_logapierrorf("Failed to initialize context for plugin: %.*s", (int)plugin_name.len, plugin_name.ptr);
-		vtable->context_free(ptr);
-		plugin_vtable->on_unload();
+	const auto net_vt = (const ham_net_vtable*)obj_vt;
+
+	if(!net_vt->init(ptr)){
+		ham_logapierrorf("Failed to initialize net object '%s'", obj_info->type_id);
+		obj_vt->destroy(mem);
+		ham_allocator_free(allocator, mem);
 		ham_plugin_unload(plugin);
-		ham_dll_close(dll);
+		ham_dso_close(dll);
+		return nullptr;
 	}
 
 	return ptr;
 }
 
-void ham_net_context_destroy(ham_net_context *net){
+void ham_net_destroy(ham_net *net){
 	if(ham_unlikely(!net)) return;
 
-	const auto vtable = net->vtable;
-	const auto dll = net->dll;
+	const auto vtable = ham_super(net)->vtable;
+	const auto dso = net->dso;
 
-	vtable->context_finish(net);
-	vtable->context_free(net);
+	((const ham_net_vtable*)vtable)->fini(net);
+	vtable->destroy((ham_object*)net);
 
-	ham_dll_close(dll);;
+	ham_dso_close(dso);
 }
 
-void ham_net_context_loop(ham_net_context *net, ham_f64 dt){
+void ham_net_loop(ham_net *net, ham_f64 dt){
 	if(ham_unlikely(!net)) return;
 
-	const auto vtable = net->vtable;
+	const auto vtable = (const ham_net_vtable*)ham_super(net)->vtable;
 
-	vtable->context_loop(net, dt);
+	vtable->loop(net, dt);
 }
 
 HAM_C_API_END

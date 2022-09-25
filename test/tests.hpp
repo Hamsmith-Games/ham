@@ -19,9 +19,21 @@
 #ifndef HAM_TEST_TESTS_HPP
 #define HAM_TEST_TESTS_HPP 1
 
+#include <stdio.h>
+
+#define HAM_TEST_PASSED_STR "PASSED"
+#define HAM_TEST_FAILED_STR "FAILED"
+
+#define ham_test_cond(cond_, err_fmt_, ...) \
+	((cond_) ? true : ( \
+		(fprintf(stdout, HAM_TEST_FAILED_STR "\n"), 0), \
+		(fprintf(stderr, "    Condition not met: %s\n    " err_fmt_, #cond_ __VA_OPT__(,) __VA_ARGS__), 0), \
+		false))
+
 bool ham_test_meta();
 bool ham_test_utf();
 bool ham_test_lex();
 bool ham_test_parse();
+bool ham_test_object();
 
 #endif // !HAM_TEST_TESTS_HPP

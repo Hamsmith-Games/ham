@@ -17,6 +17,7 @@
  */
 
 #include "ham/memory.h"
+#include "ham/log.h"
 
 #ifdef _WIN32
 
@@ -31,6 +32,7 @@
 
 #else
 
+#	include <sys/mman.h>
 #	include <stdlib.h>
 
 #	define ham_aligned_alloc(alignment, size) (aligned_alloc((alignment), (size)))
@@ -44,18 +46,103 @@ HAM_C_API_BEGIN
 
 ham_usize ham_get_page_size(){
 #ifdef _WIN32
+
 	SYSTEM_INFO info;
 	GetSystemInfo(&info);
 	return (ham_usize)info.dwPageSize;
+
 #elif defined(__unix__)
+
 	long res = sysconf(_SC_PAGESIZE);
 	if(res <= 0){
 		// wtf?
 		return 4096; // safe bet
 	}
 	return (ham_usize)res;
+
 #else
-	return 4096;
+
+	return 4096; // eh uh eh
+
+#endif
+}
+
+ham_api void *ham_map_pages(ham_usize num_pages){
+	if(num_pages == 0) return nullptr;
+
+	const auto page_size = ham_get_page_size();
+	if(num_pages > (HAM_USIZE_MAX/page_size)){
+		ham_logapierrorf("Allocating %zu pages of %zu bytes would overflow ham_usize", num_pages, page_size);
+		return nullptr;
+	}
+
+	const auto alloc_size = page_size * num_pages;
+
+#ifdef _WIN32
+
+	const auto mem = VirtualAlloc(nullptr, alloc_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	if(mem == nullptr){
+		ham_logapierrorf("Error in VirtualAlloc");
+		return nullptr;
+	}
+
+	return mem;
+
+#elif defined(__unix__)
+
+	const auto mem = mmap(nullptr, alloc_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	if(mem == MAP_FAILED){
+		ham_logapierrorf("Error in mmap: %s", strerror(errno));
+		return nullptr;
+	}
+
+	return mem;
+
+#else
+
+	ham_logapierrorf("ham_map_pages unimplemented on this platform");
+	return nullptr;
+
+#endif
+}
+
+ham_api bool ham_unmap_pages(void *mem, ham_usize num_pages){
+	if(!mem || num_pages == 0) return false;
+
+	const auto page_size = ham_get_page_size();
+	if(num_pages > (HAM_USIZE_MAX/page_size)){
+		ham_logapierrorf("Deallocating %zu pages of %zu bytes would overflow ham_usize", num_pages, page_size);
+		return false;
+	}
+
+	const auto free_size = page_size * num_pages;
+
+#ifdef _WIN32
+
+	if(!VirtualFree(mem, 0, MEM_RELEASE)){
+		ham_logapierrorf("Error in VirtualFree");
+		return false;
+	}
+
+	ham_logapiwarnf("ALL PAGES OF A MAPPING WILL ALWAYS BE FREED WHEN USING WIN32");
+
+	return true;
+
+#elif defined(__unix__)
+
+	const int res = munmap(mem, free_size);
+	if(res != 0){
+		ham_logapierrorf("Error in munmap: %s", strerror(errno));
+		return false;
+	}
+
+	return true;
+
+#else
+
+	ham_logapierrorf("ham_unmap_pages unimplemented on this platform");
+	return false;
+
 #endif
 }
 

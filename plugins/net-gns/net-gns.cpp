@@ -1,13 +1,34 @@
 #include "ham/net-vtable.h"
+#include "ham/plugin.h"
 #include "ham/log.h"
 
 #include <steam/steamnetworkingsockets.h>
 
 HAM_C_API_BEGIN
 
-struct ham_net_context_gns{
-	ham_derive(ham_net_context)
+struct ham_net_gns{
+	ham_derive(ham_net)
 };
+
+struct ham_net_vtable_gns{
+	ham_derive(ham_net_vtable)
+};
+
+static ham_net_gns *ham_net_gns_ctor(ham_net_gns *net, va_list va){
+	(void)va;
+	return new(net) ham_net_gns;
+}
+
+static void ham_net_gns_dtor(ham_net_gns *net){
+	std::destroy_at(net);
+}
+
+static void ham_net_gns_loop(ham_net *net, ham_f64 dt){
+	(void)net; (void)dt;
+
+}
+
+ham_define_object_x(2, ham_net_gns, 1, ham_net_vtable, ham_net_gns_ctor, ham_net_gns_dtor, ( .loop = ham_net_gns_loop ))
 
 static void ham_impl_gns_debug(ESteamNetworkingSocketsDebugOutputType type, const char *msg){
 	switch(type){
@@ -46,34 +67,18 @@ static void ham_net_on_unload_gns(){
 	GameNetworkingSockets_Kill();
 }
 
-static bool ham_net_init_gns(ham_net_context_gns *ctx){
-	(void)ctx;
-	return true;
-}
-
-static void ham_net_finish_gns(ham_net_context_gns *ctx){
-	(void)ctx;
-}
-
-static void ham_net_loop_gns(ham_net_context_gns *ctx, ham_f64 dt){
-	(void)ctx; (void)dt;
-}
-
 HAM_C_API_END
 
-HAM_NET_VTABLE(
-	ham_net_context_gns,
-	HAM_NET_DEFAULT_PLUGIN_UUID,
-	HAM_NET_DEFAULT_PLUGIN_NAME,
+HAM_PLUGIN(
+	ham_net_gns,
+	HAM_NET_GNS_PLUGIN_UUID,
+	HAM_NET_GNS_PLUGIN_NAME,
 	HAM_VERSION,
 	"GameNetworkingSockets",
 	"Hamsmith Ltd.",
 	"GPLv3+",
-	"Default networking using Valve's GameNetworkingSockets",
-
+	HAM_NET_PLUGIN_CATEGORY,
+	"Networking using Valve's GameNetworkingSockets",
 	ham_net_on_load_gns,
-	ham_net_on_unload_gns,
-	ham_net_init_gns,
-	ham_net_finish_gns,
-	ham_net_loop_gns
+	ham_net_on_unload_gns
 )

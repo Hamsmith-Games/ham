@@ -775,12 +775,6 @@ typedef HAM_STR_UTF(HAM_UTF)  ham_str;
  * @}
  */
 
-#define HAM_SUPER_NAME _ham_super
-
-#define ham_derive(base) base HAM_SUPER_NAME;
-
-#define ham_super(derived_ptr) (&(derived_ptr)->HAM_SUPER_NAME)
-
 HAM_C_API_END
 
 #ifdef __cplusplus

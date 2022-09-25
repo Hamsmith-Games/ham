@@ -20,11 +20,11 @@
 #include "ham/memory.h"
 #include "ham/check.h"
 #include "ham/fs.h"
-#include "ham/str_buffer.h"
-
-#include "robin_hood.h"
+#include "ham/std_vector.hpp"
 
 #include <dirent.h>
+
+#include <mutex>
 
 using namespace ham::typedefs;
 
@@ -32,15 +32,27 @@ HAM_C_API_BEGIN
 
 struct ham_plugin{
 	const ham_allocator *allocator = nullptr;
-	robin_hood::unordered_flat_map<ham::uuid, const ham_plugin_vtable*> vtable_map;
+	const ham_plugin_vtable *plugin_vtable = nullptr;
+	ham::std_vector<const ham_object_vtable*> object_vtables;
+	std::mutex mut;
+	bool init_flag = false;
 };
 
-bool ham_plugin_find(const char *id, ham_str8 path, ham_plugin **plugin_ret, ham_dll_handle *dll_ret, const ham_plugin_vtable **vtable_ret){
+ham_str8 ham_plugin_default_path(){
+	const char *path = getenv("HAM_PLUGIN_PATH");
+	if(!path){
+		static thread_local ham_path_buffer_utf8 cwd_buf;
+		path = getcwd(cwd_buf, sizeof(cwd_buf));
+	}
+
+	return (ham_str8){ path, strlen(path) };
+}
+
+bool ham_plugin_find(const char *id, ham_str8 path, ham_plugin **plugin_ret, ham_dso_handle *dso_ret){
 	if(
 		!ham_check(id != NULL) ||
 		!ham_check(plugin_ret != NULL) ||
-		!ham_check(dll_ret != NULL) ||
-		!ham_check(vtable_ret != NULL) ||
+		!ham_check(dso_ret != NULL) ||
 		!ham_check(!path.len || path.ptr)
 	){
 		return false;
@@ -49,12 +61,15 @@ bool ham_plugin_find(const char *id, ham_str8 path, ham_plugin **plugin_ret, ham
 	ham_path_buffer_utf8 cwd_buf;
 
 	if(!path.len){
-		path.ptr = getcwd(cwd_buf, sizeof(cwd_buf));
-		path.len = strlen(path.ptr);
+		path = ham_plugin_default_path();
+		if(!path.len || !path.ptr){
+			ham_logapierrorf("Error getting default plugin path");
+			return false;
+		}
 	}
 
-	constexpr ham::str8 plugin_mime = HAM_PLATFORM_DLL_MIME;
-	constexpr ham::str8 minimum_subpath = "/libx" HAM_PLATFORM_DLL_EXT;
+	constexpr ham::str8 plugin_mime = HAM_PLATFORM_DSO_MIME;
+	constexpr ham::str8 minimum_subpath = "/libx" HAM_PLATFORM_DSO_EXT;
 
 	if((path.len + minimum_subpath.len()) >= HAM_PATH_BUFFER_SIZE){
 		ham_logapierrorf("Dir path too long: %zu, max %zu", path.len, HAM_PATH_BUFFER_SIZE - (minimum_subpath.len() + 1));
@@ -109,148 +124,201 @@ bool ham_plugin_find(const char *id, ham_str8 path, ham_plugin **plugin_ret, ham
 			continue;
 		}
 
-		const ham_dll_handle plugin_dll = ham_dll_open_c(plugin_dirent->d_name);
-		if(!plugin_dll){
+		const ham_dso_handle plugin_dso = ham_dso_open_c(plugin_dirent->d_name, HAM_DSO_GLOBAL | HAM_DSO_NOW);
+		if(!plugin_dso){
 			ham_logapiwarnf("Failed to open plugin: %s", path_buf);
 			continue;
 		}
 
-		ham_plugin *const plugin = ham_plugin_load(plugin_dll);
+		ham_plugin *const plugin = ham_plugin_load(plugin_dso, id);
 		if(!plugin){
-			ham_logapiwarnf("Failed to load opened plugin: %s", path_buf);
-			ham_dll_close(plugin_dll);
+			ham_dso_close(plugin_dso);
 			continue;
 		}
 
-		const ham_usize num_vtables = ham_plugin_iterate_vtables(
-			plugin,
-			[](const ham_plugin_vtable *vtable, void *user){
-				const auto data = reinterpret_cast<plugin_iter_data*>(user);
-
-				if(
-					(vtable->name()         == ham::str8(data->id)) ||
-					(vtable->display_name() == ham::str8(data->id))
-				){
-					data->vtable = vtable;
-					return false;
-				}
-
-				return true;
-			},
-			&data
-		);
-
-		if(num_vtables == (ham_usize)-1){
-			ham_logapiwarnf("Failed to iterate plugin vtables");
-		}
-		else if(data.vtable != nullptr){
-			*plugin_ret = plugin;
-			*dll_ret = plugin_dll;
-			*vtable_ret = data.vtable;
-			closedir(plugin_dir);
-			return true;
-		}
-
-		ham_plugin_unload(plugin);
-		ham_dll_close(plugin_dll);
+		*plugin_ret = plugin;
+		*dso_ret = plugin_dso;
+		closedir(plugin_dir);
+		return true;
 	}
 
 	closedir(plugin_dir);
 	return false;
 }
 
-ham_plugin *ham_plugin_load(ham_dll_handle dll){
-	if(!dll){
-		dll = ham_dll_open_c(nullptr);
-		if(!dll){
+ham_plugin *ham_plugin_load(ham_dso_handle dso, const char *plugin_id){
+	if(!dso){
+		dso = ham_dso_open_c(nullptr, 0);
+		if(!dso){
 			ham_logapierrorf("Error opening main executable as shared object");
 			return nullptr;
 		}
 	}
 
-	const ham::allocator<ham_plugin> allocator;
+	const ham_allocator *allocator = ham_current_allocator();
 
-	const auto mem = allocator.allocate(1);
-	if(!mem) return nullptr;
+	ham::std_vector<const ham_plugin_vtable*> plug_vtables(allocator);
 
-	const auto ptr = allocator.construct(mem);
-	if(!ptr){
-		allocator.deallocate(mem);
-		return nullptr;
-	}
+	struct iter_data{
+		const char *req_id;
+		const ham_plugin_vtable *plug_vtable = nullptr;
+		ham::std_vector<const ham_object_vtable*> obj_vtables;
+	} data;
 
-	ptr->allocator = allocator;
+	data.req_id = plugin_id;
 
-	ham_usize total_num_syms = ham_dll_iterate_symbols(
-		dll,
-		[](ham_dll_handle dll, ham_str8 sym_name, void *user){
-			const auto plugin = reinterpret_cast<ham_plugin*>(user);
+	ham_usize total_num_syms = ham_dso_iterate_symbols(
+		dso,
+		[](ham_dso_handle dso, ham_str8 sym_name, void *user){
+			const auto data = reinterpret_cast<iter_data*>(user);
 
+			constexpr ham::str8 obj_vtable_prefix = HAM_STRINGIFY(ham_impl_object_vtable_prefix);
 			constexpr ham::str8 vtable_prefix = HAM_STRINGIFY(HAM_IMPL_PLUGIN_VTABLE_NAME_PREFIX);
 
 			const auto sym_str = ham::str8(sym_name);
 
-			if(sym_str.len() <= vtable_prefix.len() || strncmp(sym_str.ptr(), vtable_prefix.ptr(), vtable_prefix.len()) != 0){
-				return true;
+			if(sym_str.len() > obj_vtable_prefix.len() && strncmp(sym_str.ptr(), obj_vtable_prefix.ptr(), obj_vtable_prefix.len()) == 0){
+				using obj_vtable_fn = const ham_object_vtable*(*)();
+
+				const auto obj_vtable_fptr = reinterpret_cast<obj_vtable_fn>(ham_dso_symbol_c(dso, sym_name.ptr));
+				if(!obj_vtable_fptr){
+					ham_logwarnf("ham_plugin_load", "Failed to load object vtable: %s", sym_name.ptr);
+					return true;
+				}
+
+				const auto obj_vtable = obj_vtable_fptr();
+				if(!obj_vtable){
+					ham_logwarnf("ham_plugin_load", "Bad object vtable: %s", sym_name.ptr);
+					return true;
+				}
+
+				data->obj_vtables.emplace_back(obj_vtable);
 			}
+			else if(!data->plug_vtable && sym_str.len() > vtable_prefix.len() && strncmp(sym_str.ptr(), vtable_prefix.ptr(), vtable_prefix.len()) == 0){
+				using plug_vtable_fn = const ham_plugin_vtable*(*)();
 
-			using vtable_fptr = const ham_plugin_vtable*(*)();
+				const auto plug_vtable_fptr = reinterpret_cast<plug_vtable_fn>(ham_dso_symbol_c(dso, sym_name.ptr));
+				if(!plug_vtable_fptr){
+					ham_logwarnf("ham_plugin_load", "Failed to load plugin vtable: %s", sym_name.ptr);
+					return true;
+				}
 
-			const auto vtable_fn = reinterpret_cast<vtable_fptr>(ham_dll_symbol_c(dll, sym_name.ptr));
-			if(!vtable_fn){
-				ham_logwarnf("ham_plugin_load", "Failed to load vtable symbol: %s", sym_name.ptr);
-				return true;
+				const auto plug_vtable = plug_vtable_fptr();
+				if(!plug_vtable){
+					ham_logwarnf("ham_plugin_load", "Bad plugin vtable: %s", sym_name.ptr);
+					return true;
+				}
+
+				if(strcmp(plug_vtable->name().ptr, data->req_id) == 0){
+					ham_logdebugf("ham_plugin_load", "Found plugin vtable: %s", sym_name.ptr);
+					data->plug_vtable = plug_vtable;
+				}
 			}
-
-			const auto vtable = vtable_fn();
-			if(!vtable){
-				ham_logwarnf("ham_plugin_load", "Bad plugin vtable function: %s", sym_name.ptr);
-				return true;
-			}
-
-			const ham::uuid plugin_uuid = vtable->uuid();
-
-			plugin->vtable_map[plugin_uuid] = vtable;
 
 			return true;
 		},
-		ptr
+		&data
 	);
 
-	if(total_num_syms == (usize)-1){
-		ham_logapierrorf("Failed to iterate dll symbols");
-		allocator.destroy(ptr);
-		allocator.deallocate(mem);
+	if(!data.plug_vtable){
+		ham_logapierrorf("Failed to find plugin by id: %s", plugin_id);
 		return nullptr;
 	}
+	else if(total_num_syms == (usize)-1){
+		ham_logapierrorf("Failed to iterate dll symbols");
+		return nullptr;
+	}
+
+	const auto ptr = ham_allocator_new(allocator, ham_plugin);
+	if(!ptr){
+		ham_logapierrorf("Error allocating ham_plugin");
+		return nullptr;
+	}
+
+	ptr->allocator = allocator;
+	ptr->plugin_vtable = data.plug_vtable;
+	ptr->object_vtables = std::move(data.obj_vtables);
 
 	return ptr;
 }
 
 void ham_plugin_unload(ham_plugin *plugin){
-	if(!plugin) return;
+	if(ham_unlikely(!plugin)) return;
 
-	const ham::allocator<ham_plugin> allocator;
+	std::scoped_lock lock(plugin->mut);
 
-	allocator.destroy(plugin);
-	allocator.deallocate(plugin);
+	if(plugin->init_flag){
+		plugin->plugin_vtable->fini();
+		plugin->init_flag = false;
+	}
+
+	const ham_allocator *allocator = plugin->allocator;
+
+	ham_allocator_delete(allocator, plugin);
 }
 
-ham_usize ham_plugin_iterate_vtables(const ham_plugin *plugin, ham_plugin_iterate_vtables_fn fn, void *user){
-	if(!plugin) return (usize)-1;
+ham_uuid    ham_plugin_uuid(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? plugin->plugin_vtable->uuid() : (ham_uuid){ .u64s = { (ham_u64)-1, (ham_u64)-1 } }; }
+ham_str8    ham_plugin_name(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? plugin->plugin_vtable->name() : HAM_EMPTY_STR8; }
+ham_version ham_plugin_version(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? plugin->plugin_vtable->version() : (ham_version){ .major = (ham_u16)-1, .minor = (ham_u16)-1, .patch = (ham_u16)-1 }; }
+ham_str8    ham_plugin_display_name(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? plugin->plugin_vtable->display_name() : HAM_EMPTY_STR8; }
+ham_str8    ham_plugin_author(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? plugin->plugin_vtable->author() : HAM_EMPTY_STR8; }
+ham_str8    ham_plugin_license(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? plugin->plugin_vtable->license() : HAM_EMPTY_STR8; }
+ham_str8    ham_plugin_category(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? plugin->plugin_vtable->category() : HAM_EMPTY_STR8; }
+ham_str8    ham_plugin_description(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? plugin->plugin_vtable->description() : HAM_EMPTY_STR8; }
+
+bool ham_plugin_init(ham_plugin *plugin){
+	if(!ham_check(plugin != NULL)) return false;
+
+	std::scoped_lock lock(plugin->mut);
+
+	if(!plugin->init_flag){
+		plugin->init_flag = plugin->plugin_vtable->init();
+	}
+
+	return plugin->init_flag;
+}
+
+bool ham_plugin_fini(ham_plugin *plugin){
+	if(!ham_check(plugin != NULL)) return false;
+
+	std::scoped_lock lock(plugin->mut);
+
+	if(plugin->init_flag){
+		plugin->plugin_vtable->fini();
+		plugin->init_flag = false;
+	}
+
+	return true;
+}
+
+const ham_object_vtable *ham_plugin_object(const ham_plugin *plugin, ham_str8 name){
+	if(
+	   !ham_check(plugin != NULL) ||
+	   !ham_check(name.len && name.ptr)
+	){
+		return nullptr;
+	}
+
+	for(auto obj_vt : plugin->object_vtables){
+		const ham::str8 obj_type_id = ham::str8(obj_vt->info()->type_id);
+		if(obj_type_id == name) return obj_vt;
+	}
+
+	return nullptr;
+}
+
+ham_usize ham_plugin_iterate_objects(const ham_plugin *plugin, ham_plugin_iterate_objects_fn fn, void *user){
+	if(!ham_check(plugin != NULL)) return (usize)-1;
 
 	if(fn){
-		usize num_counted = 0;
-		for(auto &&map_pair : plugin->vtable_map){
-			++num_counted;
-			if(!fn(map_pair.second, user)) break;
+		for(usize i = 0; i < plugin->object_vtables.size(); i++){
+			if(!fn(plugin->object_vtables[i], user)){
+				return i;
+			}
 		}
+	}
 
-		return num_counted;
-	}
-	else{
-		return plugin->vtable_map.size();
-	}
+	return plugin->object_vtables.size();
 }
 
 HAM_C_API_END

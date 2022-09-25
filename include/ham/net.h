@@ -11,13 +11,13 @@
 
 HAM_C_API_BEGIN
 
-typedef struct ham_net_context ham_net_context;
+typedef struct ham_net ham_net;
 
-ham_api ham_net_context *ham_net_context_create(const char *plugin_id);
+ham_api ham_net *ham_net_create(const char *plugin_id, const char *obj_id);
 
-ham_api void ham_net_context_destroy(ham_net_context *net);
+ham_api void ham_net_destroy(ham_net *net);
 
-ham_api void ham_net_context_loop(ham_net_context *net, ham_f64 dt);
+ham_api void ham_net_loop(ham_net *net, ham_f64 dt);
 
 HAM_C_API_END
 

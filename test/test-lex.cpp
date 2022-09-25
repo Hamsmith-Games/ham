@@ -52,7 +52,7 @@ bool ham_test_lex(){
 		const auto tok_str = tok.str();
 		const auto tok_loc = tok.source_location();
 
-		std::cout << "FAILED\n" << std::flush;
+		std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
 
 		std::cerr
 			<< "    Lexing error[" << tok_loc.line() + 1 << ":" << tok_loc.column()+1 << "]: " << tok_str << '\n';
@@ -60,6 +60,6 @@ bool ham_test_lex(){
 		return false;
 	}
 
-	std::cout << "DONE\n";
+	std::cout << HAM_TEST_PASSED_STR "\n";
 	return true;
 }

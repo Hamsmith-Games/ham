@@ -35,6 +35,9 @@ HAM_C_API_BEGIN
 
 ham_api ham_usize ham_get_page_size();
 
+ham_api void *ham_map_pages(ham_usize num_pages);
+ham_api bool ham_unmap_pages(void *mem, ham_usize num_pages);
+
 typedef void*(*ham_alloc_fn)(ham_usize alignment, ham_usize size, void *user);
 typedef void(*ham_free_fn)(void *mem, void *user);
 
@@ -119,6 +122,8 @@ namespace ham{
 			}
 
 			operator const ham_allocator*() const noexcept{ return m_handle; }
+
+			const ham_allocator *handle() const noexcept{ return m_handle; }
 
 			template<typename U>
 			bool operator==(const allocator<U> &other) const noexcept{
