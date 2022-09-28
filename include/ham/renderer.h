@@ -7,7 +7,7 @@
  * @{
  */
 
-#include "typedefs.h"
+#include "shape.h"
 
 #include <stdarg.h>
 
@@ -33,18 +33,23 @@ ham_api void ham_renderer_destroy(ham_renderer *renderer);
 
 ham_api void ham_renderer_loop(ham_renderer *renderer, ham_f64 dt);
 
-typedef struct ham_shader ham_shader;
+/**
+ * @defgroup HAM_RENDERER_DRAW_GROUP Draw groups
+ * @{
+ */
 
-typedef enum ham_shader_kind{
-	HAM_SHADER_VERTEX,
-	HAM_SHADER_FRAGMENT,
+typedef struct ham_renderer_draw_group ham_renderer_draw_group;
 
-	HAM_SHADER_KIND_COUNT
-} ham_shader_kind;
+ham_api ham_renderer_draw_group *ham_renderer_draw_group_create(
+	ham_renderer *r,
+	ham_usize num_shapes, const ham_shape *shapes
+);
 
-ham_api ham_shader *ham_shader_create(ham_renderer *r, ham_shader_kind kind, ham_str8 spirv);
+ham_api void ham_renderer_draw_group_destroy(ham_renderer_draw_group *group);
 
-ham_api void ham_shader_destroy(ham_shader *shader);
+/**
+ * @}
+ */
 
 HAM_C_API_END
 

@@ -33,6 +33,8 @@ constexpr ham_usize ham_impl_max_queued_frames = 3;
 struct ham_renderer_vulkan{
 	ham_derive(ham_renderer)
 
+	bool swapchain_dirty = false;
+
 	VkInstance vk_inst;
 	VkSurfaceKHR vk_surface;
 
@@ -322,6 +324,22 @@ static inline bool ham_renderer_vulkan_init_swapchain(ham_renderer_vulkan *r){
 	r->vk_swapchain_extent = r->vk_swapchain_info.capabilities.currentExtent;
 
 	return true;
+}
+
+ham_nonnull_args(1)
+static inline void ham_renderer_vulkan_fini_swapchain(ham_renderer_vulkan *r){
+	for(auto &fb : r->vk_swapchain_framebuffers){
+		r->vk_fns.vkDestroyFramebuffer(r->vk_dev, fb, nullptr);
+		fb = nullptr;
+	}
+
+	for(auto &image_view : r->vk_swapchain_image_views){
+		r->vk_fns.vkDestroyImageView(r->vk_dev, image_view, nullptr);
+		image_view = nullptr;
+	}
+
+	r->vk_fns.vkDestroySwapchainKHR(r->vk_dev, r->vk_swapchain, nullptr);
+	r->vk_swapchain = nullptr;
 }
 
 ham_nonnull_args(1)
@@ -822,6 +840,41 @@ static inline bool ham_renderer_vulkan_fill_command_buffers(ham_renderer_vulkan 
 }
 
 ham_nonnull_args(1)
+static inline bool ham_renderer_vulkan_recreate_swapchain(ham_renderer_vulkan *r){
+	r->vk_fns.vkDeviceWaitIdle(r->vk_dev);
+
+	ham_renderer_vulkan_fini_swapchain(r);
+
+	if(!ham_renderer_vulkan_init_swapchain(r)){
+		ham_logapierrorf("Error initializing swapchain");
+		return false;
+	}
+
+	if(!ham_renderer_vulkan_init_swapchain_images(r)){
+		ham_logapierrorf("Error initializing swapchain images");
+		r->vk_fns.vkDestroySwapchainKHR(r->vk_dev, r->vk_swapchain, nullptr);
+		r->vk_swapchain = nullptr;
+		return false;
+	}
+
+	if(!ham_renderer_vulkan_init_framebuffers(r)){
+		ham_logapierrorf("Error initializing framebuffers");
+
+		for(auto &view : r->vk_swapchain_image_views){
+			r->vk_fns.vkDestroyImageView(r->vk_dev, view, nullptr);
+			view = nullptr;
+		}
+
+		r->vk_fns.vkDestroySwapchainKHR(r->vk_dev, r->vk_swapchain, nullptr);
+		r->vk_swapchain = nullptr;
+		return false;
+	}
+
+	r->swapchain_dirty = false;
+	return true;
+}
+
+ham_nonnull_args(1)
 static inline ham_renderer_vulkan *ham_renderer_vulkan_construct(ham_renderer_vulkan *mem, ham_usize nargs, va_list va){
 	if(nargs != 3){
 		ham_logapierrorf("Wrong number of arguments passed: %zu, expected 6 (VkInstance, VkSurfaceKHR, PFN_vkGetInstanceProcAddr)", nargs);
@@ -1120,20 +1173,11 @@ static inline void ham_renderer_vulkan_fini(ham_renderer *r_base){
 
 	r->vk_fns.vkDestroyCommandPool(r->vk_dev, r->vk_cmd_pool, nullptr);
 
-	for(auto fb : r->vk_swapchain_framebuffers){
-		r->vk_fns.vkDestroyFramebuffer(r->vk_dev, fb, nullptr);
-	}
-
 	r->vk_fns.vkDestroyPipeline(r->vk_dev, r->vk_pipeline, nullptr);
 	r->vk_fns.vkDestroyRenderPass(r->vk_dev, r->vk_render_pass, nullptr);
 	r->vk_fns.vkDestroyPipelineLayout(r->vk_dev, r->vk_pipeline_layout, nullptr);
 
-	for(auto image_view : r->vk_swapchain_image_views){
-		r->vk_fns.vkDestroyImageView(r->vk_dev, image_view, nullptr);
-	}
-
-	r->vk_fns.vkDestroySwapchainKHR(r->vk_dev, r->vk_swapchain, nullptr);
-	r->vk_fns.vkDestroyDevice(r->vk_dev, nullptr);
+	ham_renderer_vulkan_fini_swapchain(r);
 }
 
 ham_nonnull_args(1)
@@ -1153,17 +1197,22 @@ static inline void ham_renderer_vulkan_loop(ham_renderer *r_base, ham_f64 dt){
 		return;
 	}
 
-	res = r->vk_fns.vkResetFences(r->vk_dev, 1, &r->vk_frame_fences[current_frame_idx]);
-	if(res != VK_SUCCESS){
-		ham_logapierrorf("Error in vkResetFences: %s", res.to_str());
-		return;
-	}
-
 	// acquire swapchain image
 	ham_u32 swap_idx;
 	res = r->vk_fns.vkAcquireNextImageKHR(r->vk_dev, r->vk_swapchain, UINT64_MAX, r->vk_img_sems[current_frame_idx], VK_NULL_HANDLE, &swap_idx);
-	if(res != VK_SUCCESS){
+	if(res == VK_ERROR_OUT_OF_DATE_KHR){
+		ham_renderer_vulkan_recreate_swapchain(r);
+		return;
+	}
+	else if(res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR){
 		ham_logapierrorf("Error in vkAcquireNextImageKHR: %s", res.to_str());
+		return;
+	}
+
+	// now we have an image we can wait to actually use it
+	res = r->vk_fns.vkResetFences(r->vk_dev, 1, &r->vk_frame_fences[current_frame_idx]);
+	if(res != VK_SUCCESS){
+		ham_logapierrorf("Error in vkResetFences: %s", res.to_str());
 		return;
 	}
 
@@ -1207,7 +1256,10 @@ static inline void ham_renderer_vulkan_loop(ham_renderer *r_base, ham_f64 dt){
 	};
 
 	res = r->vk_fns.vkQueuePresentKHR(r->vk_present_queue, &present_info);
-	if(res != VK_SUCCESS){
+	if(res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || r->swapchain_dirty){
+		ham_renderer_vulkan_recreate_swapchain(r);
+	}
+	else if(res != VK_SUCCESS){
 		ham_logapierrorf("Error in vkQueuePresentKHR: %s", res.to_str());
 		return;
 	}

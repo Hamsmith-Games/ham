@@ -141,6 +141,63 @@ typedef double ham_f64;
 #define HAM_USIZE_MIN            0
 #define HAM_USIZE_MAX HAM_UPTR_MAX
 
+#ifdef __GNUC__
+
+#	define HAM_SIMD 1
+
+	// 128-bit SIMD types
+
+	typedef ham_u32 ham_v4u32 __attribute__((vector_size(16)));
+	typedef ham_i32 ham_v4i32 __attribute__((vector_size(16)));
+	typedef ham_f32 ham_v4f32 __attribute__((vector_size(16)));
+
+	typedef ham_u64 ham_v2u64 __attribute__((vector_size(16)));
+	typedef ham_i64 ham_v2i64 __attribute__((vector_size(16)));
+	typedef ham_f64 ham_v2f64 __attribute__((vector_size(16)));
+
+	// 256-bit SIMD types
+
+	typedef ham_u32 ham_v8u32 __attribute__((vector_size(32)));
+	typedef ham_i32 ham_v8i32 __attribute__((vector_size(32)));
+	typedef ham_f32 ham_v8f32 __attribute__((vector_size(32)));
+
+	typedef ham_u64 ham_v4u64 __attribute__((vector_size(32)));
+	typedef ham_i64 ham_v4i64 __attribute__((vector_size(32)));
+	typedef ham_f64 ham_v4f64 __attribute__((vector_size(32)));
+
+#else
+
+#	warning "SIMD is currently only enabled with GNU C vector extensions"
+
+#endif
+
+/**
+ * @defgroup HAM_VECS Vector types
+ * @{
+ */
+
+typedef union ham_vec2{
+	struct { ham_f32 x, y; };
+	ham_f32 data[2];
+} ham_vec2;
+
+typedef union ham_vec3{
+	struct { ham_f32 x, y, z; };
+	ham_f32 data[3];
+} ham_vec3;
+
+typedef union ham_vec4{
+	struct { ham_f32 x, y, z, w; };
+	ham_f32 data[4];
+#ifdef HAM_SIMD
+	ham_v4f32 v4f32;
+#endif
+} ham_vec4;
+
+/**
+ * @}
+ */
+
 /**
  * @defgroup HAM_STATIC_BUFFERS Static buffer types
  * @{
