@@ -17,24 +17,6 @@
 #
 
 ##
-# Dependencies
-##
-
-FetchContent_Declare(
-	gns_content
-	GIT_REPOSITORY https://github.com/ValveSoftware/GameNetworkingSockets.git
-	GIT_TAG        e0d33386903202d9af61e76d69c54e46ece2f457
-)
-
-FetchContent_GetProperties(gns_content)
-if(NOT gns_content_POPULATED)
-	FetchContent_Populate(gns_content)
-
-	set(USE_STEAMWEBRTC ON CACHE BOOL "" FORCE)
-	add_subdirectory(${gns_content_SOURCE_DIR} ${gns_content_BINARY_DIR} EXCLUDE_FROM_ALL)
-endif()
-
-##
 # Configuration
 ##
 

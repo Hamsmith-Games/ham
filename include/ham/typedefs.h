@@ -57,20 +57,52 @@ typedef uint32_t ham_u32;
 typedef  int64_t ham_i64;
 typedef uint64_t ham_u64;
 
+#if defined(__GNUC__) && defined(__SIZEOF_INT128__)
+#	define HAM_INT128 1
+	typedef __int128 ham_i128;
+	typedef unsigned __int128 ham_u128;
+#endif
+
 typedef  intptr_t ham_iptr;
 typedef uintptr_t ham_uptr;
 
 typedef ham_iptr ham_isize;
 typedef ham_uptr ham_usize;
 
+typedef struct alignas(ham_u8) ham_rat8{
+	ham_i8 num: 4;
+	ham_u8 den: 4;
+} ham_rat8;
+
+typedef struct alignas(ham_u16) ham_rat16{
+	ham_i8 num;
+	ham_u8 den;
+} ham_rat16;
+
+typedef struct alignas(ham_u32) ham_rat32{
+	ham_i16 num;
+	ham_u16 den;
+} ham_rat32;
+
+typedef struct alignas(ham_u64) ham_rat64{
+	ham_i32 num;
+	ham_u32 den;
+} ham_rat64;
+
+typedef struct alignas(sizeof(ham_u64)*2) ham_rat128{
+	ham_i64 num;
+	ham_u64 den;
+} ham_rat128;
+
+#ifdef HAM_INT128
+typedef struct alignas(sizeof(ham_u128)*2) ham_rat256{
+	ham_i128 num;
+	ham_u128 den;
+} ham_rat256;
+#endif
+
 typedef float  ham_f32;
 typedef double ham_f64;
-
-#if defined(__GNUC__) && defined(__SIZEOF_INT128__)
-#	define HAM_INT128 1
-	typedef __int128 ham_i128;
-	typedef unsigned __int128 ham_u128;
-#endif
 
 #if defined(__GNUC__) && defined(__SIZEOF_FLOAT128__)
 #	define HAM_FLOAT128 1
@@ -389,6 +421,14 @@ typedef HAM_CHAR_UTF(HAM_UTF) ham_uchar;
  * @defgroup HAM_STR Strings
  * @{
  */
+
+typedef enum ham_str_encoding{
+	HAM_STR_UTF8,
+	HAM_STR_UTF16,
+	HAM_STR_UTF32,
+
+	HAM_STR_ENCODING_COUNT
+} ham_str_encoding;
 
 typedef struct ham_str8 { const ham_char8  *ptr; ham_uptr len; } ham_str8;
 typedef struct ham_str16{ const ham_char16 *ptr; ham_uptr len; } ham_str16;
@@ -1012,6 +1052,11 @@ namespace ham{
 
 	template<typename T>
 	constexpr inline type_tag<T> type_tag_v;
+
+	namespace meta{
+		template<auto ... Vals>
+		using value_tag = type_tag<constant_value<decltype(Vals), Vals>...>;
+	}
 
 	template<typename Char>
 	class basic_str{

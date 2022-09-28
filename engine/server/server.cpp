@@ -49,8 +49,8 @@ struct ham_engine_server{
 	ham_net *net = nullptr;
 };
 
-static inline ham_engine_server *ham_engine_server_construct(ham_engine_server *mem, va_list va){
-	(void)va;
+static inline ham_engine_server *ham_engine_server_construct(ham_engine_server *mem, ham_usize nargs, va_list va){
+	(void)nargs; (void)va;
 	return new(mem) ham_engine_server;
 }
 

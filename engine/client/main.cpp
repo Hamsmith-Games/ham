@@ -1,4 +1,4 @@
-/*
+﻿/*
  * The Ham World Engine Client
  * Copyright (C) 2022  Hamsmith Ltd.
  *
@@ -71,8 +71,8 @@ struct ham_engine_client{
 	ham_renderer *renderer = nullptr;
 };
 
-static inline ham_engine_client *ham_engine_client_construct(ham_engine_client *mem, va_list va){
-	(void)va;
+static inline ham_engine_client *ham_engine_client_construct(ham_engine_client *mem, ham_usize nargs, va_list va){
+	(void)nargs; (void)va;
 	return new(mem) ham_engine_client;
 }
 
@@ -147,7 +147,11 @@ static inline bool ham_engine_client_init_vulkan(ham_engine_client *engine){
 		return false;
 	}
 
-	const auto vk_ext_strs = (const char**)ham_allocator_alloc(ham_super(engine)->allocator, alignof(void*), sizeof(void*) * vk_ext_count);
+	const char *enabled_exts[] = {
+		VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+	};
+
+	const auto vk_ext_strs = (const char**)ham_allocator_alloc(ham_super(engine)->allocator, alignof(void*), sizeof(void*) * (vk_ext_count + std::size(enabled_exts)));
 	if(!vk_ext_strs){
 		ham_logapierrorf("Error allocating %u Vulkan extension string pointers", vk_ext_count);
 		return false;
@@ -159,7 +163,8 @@ static inline bool ham_engine_client_init_vulkan(ham_engine_client *engine){
 		return false;
 	}
 
-	// TODO: get a VkInstance and create renderer
+	memcpy(vk_ext_strs + vk_ext_count, enabled_exts, sizeof(enabled_exts));
+	vk_ext_count += (ham_u32)std::size(enabled_exts);
 
 	VkApplicationInfo app_info;
 
@@ -171,14 +176,25 @@ static inline bool ham_engine_client_init_vulkan(ham_engine_client *engine){
 	app_info.engineVersion = VK_MAKE_VERSION(HAM_ENGINE_VERSION_MAJOR, HAM_ENGINE_VERSION_MINOR, HAM_ENGINE_VERSION_PATCH);
 	app_info.apiVersion = VK_API_VERSION_1_1;
 
+	const char *layers[] = {
+		"VK_LAYER_KHRONOS_validation"
+	};
+
+	const bool layers_enabled =
+	#ifndef NDEBUG
+		true;
+	#else
+		false;
+	#endif
+
 	VkInstanceCreateInfo inst_info;
 
 	inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	inst_info.pNext = nullptr;
 	inst_info.flags = 0;
 	inst_info.pApplicationInfo = &app_info;
-	inst_info.enabledLayerCount = 0;
-	inst_info.ppEnabledLayerNames = nullptr;
+	inst_info.enabledLayerCount = layers_enabled ? (ham_u32)std::size(layers) : 0;
+	inst_info.ppEnabledLayerNames = layers_enabled ? layers : nullptr;
 	inst_info.enabledExtensionCount = vk_ext_count;
 	inst_info.ppEnabledExtensionNames = vk_ext_strs;
 
@@ -252,7 +268,12 @@ static inline bool ham_engine_client_init(ham_engine *engine_base){
 		return false;
 	}
 
-	engine->renderer = ham_renderer_create(HAM_RENDERER_VULKAN_PLUGIN_NAME, HAM_RENDERER_VULKAN_OBJECT_NAME);
+	engine->renderer = ham_renderer_create(
+		HAM_RENDERER_VULKAN_PLUGIN_NAME,
+		HAM_RENDERER_VULKAN_OBJECT_NAME,
+		engine->vk_inst, engine->vk_surface,
+		engine->vkGetInstanceProcAddr
+	);
 	if(!engine->renderer){
 		ham_logapierrorf("Error creating renderer");
 		engine->vkDestroySurfaceKHR(engine->vk_inst, engine->vk_surface, nullptr);
@@ -299,8 +320,27 @@ ham_define_object_x(
 	)
 )
 
+struct ham_engine_client_render_subsys{
+	ham_renderer *renderer;
+};
+
 int main(int argc, char *argv[]){
 	const auto engine = ham_engine_create(HAM_ENGINE_CLIENT_API_NAME, HAM_ENGINE_CLIENT_OBJ_NAME, argc, argv);
+
+	const auto render_subsys = ham_engine_subsys_create(
+		engine, HAM_LIT_UTF8("render-subsys"),
+		[]/* init */(ham_engine *engine, void *user) -> bool{ return true; },
+		[]/* fini */(ham_engine *engine, void *user) -> void{ },
+		[]/* loop */(ham_engine *engine, ham_f64 dt, void *user) -> void{ },
+		nullptr
+	);
+	if(!render_subsys){
+		ham_logerrorf("ham-engine-client", "Failed to create render subsystem");
+		ham_engine_destroy(engine);
+		return 1;
+	}
+
+	ham_engine_subsys_set_min_dt(render_subsys, 1.0/144.0);
 
 	// TODO: create subsystems
 

@@ -115,11 +115,27 @@ ham_uptr ham_impl_engine_thread_main(void *user){
 	ham_ticker ticker;
 	ham_ticker_reset(&ticker);
 
+	ham_f64 excess_dt = 0.0;
+
+	ham_u32 frame_count = 0;
+	ham_f64 frame_dt_accum = 0.0;
+
 	while(engine->running.load(std::memory_order_relaxed)){
-		const ham_f64 dt = ham_ticker_tick(&ticker, engine->min_dt.load(std::memory_order_relaxed));
-		(void)dt;
+		const ham_f64 min_dt = ham_max(engine->min_dt.load(std::memory_order_relaxed) - excess_dt, 0.0);
+		const ham_f64 dt = ham_ticker_tick(&ticker, min_dt);
+		excess_dt = dt - min_dt;
 
 		engine_vt->loop(engine, dt);
+
+		++frame_count;
+		frame_dt_accum += dt;
+
+		if(frame_dt_accum >= 1.0){
+			const auto fps = (ham_f64)frame_count / frame_dt_accum;
+			ham_logdebugf("ham-engine", "FPS: %f", fps);
+			frame_count = 0;
+			frame_dt_accum = 0.0;
+		}
 	}
 
 	engine_vt->fini(engine);
@@ -334,7 +350,7 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 
 	mem->vtable = ham_super(data.vtable);
 
-	const auto engine = (ham_engine*)ham_super(data.vtable)->construct(mem, nullptr);
+	const auto engine = (ham_engine*)ham_super(data.vtable)->construct(mem, 0, nullptr);
 	if(!engine){
 		ham_logapierrorf("Failed to construct engine object");
 		ham_plugin_unload(data.plugin);
@@ -397,6 +413,12 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 	ham_sem_wait(engine->sem);
 
 	return engine;
+}
+
+ham_nothrow void ham_engine_destroy(ham_engine *engine){
+	if(ham_unlikely(engine == NULL)) return;
+
+
 }
 
 ham_nothrow bool ham_engine_request_exit(ham_engine *engine){

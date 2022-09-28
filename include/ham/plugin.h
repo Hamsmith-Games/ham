@@ -55,6 +55,7 @@ ham_api ham_plugin *ham_plugin_load(ham_dso_handle dso, const char *plugin_id);
 
 ham_api void ham_plugin_unload(ham_plugin *plugin);
 
+ham_api ham_str8    ham_plugin_dir(const ham_plugin *plugin);
 ham_api ham_uuid    ham_plugin_uuid(const ham_plugin *plugin);
 ham_api ham_str8    ham_plugin_name(const ham_plugin *plugin);
 ham_api ham_version ham_plugin_version(const ham_plugin *plugin);

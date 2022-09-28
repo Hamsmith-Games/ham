@@ -3,5 +3,7 @@
 #define VK_USE_PLATFORM_WIN32_KHR 1
 #endif
 
+#define _GNU_SOURCE 1
+
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"

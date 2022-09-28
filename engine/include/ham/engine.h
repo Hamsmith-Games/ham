@@ -45,18 +45,50 @@ typedef struct ham_screen{
  * @{
  */
 
+/**
+ * Base engine object.
+ */
 typedef struct ham_engine ham_engine;
 
+/**
+ * Create a new engine.
+ * @warning It is not advised to create multiple engines in the same process.
+ * @param plugin_id id of the engine plugin
+ * @param obj_id id of the engine object within \p plugin_id
+ * @param argc ``argc`` passed from ``main``
+ * @param argv ``argv`` passed from ``main``
+ * @returns newly created engine or ``NULL`` on error
+ * @see ham_engine_subsystem_create
+ * @see ham_engine_exec
+ * @see ham_engine_destroy
+ */
 ham_engine_api ham_engine *ham_engine_create(
 	const char *plugin_id,
 	const char *obj_id,
 	int argc, char **argv
 );
 
-// ham_engine_api ham_nothrow void ham_engine_destroy(ham_engine *engine);
+/**
+ * Destroy an unexecuted engine.
+ * @note Do not use this function after \ref ham_engine_exec on the same \p engine .
+ * @param engine engine to destroy
+ * @see ham_engine_create
+ */
+ham_engine_api ham_nothrow void ham_engine_destroy(ham_engine *engine);
 
+/**
+ * Request an engine to finish execution.
+ * @param engine engine to make the request on
+ * @returns whether the request was successful
+ */
 ham_engine_api ham_nothrow bool ham_engine_request_exit(ham_engine *engine);
 
+/**
+ * Execute an engine, destroy it and return an exit code.
+ * @note This function calls \ref ham_engine_destroy on the \p engine .
+ * @param engine engine to execute
+ * @return exit status as if returned from ``main``
+ */
 ham_engine_api int ham_engine_exec(ham_engine *engine);
 
 /**
@@ -74,6 +106,17 @@ typedef bool(*ham_engine_subsys_init_fn)(ham_engine *engine, void *user);
 typedef void(*ham_engine_subsys_fini_fn)(ham_engine *engine, void *user);
 typedef void(*ham_engine_subsys_loop_fn)(ham_engine *engine, ham_f64 dt, void *user);
 
+/**
+ * Create a new engine subsystem.
+ * @param engine engine to create the subsystem in
+ * @param name name of the new subsystem; a valid string is required
+ * @param init_fn initializer function
+ * @param fini_fn finalizer function
+ * @param loop_fn loop/tick function
+ * @param user passed in ever call to \p init_fn , \p fini_fn and \p loop_fn
+ * @returns newly created subsystem or ``NULL`` on error
+ * @see ham_engine_subsys_launch
+ */
 ham_engine_api ham_engine_subsys *ham_engine_subsys_create(
 	ham_engine *engine,
 	ham_str8 name,
@@ -83,10 +126,17 @@ ham_engine_api ham_engine_subsys *ham_engine_subsys_create(
 	void *user
 );
 
+ham_engine_api ham_nothrow ham_engine *ham_engine_subsys_owner(ham_engine_subsys *subsys);
+
 ham_engine_api ham_nothrow bool ham_engine_subsys_running(ham_engine_subsys *subsys);
 
 ham_engine_api ham_nothrow bool ham_engine_subsys_set_min_dt(ham_engine_subsys *subsys, ham_f64 min_dt);
 
+/**
+ * Launch a subsystem before its owning engine is executed.
+ * @param subsys
+ * @returns whether the subsystem was successfully launched
+ */
 ham_engine_api ham_nothrow bool ham_engine_subsys_launch(ham_engine_subsys *subsys);
 
 /**

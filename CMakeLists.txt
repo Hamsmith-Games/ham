@@ -43,6 +43,7 @@ include(CPUFeatures)
 
 if(PROJECT_IS_TOP_LEVEL)
 	set(CMAKE_SKIP_INSTALL_RPATH ON)
+	set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
 set(HAM_VERSION_MAJOR ${ham_VERSION_MAJOR})
@@ -138,23 +139,27 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/typedefs.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/typesys.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/log.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/check.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/memory.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/object.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/math.h
-	${HAM_SOURCE_INCLUDE_DIR}/ham/str_buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/hash.h
-	${HAM_SOURCE_INCLUDE_DIR}/ham/log.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/fs.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/dso.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/plugin.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/colony.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/str_buffer.h
+
 	${HAM_SOURCE_INCLUDE_DIR}/ham/lex.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/parse.h
-	${HAM_SOURCE_INCLUDE_DIR}/ham/memory.h
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/net.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/net-object.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/renderer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/renderer-object.h
 
+	# C++ only headers
 	${HAM_SOURCE_INCLUDE_DIR}/ham/meta.hpp
 	${HAM_SOURCE_INCLUDE_DIR}/ham/std_vector.hpp
 )
@@ -183,6 +188,7 @@ option(HAM_INSTALL_ENGINE  "Whether to install the world engine"        OFF)
 set(HAM_ENGINE_MAX_SUBSYSTEMS "16" CACHE STRING "Maximum number of subsystems allowed in an engine before an error")
 set(HAM_BUILD_STEAM_APPID "480" CACHE STRING "Steam appid to put in steam_appid.txt for build directories")
 
+set(HAM_COLONY_MAX_BUCKETS 16 CACHE STRING "Maximum number of storage buckets for each colony before an out of memory error")
 set(HAM_OBJECT_INSTANCE_MANAGER_MAX_BLOCKS 16 CACHE STRING "Maximum number of storage blocks for each instance manager before an out of memory error")
 
 # Create configuration file
@@ -203,6 +209,14 @@ FetchContent_Declare(
 	GIT_REPOSITORY https://github.com/martinus/robin-hood-hashing.git
 	GIT_TAG        fb1483621fda28d4afb31c0097c1a4a457fdd35b
 )
+
+FetchContent_Declare(
+	yyjson_content
+	GIT_REPOSITORY https://github.com/ibireme/yyjson.git
+	GIT_TAG        c3856514de0a67d7b66939bf3ed491a2d6e61277 # 0.5.1
+)
+
+FetchContent_MakeAvailable(yyjson_content)
 
 FetchContent_GetProperties(robin_hood_content)
 if(NOT robin_hood_content_POPULATED)

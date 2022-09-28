@@ -78,6 +78,8 @@
 #define HAM_RENDERER_DEFAULT_PLUGIN_UUID HAM_RENDERER_VULKAN_PLUGIN_UUID
 #define HAM_RENDERER_DEFAULT_OBJECT_NAME HAM_RENDERER_VULKAN_OBJECT_NAME
 
+#define HAM_COLONY_MAX_BUCKETS @HAM_COLONY_MAX_BUCKETS@
+
 #define HAM_OBJECT_INSTANCE_MANAGER_MAX_BLOCKS @HAM_OBJECT_INSTANCE_MANAGER_MAX_BLOCKS@
 
 #ifndef HAM_NAME_BUFFER_SIZE
@@ -307,6 +309,11 @@
 
 #ifdef __GNUC__
 
+#	define HAM_DIAGNOSTIC_PUSH() _Pragma("GCC diagnostic push")
+#	define HAM_DIAGNOSTIC_POP() _Pragma("GCC diagnostic pop")
+
+#	define HAM_DIAGNOSTIC_IGNORE_MACRO_REDEFINED() _Pragma("GCC diagnostic ignored \"-Wmacro-redefined\"")
+
 #	define ham_public __attribute__((visibility("default")))
 #	define ham_private __attribute__((visibility("hidden")))
 
@@ -378,6 +385,13 @@
 		}((a), (b)))
 
 #endif // __GNUC__
+
+#ifdef _MSVC_VER
+#	define HAM_DIAGNOSTIC_PUSH()
+#	define HAM_DIAGNOSTIC_POP()
+
+#	define HAM_DIAGNOSTIC_IGNORE_MACRO_REDEFINED()
+#endif
 
 #define ham_popcnt ham_popcnt32
 #define ham_lzcnt  ham_lzcnt32

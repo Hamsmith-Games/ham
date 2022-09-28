@@ -53,7 +53,7 @@ typedef enum ham_dso_flags{
  * @returns newly opened handle to the DSO or ``NULL`` on error
  * @see ham_dso_close
  */
-ham_api ham_dso_handle ham_dso_open_c(const char *path, ham_u32 flags);
+ham_api ham_nothrow ham_dso_handle ham_dso_open_c(const char *path, ham_u32 flags);
 
 /**
  * Open a dynamic shared object.
@@ -62,7 +62,7 @@ ham_api ham_dso_handle ham_dso_open_c(const char *path, ham_u32 flags);
  * @return newly opened handle to the DSO or ``NULL`` on error
  * @see ham_dso_close
  */
-static inline ham_dso_handle ham_dso_open(ham_str8 path, ham_u32 flags){
+ham_nothrow static inline ham_dso_handle ham_dso_open(ham_str8 path, ham_u32 flags){
 	if(path.ptr && path.len){
 		if(path.len >= HAM_PATH_BUFFER_SIZE){
 			return ham_null;
@@ -83,7 +83,9 @@ static inline ham_dso_handle ham_dso_open(ham_str8 path, ham_u32 flags){
  * Close a dynamic shared object.
  * @param handle handle to the DSO to close
  */
-ham_api void ham_dso_close(ham_dso_handle handle);
+ham_api ham_nothrow void ham_dso_close(ham_dso_handle handle);
+
+ham_api ham_nothrow bool ham_dso_path(ham_dso_handle handle, ham_usize buf_size, ham_char8 *buf);
 
 /**
  * Try to get a symbol from a DSO.
@@ -92,7 +94,7 @@ ham_api void ham_dso_close(ham_dso_handle handle);
  * @returns symbol by name \p id or ``NULL`` on error
  * @see ham_dso_iterate_symbols
  */
-ham_api void *ham_dso_symbol_c(ham_dso_handle handle, const char *id);
+ham_api ham_nothrow void *ham_dso_symbol_c(ham_dso_handle handle, const char *id);
 
 /**
  * Try to get a symbol from a DSO.
@@ -101,7 +103,7 @@ ham_api void *ham_dso_symbol_c(ham_dso_handle handle, const char *id);
  * @returns symbol by name \p id or ``NULL`` on error
  * @see ham_dso_iterate_symbols
  */
-static inline void *ham_dso_symbol(ham_dso_handle handle, ham_str8 id){
+ham_nothrow static inline void *ham_dso_symbol(ham_dso_handle handle, ham_str8 id){
 	if(!id.ptr || id.len >= HAM_NAME_BUFFER_SIZE){
 		return ham_null;
 	}

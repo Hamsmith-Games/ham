@@ -166,7 +166,7 @@ struct ham_object_manager{
 		return true;
 	}
 
-	ham_object *create(va_list va){
+	ham_object *create(ham_usize nargs, va_list va){
 		std::scoped_lock lock(mut);
 
 		void *new_ptr;
@@ -200,7 +200,7 @@ struct ham_object_manager{
 			}
 		}
 
-		const auto ret = obj_vtable->construct((ham_object*)new_ptr, va);
+		const auto ret = obj_vtable->construct((ham_object*)new_ptr, nargs, va);
 
 		if(!ret){
 			ham_logerrorf("ham_object_create", "Error constructing object");
@@ -242,12 +242,12 @@ struct ham_object_manager{
 	mutable std::recursive_mutex mut;
 };
 
-ham_object *ham_object_create(ham_object_manager *manager, ...){
+ham_object *ham_object_create(ham_object_manager *manager, ham_usize nargs, ...){
 	if(!ham_check(manager != NULL)) return nullptr;
 
 	va_list va;
-	va_start(va, manager);
-	const auto ret = manager->create(va);
+	va_start(va, nargs);
+	const auto ret = manager->create(nargs, va);
 	va_end(va);
 
 	return ret;
@@ -300,12 +300,12 @@ ham_usize ham_object_manager_block_index(const ham_object_manager *manager, cons
 	return manager->find_block_unsafe(obj);
 }
 
-ham_object *ham_object_vnew(ham_object_manager *manager, va_list va){
+ham_object *ham_object_vnew(ham_object_manager *manager, ham_usize nargs, va_list va){
 	if(!ham_check(manager != NULL)){
 		return nullptr;
 	}
 
-	return manager->create(va);
+	return manager->create(nargs, va);
 }
 
 bool ham_object_delete(ham_object_manager *manager, ham_object *obj){

@@ -14,8 +14,8 @@ struct ham_net_vtable_gns{
 	ham_derive(ham_net_vtable)
 };
 
-static ham_net_gns *ham_net_gns_ctor(ham_net_gns *net, va_list va){
-	(void)va;
+static ham_net_gns *ham_net_gns_ctor(ham_net_gns *net, ham_usize nargs, va_list va){
+	(void)nargs; (void)va;
 	return new(net) ham_net_gns;
 }
 

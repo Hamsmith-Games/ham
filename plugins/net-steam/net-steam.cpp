@@ -12,8 +12,8 @@ struct ham_net_steam{
 	ham_derive(ham_net)
 };
 
-static ham_net_steam *ham_net_steam_ctor(ham_net_steam *net, va_list va){
-	(void)va;
+static ham_net_steam *ham_net_steam_ctor(ham_net_steam *net, ham_usize nargs, va_list va){
+	(void)nargs; (void)va;
 	return new(net) ham_net_steam;
 }
 

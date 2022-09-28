@@ -17,7 +17,7 @@
  */
 
 #include "ham/dso.h"
-#include "ham/log.h"
+#include "ham/check.h"
 
 #ifndef PACKAGE
 #	define PACKAGE
@@ -35,7 +35,7 @@ static bool ham_impl_bfd_init_flag = false;
 
 HAM_C_API_BEGIN
 
-ham_dso_handle ham_dso_open_c(const char *path, ham_u32 flags){
+ham_nothrow ham_dso_handle ham_dso_open_c(const char *path, ham_u32 flags){
 	int mode = RTLD_LAZY;
 
 	if(flags & HAM_DSO_NOW){
@@ -54,15 +54,70 @@ ham_dso_handle ham_dso_open_c(const char *path, ham_u32 flags){
 	return ret;
 }
 
-void ham_dso_close(ham_dso_handle handle){
-	if(!handle) return;
+ham_nothrow void ham_dso_close(ham_dso_handle handle){
+	if(ham_unlikely(handle == NULL)) return;
 
 	const int res = dlclose(handle);
 	if(res != 0) ham_logapierrorf("Error in dlclose: %s", dlerror());
 }
 
-void *ham_dso_symbol_c(ham_dso_handle handle, const char *id){
-	if(!handle) return ham_null;
+ham_nothrow bool ham_dso_path(ham_dso_handle handle, ham_usize buf_size, ham_char8 *buf){
+	if(
+	   !ham_check(handle != NULL) ||
+	   !ham_check(buf_size != 0) ||
+	   !ham_check(buf != NULL)
+	){
+		return false;
+	}
+
+	struct link_map *lm;
+	int res = dlinfo(handle, RTLD_DI_LINKMAP, &lm);
+	if(res == -1){
+		ham_logapierrorf("Error in dlinfo: %s", dlerror());
+		return false;
+	}
+
+	const char *abs_path = lm->l_name;
+	if(!abs_path){
+		ham_logapierrorf("Failed to get executable absolute path");
+		return false;
+	}
+
+	ham_path_buffer abs_path_buf;
+	if(!*abs_path){
+		// get self executable location
+		ssize_t readlink_res = readlink(
+		#ifdef __FreeBSD__
+			"/proc/curproc/file",
+		#else
+			"/proc/self/exe",
+		#endif
+			abs_path_buf,
+			sizeof(abs_path_buf)-1
+		);
+
+		if(readlink_res == -1){
+			ham_logapierrorf("Error in readlink: %s", strerror(errno));
+			return false;
+		}
+
+		abs_path_buf[readlink_res] = '\0';
+		abs_path = abs_path_buf;
+	}
+
+	const auto path_len = strlen(abs_path);
+	if(path_len >= buf_size){
+		ham_logapierrorf("DSO path is longer (%zu) than buffer size (%zu)", path_len, buf_size);
+		return false;
+	}
+
+	memcpy(buf, abs_path, path_len);
+	buf[path_len] = '\0';
+	return true;
+}
+
+ham_nothrow void *ham_dso_symbol_c(ham_dso_handle handle, const char *id){
+	if(!ham_check(handle != NULL)) return nullptr;
 
 	void *const ret = dlsym(handle, id);
 	if(!ret) ham_logapiverbosef("Error in dlsym: %s", dlerror());
@@ -70,7 +125,12 @@ void *ham_dso_symbol_c(ham_dso_handle handle, const char *id){
 }
 
 ham_usize ham_dso_iterate_symbols(ham_dso_handle handle, ham_dso_iterate_symbols_fn fn, void *user){
-	if(!handle) return (ham_usize)-1;
+	if(!ham_check(handle != NULL)) return (ham_usize)-1;
+
+	if(!ham_impl_bfd_init_flag){
+		bfd_init();
+		ham_impl_bfd_init_flag = true;
+	}
 
 	struct link_map *lm;
 	int res = dlinfo(handle, RTLD_DI_LINKMAP, &lm);
@@ -79,14 +139,9 @@ ham_usize ham_dso_iterate_symbols(ham_dso_handle handle, ham_dso_iterate_symbols
 		return (ham_usize)-1;
 	}
 
-	if(!ham_impl_bfd_init_flag){
-		bfd_init();
-		ham_impl_bfd_init_flag = true;
-	}
-
 	const char *abs_path = lm->l_name;
 	if(!abs_path){
-		ham_logapierrorf("Failed to get elf executable absolute path");
+		ham_logapierrorf("Failed to get executable absolute path");
 		return (ham_usize)-1;
 	}
 

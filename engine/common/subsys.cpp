@@ -60,8 +60,12 @@ static inline ham_uptr ham_engine_subsys_thread_routine(void *data){
 	ham_ticker ticker;
 	ham_ticker_reset(&ticker);
 
+	ham_f64 excess_dt = 0.0;
+
 	while(subsys->running.load(std::memory_order_relaxed)){
-		const auto dt = ham_ticker_tick(&ticker, subsys->min_dt.load(std::memory_order_relaxed));
+		const auto min_dt = subsys->min_dt.load(std::memory_order_relaxed) - excess_dt;
+		const auto dt = ham_ticker_tick(&ticker, min_dt);
+		excess_dt = ham_max(dt - min_dt, 0.0);
 		subsys->loop_fn(subsys->engine, dt, subsys->user);
 	}
 
@@ -131,6 +135,11 @@ ham_api ham_engine_subsys *ham_engine_subsys_create(
 	++engine->num_subsystems;
 
 	return subsys;
+}
+
+ham_nothrow ham_engine *ham_engine_subsys_owner(ham_engine_subsys *subsys){
+	if(!ham_check(subsys != NULL)) return nullptr;
+	return subsys->engine;
 }
 
 ham_nothrow bool ham_engine_subsys_running(ham_engine_subsys *subsys){

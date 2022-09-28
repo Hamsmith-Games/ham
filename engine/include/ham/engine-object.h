@@ -42,7 +42,7 @@ struct ham_engine{
 	ham_sem *sem = nullptr;
 
 	std::atomic_bool running = false;
-	std::atomic<ham_f64> min_dt = 0.0;
+	std::atomic<ham_f64> min_dt = 1.0/144.0;
 
 	ham_thread *thd = nullptr;
 

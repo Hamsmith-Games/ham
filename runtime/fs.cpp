@@ -18,7 +18,7 @@
 
 #include "ham/fs.h"
 #include "ham/memory.h"
-#include "ham/log.h"
+#include "ham/check.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -232,11 +232,11 @@ bool ham_path_file_info_utf32(ham_str32 path, ham_file_info *ret){
 	return true;
 }
 
-ham_file *ham_file_open_utf8 (ham_str8  path, ham_u32 flags){
-	if(!path.ptr || !path.len) return nullptr;
+ham_file *ham_file_open_utf8(ham_str8 path, ham_u32 flags){
+	if(!ham_check(path.ptr && path.len)) return nullptr;
 
 	ham_path_buffer_utf8 path_buf;
-	if(path.len >= HAM_PATH_BUFFER_SIZE) return nullptr;
+	if(!ham_check(path.len < HAM_PATH_BUFFER_SIZE)) return nullptr;
 
 	memcpy(path_buf, path.ptr, path.len);
 	path_buf[path.len] = '\0';
@@ -259,7 +259,7 @@ ham_file *ham_file_open_utf8 (ham_str8  path, ham_u32 flags){
 
 	int fd = open(path_buf, open_flags);
 	if(fd == -1){
-		// TODO: signal error
+		ham_logapierrorf("Error in open: %s", strerror(errno));
 		return nullptr;
 	}
 
@@ -268,7 +268,7 @@ ham_file *ham_file_open_utf8 (ham_str8  path, ham_u32 flags){
 	const auto mem = allocator.allocate();
 	if(!mem){
 		if(close(fd) != 0){
-			// TODO: signal warning
+			ham_logapiwarnf("Error in close: %s", strerror(errno));
 		}
 		return nullptr;
 	}
@@ -276,7 +276,7 @@ ham_file *ham_file_open_utf8 (ham_str8  path, ham_u32 flags){
 	const auto ptr = allocator.construct(mem);
 	if(!ptr){
 		if(close(fd) != 0){
-			// TODO: signal warning
+			ham_logapiwarnf("Error in close: %s", strerror(errno));
 		}
 		allocator.deallocate(mem);
 		return nullptr;
@@ -295,7 +295,7 @@ void ham_file_close(ham_file *file){
 	if(!file) return;
 
 	if(close(file->fd) != 0){
-		// TODO: signal warning
+		ham_logapiwarnf("Error in close: %s", strerror(errno));
 	}
 
 	const ham::allocator<ham_file> allocator = file->allocator;
@@ -305,7 +305,7 @@ void ham_file_close(ham_file *file){
 }
 
 bool ham_file_get_info(const ham_file *file, ham_file_info *ret){
-	if(!file || !ret) return false;
+	if(!ham_check(file != NULL) || !ham_check(ret != NULL)) return false;
 
 	if(!ham_impl_fstat(file->fd, ret)){
 		ham_logapierrorf("Internal error in ham_impl_stat");
@@ -316,13 +316,12 @@ bool ham_file_get_info(const ham_file *file, ham_file_info *ret){
 }
 
 ham_usize ham_file_read(ham_file *file, void *buf, ham_usize max_len){
-	if(!file) return (usize)-1;
+	if(!ham_check(file != NULL) || !ham_check(buf != NULL)) return (usize)-1;
 	else if(!max_len) return 0;
-	else if(!buf) return (usize)-1;
 
 	const ssize_t res = read(file->fd, buf, max_len);
 	if(res == -1){
-		// TODO: signal error
+		ham_logapierrorf("Error in read: %s", strerror(errno));
 		return (usize)-1;
 	}
 

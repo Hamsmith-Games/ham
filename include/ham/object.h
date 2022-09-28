@@ -26,12 +26,12 @@ ham_api bool ham_object_manager_contains(const ham_object_manager *manager, cons
 
 ham_api ham_usize ham_object_manager_block_index(const ham_object_manager *manager, const ham_object *obj);
 
-ham_api ham_object *ham_object_vnew(ham_object_manager *manager, va_list va);
+ham_api ham_object *ham_object_vnew(ham_object_manager *manager, ham_usize nargs, va_list va);
 
-static inline ham_object *ham_object_new(ham_object_manager *manager, ...){
+static inline ham_object *ham_object_new(ham_object_manager *manager, ham_usize nargs, ...){
 	va_list va;
-	va_start(va, manager);
-	ham_object *const ret = ham_object_vnew(manager, va);
+	va_start(va, nargs);
+	ham_object *const ret = ham_object_vnew(manager, nargs, va);
 	va_end(va);
 	return ret;
 }
@@ -46,7 +46,7 @@ typedef struct ham_object_info{
 struct ham_object_vtable{
 	const ham_object_info*(*info)();
 
-	ham_object*(*construct)(ham_object *ptr, va_list va);
+	ham_object*(*construct)(ham_object *ptr, ham_u32 nargs, va_list va);
 	void(*destroy)(ham_object*);
 };
 
@@ -84,9 +84,9 @@ struct ham_object{
 		}; \
 		return &ret; \
 	} \
-	static ham_object *HAM_CONCAT(ham_impl_obj_ctor_, obj_)(ham_object *ptr, va_list va){ \
+	static ham_object *HAM_CONCAT(ham_impl_obj_ctor_, obj_)(ham_object *ptr, ham_u32 nargs, va_list va){ \
 		ptr->vtable = HAM_CONCAT(ham_impl_obj_vtable_, obj_)(); \
-		obj_ *const ret = (ctor_)((obj_*)ptr, va); \
+		obj_ *const ret = (ctor_)((obj_*)ptr, nargs, va); \
 		return ret ? ham_super_n(obj_depth_, ret) : nullptr; \
 	} \
 	static void HAM_CONCAT(ham_impl_obj_dtor_, obj_)(ham_object *obj){ \
@@ -111,6 +111,89 @@ struct ham_object{
 #define ham_define_object(obj, vtable, ctor, dtor, vtable_body) ham_define_object_x(1, obj, 1, vtable, ctor, dtor, vtable_body)
 
 HAM_C_API_END
+
+#ifdef __cplusplus
+
+#include <concepts>
+
+namespace ham{
+	namespace meta{
+		template<typename, typename = void>
+		struct is_ham_object: meta::constant_bool<false>{};
+
+		template<>
+		struct is_ham_object<ham_object>: meta::constant_bool<true>{};
+
+		template<typename T>
+		struct is_ham_object<T, std::void_t<decltype(T::HAM_SUPER_NAME)>>: is_ham_object<decltype(T::HAM_SUPER_NAME)>{};
+
+		template<typename T>
+		constexpr inline bool is_ham_object_v = is_ham_object<T>::value;
+
+		template<typename T>
+		concept HamObject = is_ham_object_v<T>;
+
+		// Type for
+
+		template<typename ... Ts>
+		struct type_for_functor{
+			template<typename Fn>
+			constexpr static void call(Fn &&fn){
+				if constexpr(requires {
+					{ (fn.template operator()<Ts>(), ...) };
+				}){
+					(std::forward<Fn>(fn).template operator()<Ts>(), ...);
+				}
+				else{
+					(std::forward<Fn>(fn)(type_tag<Ts>{}), ...);
+				}
+			}
+
+			template<typename Fn>
+			constexpr void operator()(Fn &&fn){ call(std::forward<Fn>(fn)); }
+		};
+
+		template<typename Fn, typename ... Ts>
+		static void type_for(Fn &&f){
+			constexpr type_for_functor<Ts...> functor;
+			functor(std::forward<Fn>(f));
+		}
+
+		// Static for
+
+		template<auto ... Vals>
+		struct static_for_functor{
+			template<typename Fn>
+			constexpr static void call(Fn &&fn){
+				if constexpr(requires {
+					{ (fn.template operator()<Vals>(), ...) };
+				}){
+					(std::forward<Fn>(fn).template operator()<Vals>(), ...);
+				}
+				else{
+					(std::forward<Fn>(fn)(Vals), ...);
+				}
+			}
+
+			template<typename Fn>
+			constexpr void operator()(Fn &&fn){ call(std::forward<Fn>(fn)); }
+		};
+
+		template<typename Fn, auto ... Vals>
+		static void static_for(value_tag<Vals...>, Fn &&f){
+			constexpr static_for_functor<Vals...> functor;
+			functor(std::forward<Fn>(f));
+		}
+
+		template<typename Fn, usize ... Is>
+		static void static_for(index_seq<Is...>, Fn &&f){
+			constexpr static_for_functor<Is...> functor;
+			functor(std::forward<Fn>(f));
+		}
+	}
+}
+
+#endif // __cplusplus
 
 /**
  * @}

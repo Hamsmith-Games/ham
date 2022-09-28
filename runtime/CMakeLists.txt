@@ -29,11 +29,13 @@ set(
 	object.cpp
 	memory.cpp
 	log.cpp
-	str_buffer.cpp
 	fs.cpp
 	plugin.cpp
+	colony.cpp
+	str_buffer.cpp
 	lex.cpp
 	parse.cpp
+	json.cpp
 	net.cpp
 	renderer.cpp
 )
@@ -95,6 +97,7 @@ target_link_libraries(
 	    ${HAM_CPU_LIBS}
 		bfd
 		robin_hood::robin_hood
+		yyjson
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")

@@ -3,7 +3,7 @@
 
 HAM_C_API_BEGIN
 
-ham_renderer *ham_renderer_create(const char *plugin_id, const char *object_id){
+ham_renderer *ham_renderer_vcreate(const char *plugin_id, const char *object_id, ham_usize nargs, va_list va){
 	if(!ham_check(object_id != NULL)) return nullptr;
 
 	ham_plugin *plugin = nullptr;
@@ -44,7 +44,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *object_id){
 		return nullptr;
 	}
 
-	const auto ret = (ham_renderer*)obj_vtable->construct(obj, nullptr);
+	const auto ret = (ham_renderer*)obj_vtable->construct(obj, nargs, va);
 	if(!ret){
 		ham_logapierrorf("Failed to construct renderer object '%s'", object_id);
 		ham_allocator_free(allocator, obj);

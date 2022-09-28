@@ -32,6 +32,7 @@ HAM_C_API_BEGIN
 
 struct ham_plugin{
 	const ham_allocator *allocator = nullptr;
+	ham_path_buffer_utf8 dir_path = { 0 };
 	const ham_plugin_vtable *plugin_vtable = nullptr;
 	ham::std_vector<const ham_object_vtable*> object_vtables;
 	std::mutex mut;
@@ -239,6 +240,13 @@ ham_plugin *ham_plugin_load(ham_dso_handle dso, const char *plugin_id){
 	ptr->plugin_vtable = data.plug_vtable;
 	ptr->object_vtables = std::move(data.obj_vtables);
 
+	ham_dso_path(dso, sizeof(ptr->dir_path), ptr->dir_path);
+
+	const auto slash_idx = ham::str8((const char*)ptr->dir_path).rfind("/");
+	if(slash_idx != ham::str8::npos){
+		ptr->dir_path[slash_idx] = '\0';
+	}
+
 	return ptr;
 }
 
@@ -257,6 +265,7 @@ void ham_plugin_unload(ham_plugin *plugin){
 	ham_allocator_delete(allocator, plugin);
 }
 
+ham_str8    ham_plugin_dir(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? (ham_str8)ham::str8((const char*)plugin->dir_path) : HAM_EMPTY_STR8; }
 ham_uuid    ham_plugin_uuid(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? plugin->plugin_vtable->uuid() : (ham_uuid){ .u64s = { (ham_u64)-1, (ham_u64)-1 } }; }
 ham_str8    ham_plugin_name(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? plugin->plugin_vtable->name() : HAM_EMPTY_STR8; }
 ham_version ham_plugin_version(const ham_plugin *plugin){ return ham_likely(plugin != NULL) ? plugin->plugin_vtable->version() : (ham_version){ .major = (ham_u16)-1, .minor = (ham_u16)-1, .patch = (ham_u16)-1 }; }

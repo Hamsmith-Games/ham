@@ -54,7 +54,7 @@ ham_net *ham_net_create(const char *plugin_id, const char *obj_id){
 
 	mem->vtable = obj_vt;
 
-	const auto ptr = (ham_net*)obj_vt->construct((ham_object*)mem, nullptr);
+	const auto ptr = (ham_net*)obj_vt->construct((ham_object*)mem, 0, nullptr);
 	if(!ptr){
 		ham_logapierrorf("Failed to construct object '%s'", obj_info->type_id);
 		ham_allocator_free(allocator, mem);
