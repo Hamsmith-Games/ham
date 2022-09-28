@@ -137,11 +137,16 @@ set(
 	${HAM_BINARY_INCLUDE_DIR}/ham/config.h
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham.h
+
+	${HAM_SOURCE_INCLUDE_DIR}/ham/pp.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/typedefs.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/typesys.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/log.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/check.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/memory.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/time.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/async.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/functional.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/object.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/math.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/hash.h
@@ -149,10 +154,14 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/dso.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/plugin.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/colony.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/str_buffer.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/json.h
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/lex.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/parse.h
+
+	${HAM_SOURCE_INCLUDE_DIR}/ham/shape.h
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/net.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/net-object.h

@@ -30,8 +30,6 @@ HAM_C_API_BEGIN
 
 ham_api ham_version ham_linked_version();
 
-ham_api bool ham_init();
-
 HAM_C_API_END
 
 /**

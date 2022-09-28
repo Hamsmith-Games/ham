@@ -1,6 +1,12 @@
 #ifndef HAM_FUNCTIONAL_H
 #define HAM_FUNCTIONAL_H 1
 
+/**
+ * @defgroup HAM_FUNCTIONAL Functional programming helpers
+ * @ingroup HAM
+ * @{
+ */
+
 #include "memory.h"
 
 #ifdef __cplusplus
@@ -153,5 +159,9 @@ namespace ham{
 }
 
 #endif // __cplusplus
+
+/**
+ * @}
+ */
 
 #endif // !HAM_FUNCTIONAL_H
