@@ -9,36 +9,7 @@ HAM_C_API_BEGIN
 
 static inline ham_usize ham_impl_colony_get_bucket_size(ham_usize idx) noexcept{
 	static const ham_usize page_size = ham_get_page_size();
-
-	static const ham_usize ret[] = {
-		page_size,
-		page_size * 2,
-		page_size * 3,
-		page_size * 4,
-		page_size * 5,
-		page_size * 6,
-		page_size * 7,
-		page_size * 8,
-		page_size * 9,
-		page_size * 10,
-		page_size * 11,
-		page_size * 12,
-		page_size * 13,
-		page_size * 14,
-		page_size * 15,
-		page_size * 16,
-		page_size * 17,
-		page_size * 18,
-		page_size * 19,
-		page_size * 20,
-		page_size * 21,
-		page_size * 22,
-		page_size * 23,
-	};
-
-	static_assert(HAM_COLONY_MAX_BUCKETS <= std::size(ret));
-
-	return ret[idx];
+	return page_size * (1UL << idx);
 }
 
 struct ham_colony{
@@ -56,15 +27,14 @@ ham_nonnull_args(1, 2)
 static inline ham_usize ham_impl_colony_find_bucket(const ham_colony *colony, const void *ptr){
 	if((ham_uptr)ptr % colony->obj_alignment != 0) return (ham_usize)-1;
 
-	const auto ptr_beg = (ham_uptr)ptr;
-	const auto ptr_end = (ham_uptr)ptr + colony->obj_size;
+	const auto ptr_beg = (const char*)ptr;
+	const auto ptr_end = (const char*)ptr + colony->obj_size;
 
-	const auto page_size = ham_get_page_size();
-
-	for(int i = 0; i < colony->num_buckets; i++){
-		const auto bucket_size = page_size * (1 << i);
-		const auto bucket = colony->buckets[i];
-		if(ptr_beg >= (ham_uptr)bucket && ptr_end < ((ham_uptr)bucket + bucket_size)){
+	for(ham_usize i = 0; i < colony->num_buckets; i++){
+		const auto bucket_size = ham_impl_colony_get_bucket_size(i);
+		const auto bucket     = (const char*)colony->buckets[i];
+		const auto bucket_end = (const char*)bucket + bucket_size;
+		if(ptr_beg >= bucket && ptr_end < bucket_end){
 			return (ham_usize)i;
 		}
 	}
@@ -77,7 +47,7 @@ static inline ham_usize ham_impl_colony_new_bucket(ham_colony *colony){
 	if(colony->num_buckets == HAM_COLONY_MAX_BUCKETS) return (ham_usize)-1;
 
 	const auto new_idx = colony->num_buckets;
-	const auto num_pages = 1 << new_idx;
+	const auto num_pages = 1UL << new_idx;
 	const auto new_bucket = ham_map_pages(num_pages);
 	if(!new_bucket) return (ham_usize)-1;
 
@@ -89,7 +59,7 @@ static inline ham_usize ham_impl_colony_new_bucket(ham_colony *colony){
 ham_colony *ham_colony_create(ham_usize obj_alignment, ham_usize obj_size){
 	if(
 	   !ham_check(ham_popcnt64(obj_alignment) == 1) ||
-	   !ham_check(obj_size % obj_alignment != 0) ||
+	   !ham_check(obj_size % obj_alignment == 0) ||
 	   !ham_check(obj_size < ham_get_page_size())
 	){
 		return nullptr;
@@ -148,10 +118,11 @@ void *ham_colony_emplace(ham_colony *colony){
 	for(ham_usize i = 0; i < colony->elements.size(); i++){
 		const auto &elem = colony->elements[i];
 		const auto elem_bucket = colony->buckets[elem.first];
-		const auto elem_bucket_end = (ham_uptr)elem_bucket + ham_impl_colony_get_bucket_size(elem.first);
+		const auto elem_bucket_end = (char*)elem_bucket + ham_impl_colony_get_bucket_size(elem.first);
 
-		const auto req_ptr = (void*)((ham_uptr)elem.second + colony->obj_size);
-		if((ham_uptr)req_ptr > elem_bucket_end) continue;
+		const auto req_ptr = (char*)elem.second + colony->obj_size;
+		const auto req_ptr_end = req_ptr + colony->obj_size;
+		if(req_ptr_end >= elem_bucket_end) continue;
 
 		if((i + 1) != colony->elements.size()){
 			const auto &next_elem = colony->elements[i + 1];
@@ -161,7 +132,11 @@ void *ham_colony_emplace(ham_colony *colony){
 		}
 
 		// this is a sorted insert
-		colony->elements.insert(colony->elements.begin() + (i + 1), std::make_pair(elem.first, req_ptr));
+		const auto res = colony->elements.insert(colony->elements.begin() + (i + 1), std::make_pair(elem.first, req_ptr));
+		if(res == colony->elements.end()){
+			ham_logapierrorf("Error inserting new allocation");
+			return nullptr;
+		}
 
 		return req_ptr;
 	}

@@ -36,6 +36,7 @@ set(
 	lex.cpp
 	parse.cpp
 	json.cpp
+	shape.cpp
 	net.cpp
 	renderer.cpp
 )

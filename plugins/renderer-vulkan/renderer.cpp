@@ -1,10 +1,10 @@
+#include "renderer.hpp"
+
 #include "ham/renderer-object.h"
 #include "ham/plugin.h"
 #include "ham/log.h"
 #include "ham/fs.h"
 #include "ham/functional.h"
-
-#include "vulkan.hpp"
 
 #include "vk_mem_alloc.h"
 
@@ -27,49 +27,6 @@ HAM_PLUGIN(
 	ham_renderer_on_load_vulkan,
 	ham_renderer_on_unload_vulkan
 )
-
-constexpr ham_usize ham_impl_max_queued_frames = 3;
-
-struct ham_renderer_vulkan{
-	ham_derive(ham_renderer)
-
-	bool swapchain_dirty = false;
-
-	VkInstance vk_inst;
-	VkSurfaceKHR vk_surface;
-
-	ham_u32 vk_graphics_family, vk_present_family;
-	VkPhysicalDevice vk_phys_dev;
-	VkDevice vk_dev;
-
-	VkQueue vk_graphics_queue, vk_present_queue;
-
-	VkSwapchainKHR vk_swapchain;
-	VkFormat vk_swapchain_format;
-	VkExtent2D vk_swapchain_extent;
-	ham::std_vector<VkImage> vk_swapchain_images;
-	ham::std_vector<VkImageView> vk_swapchain_image_views;
-	ham::std_vector<VkFramebuffer> vk_swapchain_framebuffers;
-
-	VkPipelineLayout vk_pipeline_layout;
-	VkRenderPass vk_render_pass;
-	VkPipeline vk_pipeline;
-
-	VkCommandPool vk_cmd_pool;
-
-	VkCommandBuffer vk_cmd_bufs[ham_impl_max_queued_frames];
-	VkSemaphore vk_img_sems[ham_impl_max_queued_frames];
-	VkSemaphore vk_render_sems[ham_impl_max_queued_frames];
-	VkFence vk_frame_fences[ham_impl_max_queued_frames];
-
-	ham::vk::fns vk_fns;
-	ham::vk::swapchain_info vk_swapchain_info;
-
-	VmaVulkanFunctions vma_vk_fns;
-	VmaAllocator vma_allocator;
-
-	ham_u32 frame_counter = 0;
-};
 
 ham_nonnull_args(1)
 static inline bool ham_renderer_vulkan_init_phys_device(ham_renderer_vulkan *r){
@@ -875,9 +832,9 @@ static inline bool ham_renderer_vulkan_recreate_swapchain(ham_renderer_vulkan *r
 }
 
 ham_nonnull_args(1)
-static inline ham_renderer_vulkan *ham_renderer_vulkan_construct(ham_renderer_vulkan *mem, ham_usize nargs, va_list va){
+static inline ham_renderer_vulkan *ham_renderer_vulkan_ctor(ham_renderer_vulkan *mem, ham_usize nargs, va_list va){
 	if(nargs != 3){
-		ham_logapierrorf("Wrong number of arguments passed: %zu, expected 6 (VkInstance, VkSurfaceKHR, PFN_vkGetInstanceProcAddr)", nargs);
+		ham_logapierrorf("Wrong number of arguments passed: %zu, expected 3 (VkInstance, VkSurfaceKHR, PFN_vkGetInstanceProcAddr)", nargs);
 		return nullptr;
 	}
 
@@ -904,14 +861,12 @@ static inline ham_renderer_vulkan *ham_renderer_vulkan_construct(ham_renderer_vu
 }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_renderer_vulkan_destroy(ham_renderer_vulkan *r){
+ham_nothrow static inline void ham_renderer_vulkan_dtor(ham_renderer_vulkan *r){
 	std::destroy_at(r);
 }
 
 ham_nonnull_args(1)
-static inline bool ham_renderer_vulkan_init(ham_renderer *r_base){
-	const auto r = (ham_renderer_vulkan*)r_base;
-
+static inline bool ham_renderer_vulkan_init(ham_renderer_vulkan *r){
 #define HAM_RESOLVE_VK(fn_id) \
 	r->vk_fns.fn_id = (PFN_##fn_id)r->vk_fns.vkGetInstanceProcAddr(r->vk_inst, #fn_id); \
 	if(!r->vk_fns.fn_id){ \
@@ -1156,9 +1111,7 @@ static inline bool ham_renderer_vulkan_init(ham_renderer *r_base){
 }
 
 ham_nonnull_args(1)
-static inline void ham_renderer_vulkan_fini(ham_renderer *r_base){
-	const auto r = (ham_renderer_vulkan*)r_base;
-
+static inline void ham_renderer_vulkan_fini(ham_renderer_vulkan *r){
 	r->vk_fns.vkDeviceWaitIdle(r->vk_dev);
 
 	vmaDestroyAllocator(r->vma_allocator);
@@ -1178,13 +1131,13 @@ static inline void ham_renderer_vulkan_fini(ham_renderer *r_base){
 	r->vk_fns.vkDestroyPipelineLayout(r->vk_dev, r->vk_pipeline_layout, nullptr);
 
 	ham_renderer_vulkan_fini_swapchain(r);
+
+	r->vk_fns.vkDestroyDevice(r->vk_dev, nullptr);
 }
 
 ham_nonnull_args(1)
-static inline void ham_renderer_vulkan_loop(ham_renderer *r_base, ham_f64 dt){
+static inline void ham_renderer_vulkan_loop(ham_renderer_vulkan *r, ham_f64 dt){
 	(void)dt;
-
-	const auto r = (ham_renderer_vulkan*)r_base;
 
 	vmaSetCurrentFrameIndex(r->vma_allocator, r->frame_counter);
 
@@ -1267,15 +1220,6 @@ static inline void ham_renderer_vulkan_loop(ham_renderer *r_base, ham_f64 dt){
 	++r->frame_counter;
 }
 
-ham_define_object_x(
-	2, ham_renderer_vulkan, 1, ham_renderer_vtable,
-	ham_renderer_vulkan_construct,
-	ham_renderer_vulkan_destroy,
-	(
-		.init = ham_renderer_vulkan_init,
-		.fini = ham_renderer_vulkan_fini,
-		.loop = ham_renderer_vulkan_loop,
-	)
-)
+ham_define_renderer(ham_renderer_vulkan, ham_draw_group_vulkan)
 
 HAM_C_API_END

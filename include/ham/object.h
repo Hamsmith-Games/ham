@@ -24,17 +24,23 @@ ham_api void ham_object_manager_destroy(ham_object_manager *manager);
 
 ham_api bool ham_object_manager_contains(const ham_object_manager *manager, const ham_object *obj);
 
-ham_api ham_usize ham_object_manager_block_index(const ham_object_manager *manager, const ham_object *obj);
+typedef bool(*ham_object_manager_iterate_fn)(ham_object *obj, void *user);
+
+ham_api ham_usize ham_object_manager_iterate(ham_object_manager *manager, ham_object_manager_iterate_fn fn, void *user);
 
 ham_api ham_object *ham_object_vnew(ham_object_manager *manager, ham_usize nargs, va_list va);
 
-static inline ham_object *ham_object_new(ham_object_manager *manager, ham_usize nargs, ...){
+//! @cond ignore
+static inline ham_object *ham_impl_object_new(ham_object_manager *manager, ham_usize nargs, ...){
 	va_list va;
 	va_start(va, nargs);
 	ham_object *const ret = ham_object_vnew(manager, nargs, va);
 	va_end(va);
 	return ret;
 }
+//! @endcond
+
+#define ham_object_new(manager, ...) (ham_impl_object_new(manager, HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__))
 
 ham_api bool ham_object_delete(ham_object_manager *manager, ham_object *obj);
 
@@ -73,10 +79,14 @@ struct ham_object{
 
 //! @cond ignore
 #define ham_impl_object_vtable_prefix ham_impl_obj_vtable_
+#define ham_impl_object_vtable_name(obj_name) HAM_CONCAT(ham_impl_obj_vtable_, obj_name)
+#define ham_impl_object_info_name(obj_name) HAM_CONCAT(ham_impl_obj_info_, obj_name)
+#define ham_impl_object_ctor_name(obj_name) HAM_CONCAT(ham_impl_obj_ctor_, obj_name)
+#define ham_impl_object_dtor_name(obj_name) HAM_CONCAT(ham_impl_obj_dtor_, obj_name)
 
 #define ham_impl_define_object(obj_depth_, obj_, vtable_depth_, vtable_, ctor_, dtor_, vtable_body_) \
-	ham_extern_c ham_public ham_export const ham_object_vtable *HAM_CONCAT(ham_impl_object_vtable_prefix, obj_)(); \
-	static const ham_object_info *HAM_CONCAT(ham_impl_obj_info_, obj_)(){ \
+	ham_extern_c ham_public ham_export const ham_object_vtable *ham_impl_object_vtable_name(obj_)(); \
+	static const ham_object_info *ham_impl_object_info_name(obj_)(){ \
 		static const ham_object_info ret = (ham_object_info){ \
 			.type_id = #obj_, \
 			.alignment = alignof(obj_), \
@@ -84,21 +94,21 @@ struct ham_object{
 		}; \
 		return &ret; \
 	} \
-	static ham_object *HAM_CONCAT(ham_impl_obj_ctor_, obj_)(ham_object *ptr, ham_u32 nargs, va_list va){ \
-		ptr->vtable = HAM_CONCAT(ham_impl_obj_vtable_, obj_)(); \
+	static ham_object *ham_impl_object_ctor_name(obj_)(ham_object *ptr, ham_u32 nargs, va_list va){ \
+		ptr->vtable = ham_impl_object_vtable_name(obj_)(); \
 		obj_ *const ret = (ctor_)((obj_*)ptr, nargs, va); \
 		return ret ? ham_super_n(obj_depth_, ret) : nullptr; \
 	} \
-	static void HAM_CONCAT(ham_impl_obj_dtor_, obj_)(ham_object *obj){ \
+	static void ham_impl_object_dtor_name(obj_)(ham_object *obj){ \
 		obj_ *const derived_ptr = (obj_*)obj; \
 		(dtor_)(derived_ptr); \
 	} \
-	const ham_object_vtable *HAM_CONCAT(ham_impl_object_vtable_prefix, obj_)(){\
+	const ham_object_vtable *ham_impl_object_vtable_name(obj_)(){\
 		static const vtable_ ret = (vtable_){ \
 			HAM_REPEAT(vtable_depth_, .HAM_SUPER_NAME) = (ham_object_vtable){ \
-				.info = HAM_CONCAT(ham_impl_obj_info_, obj_), \
-				.construct = HAM_CONCAT(ham_impl_obj_ctor_, obj_), \
-				.destroy = HAM_CONCAT(ham_impl_obj_dtor_, obj_), \
+				.info = ham_impl_object_info_name(obj_), \
+				.construct = ham_impl_object_ctor_name(obj_), \
+				.destroy = ham_impl_object_dtor_name(obj_), \
 			}, \
 			HAM_EAT vtable_body_ \
 		}; \

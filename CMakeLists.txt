@@ -51,6 +51,8 @@ set(HAM_VERSION_MINOR ${ham_VERSION_MINOR})
 set(HAM_VERSION_PATCH ${ham_VERSION_PATCH})
 set(HAM_VERSION ${ham_VERSION})
 
+# CPU detection
+
 check_target_arch(HAM_TARGET_ARCH)
 
 if(HAM_TARGET_ARCH STREQUAL "x86_64")
@@ -58,6 +60,8 @@ if(HAM_TARGET_ARCH STREQUAL "x86_64")
 else()
 	set(HAM_CPU_LIBS)
 endif()
+
+# Build info
 
 string_camel_to_snake("${CMAKE_BUILD_TYPE}" HAM_BUILD_TYPE)
 string(TOUPPER ${HAM_BUILD_TYPE} HAM_BUILD_TYPE)
@@ -163,6 +167,8 @@ set(
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/shape.h
 
+	${HAM_SOURCE_INCLUDE_DIR}/ham/vk.h # just a dispatch lib, not a loader
+
 	${HAM_SOURCE_INCLUDE_DIR}/ham/net.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/net-object.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/renderer.h
@@ -194,10 +200,31 @@ option(HAM_INSTALL_TOOLS   "Whether to install compiled tools"          ${PROJEC
 option(HAM_INSTALL_TESTS   "Whether to install the tests"               OFF)
 option(HAM_INSTALL_ENGINE  "Whether to install the world engine"        OFF)
 
+# Platform specific options
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+	option(HAM_VK_WIN32   "Whether to enable Win32 Vulkan extensions"   ON)
+	option(HAM_VK_WAYLAND "Whether to enable Wayland Vulkan extensions" OFF)
+	option(HAM_VK_XCB     "Whether to enable XCB Vulkan extensions"     OFF)
+	option(HAM_VK_XLIB    "Whether to enable Xlib Vulkan extensions"    OFF)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	option(HAM_VK_WIN32   "Whether to enable Win32 Vulkan extensions"   OFF)
+	option(HAM_VK_WAYLAND "Whether to enable Wayland Vulkan extensions" ON)
+	option(HAM_VK_XCB     "Whether to enable XCB Vulkan extensions"     ON)
+	option(HAM_VK_XLIB    "Whether to enable Xlib Vulkan extensions"    OFF)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+	option(HAM_VK_WIN32   "Whether to enable Win32 Vulkan extensions"   OFF)
+	option(HAM_VK_WAYLAND "Whether to enable Wayland Vulkan extensions" OFF)
+	option(HAM_VK_XCB     "Whether to enable XCB Vulkan extensions"     OFF)
+	option(HAM_VK_XLIB    "Whether to enable Xlib Vulkan extensions"    ON) # dunno, don't care
+endif()
+
+# Build options
+
 set(HAM_ENGINE_MAX_SUBSYSTEMS "16" CACHE STRING "Maximum number of subsystems allowed in an engine before an error")
 set(HAM_BUILD_STEAM_APPID "480" CACHE STRING "Steam appid to put in steam_appid.txt for build directories")
 
-set(HAM_COLONY_MAX_BUCKETS 16 CACHE STRING "Maximum number of storage buckets for each colony before an out of memory error")
+set(HAM_COLONY_MAX_BUCKETS 14 CACHE STRING "Maximum number of storage buckets for each colony before an out of memory error")
 set(HAM_OBJECT_INSTANCE_MANAGER_MAX_BLOCKS 16 CACHE STRING "Maximum number of storage blocks for each instance manager before an out of memory error")
 
 # Create configuration file
@@ -214,6 +241,12 @@ configure_file(
 ##
 
 FetchContent_Declare(
+	fmtlib_content
+	GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+	GIT_TAG        a33701196adfad74917046096bf5a2aa0ab0bb50
+)
+
+FetchContent_Declare(
 	robin_hood_content
 	GIT_REPOSITORY https://github.com/martinus/robin-hood-hashing.git
 	GIT_TAG        fb1483621fda28d4afb31c0097c1a4a457fdd35b
@@ -225,7 +258,7 @@ FetchContent_Declare(
 	GIT_TAG        c3856514de0a67d7b66939bf3ed491a2d6e61277 # 0.5.1
 )
 
-FetchContent_MakeAvailable(yyjson_content)
+FetchContent_MakeAvailable(yyjson_content fmtlib_content)
 
 FetchContent_GetProperties(robin_hood_content)
 if(NOT robin_hood_content_POPULATED)

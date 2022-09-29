@@ -38,14 +38,14 @@ ham_api void ham_renderer_loop(ham_renderer *renderer, ham_f64 dt);
  * @{
  */
 
-typedef struct ham_renderer_draw_group ham_renderer_draw_group;
+typedef struct ham_draw_group ham_draw_group;
 
-ham_api ham_renderer_draw_group *ham_renderer_draw_group_create(
+ham_api ham_draw_group *ham_draw_group_create(
 	ham_renderer *r,
-	ham_usize num_shapes, const ham_shape *shapes
+	ham_usize num_shapes, const ham_shape *const *shapes
 );
 
-ham_api void ham_renderer_draw_group_destroy(ham_renderer_draw_group *group);
+ham_api void ham_draw_group_destroy(ham_draw_group *group);
 
 /**
  * @}

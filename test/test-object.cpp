@@ -17,8 +17,8 @@ struct ham_object_test_vtable{
 	int(*bar)(const ham_object_test*);
 };
 
-static ham_object_test *ham_object_test_ctor(ham_object_test *mem, va_list va){
-	(void)va;
+static ham_object_test *ham_object_test_ctor(ham_object_test *mem, ham_u32 nargs, va_list va){
+	(void)nargs; (void)va;
 	return new(mem) ham_object_test;
 }
 
@@ -32,8 +32,8 @@ ham_define_object(
 	ham_object_test_ctor,
 	ham_object_test_dtor,
 	(
-		.foo = [](ham_object_test *obj) -> int{ return obj->test_val += 2; },
-		.bar = [](const ham_object_test *obj) -> int{ return obj->test_val * 4; },
+		.foo = +[](ham_object_test *obj) -> int{ return obj->test_val += 2; },
+		.bar = +[](const ham_object_test *obj) -> int{ return obj->test_val * 4; },
 	)
 );
 
@@ -82,24 +82,6 @@ bool ham_test_object(){
 			return false;
 		}
 
-		if(i > 0){
-			const auto prev = objs[i-1];
-
-			const auto cur_blk = ham_object_manager_block_index(obj_man, obj);
-			const auto prev_blk = ham_object_manager_block_index(obj_man, prev);
-
-			if(cur_blk == prev_blk){
-				const auto off = (ham_uptr)obj - (ham_uptr)prev;
-
-				if(off != obj_info->size){
-					std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
-					std::cerr << "    Bad object offset for " << i << "'th object instance.\n"
-								 "        Got:      " << off << "\n"
-								 "        Expected: " << obj_info->size << '\n';
-				}
-			}
-		}
-
 		((ham_object_test*)obj)->test_val = i + 1;
 	}
 
@@ -108,7 +90,7 @@ bool ham_test_object(){
 		const auto test_vt  = (ham_object_test_vtable*)objs[i]->vtable;
 		if(test_vt->foo(test_obj) != i + 3){
 			std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
-			std::cerr << "    Function call bad result `foo(obj)`\n"
+			std::cerr << "    Function call bad result from object " << i << " `foo(obj)`\n"
 						 "        Given:    " << test_obj->test_val << "\n"
 						 "        Expected: " << i + 3 << '\n';
 			ham_object_manager_destroy(obj_man);
@@ -118,7 +100,7 @@ bool ham_test_object(){
 		const auto bar_res = test_vt->bar(test_obj);
 		if(bar_res != (i + 3) * 4){
 			std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
-			std::cerr << "    Function call bad result `bar(obj)`\n"
+			std::cerr << "    Function call bad result from object " << i << " `bar(obj)`\n"
 						 "        Given:    " << bar_res << "\n"
 						 "        Expected: " << (i + 3) * 4 << '\n';
 			ham_object_manager_destroy(obj_man);

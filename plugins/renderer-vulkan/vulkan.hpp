@@ -1,11 +1,12 @@
 #ifndef HAM_RENDERER_VULKAN_VULKAN_HPP
 #define HAM_RENDERER_VULKAN_VULKAN_HPP 1
 
+#define VK_NO_PROTOTYPES 1
+
 #include "ham/log.h"
+#include "ham/vk.h"
 
 #include "ham/std_vector.hpp"
-
-#include <vulkan/vulkan_core.h>
 
 #include <array>
 
@@ -355,72 +356,6 @@ namespace ham::vk{
 		}
 	}
 
-	struct fns{
-		PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = nullptr;
-		PFN_vkGetDeviceProcAddr vkGetDeviceProcAddr = nullptr;
-
-		PFN_vkEnumeratePhysicalDevices vkEnumeratePhysicalDevices = nullptr;
-		PFN_vkGetPhysicalDeviceProperties vkGetPhysicalDeviceProperties = nullptr;
-		PFN_vkGetPhysicalDeviceFeatures vkGetPhysicalDeviceFeatures = nullptr;
-		PFN_vkGetPhysicalDeviceQueueFamilyProperties vkGetPhysicalDeviceQueueFamilyProperties = nullptr;
-		PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
-		PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR vkGetPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
-		PFN_vkGetPhysicalDeviceSurfaceFormatsKHR vkGetPhysicalDeviceSurfaceFormatsKHR = nullptr;
-		PFN_vkGetPhysicalDeviceSurfacePresentModesKHR vkGetPhysicalDeviceSurfacePresentModesKHR = nullptr;
-
-		PFN_vkCreateDevice vkCreateDevice = nullptr;
-		PFN_vkDestroyDevice vkDestroyDevice = nullptr;
-		PFN_vkDeviceWaitIdle vkDeviceWaitIdle = nullptr;
-		PFN_vkGetDeviceQueue vkGetDeviceQueue = nullptr;
-		PFN_vkQueueSubmit vkQueueSubmit = nullptr;
-		PFN_vkQueuePresentKHR vkQueuePresentKHR = nullptr;
-
-		PFN_vkCreateSwapchainKHR vkCreateSwapchainKHR = nullptr;
-		PFN_vkDestroySwapchainKHR vkDestroySwapchainKHR = nullptr;
-		PFN_vkGetSwapchainImagesKHR vkGetSwapchainImagesKHR = nullptr;
-		PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR = nullptr;
-
-		PFN_vkCreateImageView vkCreateImageView = nullptr;
-		PFN_vkDestroyImageView vkDestroyImageView = nullptr;
-
-		PFN_vkCreateShaderModule vkCreateShaderModule = nullptr;
-		PFN_vkDestroyShaderModule vkDestroyShaderModule = nullptr;
-
-		PFN_vkCreateRenderPass vkCreateRenderPass = nullptr;
-		PFN_vkDestroyRenderPass vkDestroyRenderPass = nullptr;
-
-		PFN_vkCreatePipelineLayout vkCreatePipelineLayout = nullptr;
-		PFN_vkDestroyPipelineLayout vkDestroyPipelineLayout = nullptr;
-		PFN_vkCreateGraphicsPipelines vkCreateGraphicsPipelines = nullptr;
-		PFN_vkDestroyPipeline vkDestroyPipeline = nullptr;
-
-		PFN_vkCreateFramebuffer vkCreateFramebuffer = nullptr;
-		PFN_vkDestroyFramebuffer vkDestroyFramebuffer = nullptr;
-
-		PFN_vkCreateCommandPool vkCreateCommandPool = nullptr;
-		PFN_vkDestroyCommandPool vkDestroyCommandPool = nullptr;
-		PFN_vkAllocateCommandBuffers vkAllocateCommandBuffers = nullptr;
-		PFN_vkFreeCommandBuffers vkFreeCommandBuffers = nullptr;
-		PFN_vkBeginCommandBuffer vkBeginCommandBuffer = nullptr;
-		PFN_vkEndCommandBuffer vkEndCommandBuffer = nullptr;
-		PFN_vkResetCommandBuffer vkResetCommandBuffer = nullptr;
-
-		PFN_vkCmdBeginRenderPass vkCmdBeginRenderPass = nullptr;
-		PFN_vkCmdEndRenderPass vkCmdEndRenderPass = nullptr;
-		PFN_vkCmdBindPipeline vkCmdBindPipeline = nullptr;
-		PFN_vkCmdSetViewport vkCmdSetViewport = nullptr;
-		PFN_vkCmdSetScissor vkCmdSetScissor = nullptr;
-		PFN_vkCmdDraw vkCmdDraw = nullptr;
-
-		PFN_vkCreateSemaphore vkCreateSemaphore = nullptr;
-		PFN_vkDestroySemaphore vkDestroySemaphore = nullptr;
-		PFN_vkCreateFence vkCreateFence = nullptr;
-		PFN_vkDestroyFence vkDestroyFence = nullptr;
-
-		PFN_vkWaitForFences vkWaitForFences = nullptr;
-		PFN_vkResetFences vkResetFences = nullptr;
-	};
-
 	struct swapchain_info{
 		VkSurfaceCapabilitiesKHR capabilities;
 		ham::std_vector<VkSurfaceFormatKHR> surface_formats;
@@ -710,7 +645,7 @@ namespace ham::vk{
 	};
 
 	ham_nonnull_args(2, 3, 4)
-	static inline bool get_swapchain_info(const fns &fns, VkPhysicalDevice phys_dev, VkSurfaceKHR surface, swapchain_info *ret){
+	static inline bool get_swapchain_info(const ham_vk_fns &fns, VkPhysicalDevice phys_dev, VkSurfaceKHR surface, swapchain_info *ret){
 		result res = fns.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phys_dev, surface, &ret->capabilities);
 		if(res != VK_SUCCESS){
 			ham_logerrorf("ham::vk::get_swapchain_infos", "Error in vkGetPhysicalDeviceSurfaceCapabilitiesKHR: %s", res.to_str());
@@ -758,7 +693,7 @@ namespace ham::vk{
 		return true;
 	}
 
-	static inline VkShaderModule create_shader_module(const fns &fs, VkDevice dev, usize buf_size, void *buf){
+	static inline VkShaderModule create_shader_module(const ham_vk_fns &fs, VkDevice dev, usize buf_size, void *buf){
 		VkShaderModuleCreateInfo create_info{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, nullptr, 0, buf_size, (const u32*)buf };
 
 		VkShaderModule ret;
@@ -771,11 +706,11 @@ namespace ham::vk{
 		return ret;
 	}
 
-	static inline void destroy_shader_module(const fns &fns, VkDevice dev, VkShaderModule module){
+	static inline void destroy_shader_module(const ham_vk_fns &fns, VkDevice dev, VkShaderModule module){
 		fns.vkDestroyShaderModule(dev, module, nullptr);
 	}
 
-	static inline VkPipelineLayout create_pipeline_layout(const fns &fs, VkDevice dev, const VkPipelineLayoutCreateInfo &create_info){
+	static inline VkPipelineLayout create_pipeline_layout(const ham_vk_fns &fs, VkDevice dev, const VkPipelineLayoutCreateInfo &create_info){
 		VkPipelineLayout ret;
 		const auto res = fs.vkCreatePipelineLayout(dev, &create_info, nullptr, &ret);
 		if(res != VK_SUCCESS){
@@ -786,7 +721,7 @@ namespace ham::vk{
 		return ret;
 	}
 
-	static inline void destroy_pipeline_layout(const fns &fs, VkDevice dev, VkPipelineLayout layout){
+	static inline void destroy_pipeline_layout(const ham_vk_fns &fs, VkDevice dev, VkPipelineLayout layout){
 		fs.vkDestroyPipelineLayout(dev, layout, nullptr);
 	}
 }
