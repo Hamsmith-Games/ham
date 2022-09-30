@@ -35,6 +35,9 @@ struct ham_typeset{
 
 	// str8, str16, str32
 	const ham_type *str_types[3];
+
+	// vec2, vec3, vec4
+	const ham_type *vec_types[3];
 };
 
 ham_nonnull_args(1)
@@ -92,10 +95,28 @@ ham_typeset *ham_typeset_create(){
 	}
 
 	// string types
-	for(ham_usize i = 0; i < 3; i++){
+	for(int i = 0; i < 3; i++){
 		constexpr auto size = sizeof(void*) * 2;
 		constexpr auto alignment = alignof(void*);
 		ptr->str_types[i] = ham_impl_typeset_new_type(ptr, HAM_TYPE_STRING, (ham_type_info_flag)(HAM_TYPE_INFO_STRING_UTF8 + i), alignof(ham_str8), sizeof(ham_str8));
+	}
+
+	const auto f32_type = ptr->float_types[1];
+
+	constexpr ham_usize vec_sizes[] = {
+		sizeof(ham_vec2),
+		sizeof(ham_vec3),
+		sizeof(ham_vec4),
+	};
+
+	constexpr ham_usize vec_aligns[] = {
+		alignof(ham_vec2),
+		alignof(ham_vec3),
+		alignof(ham_vec4),
+	};
+
+	for(ham_usize i = 0; i < std::size(vec_sizes); i++){
+		ptr->vec_types[i] = ham_impl_typeset_new_type(ptr, HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_VECTOR, vec_aligns[i], vec_sizes[i]);
 	}
 
 	return ptr;
@@ -182,6 +203,24 @@ const ham_type *ham_typeset_str(const ham_typeset *ts, ham_str_encoding encoding
 
 		default:{
 			ham_logapierrorf("Unrecognized ham_str_encoding: 0x%x", encoding);
+			return nullptr;
+		}
+	}
+}
+
+const ham_type *ham_typeset_vec(const ham_typeset *ts, const ham_type *elem, ham_usize n){
+	if(elem != ts->float_types[1]){
+		ham_logapierrorf("Only vec2<f32> vec3<f32> and vec4<f32> currently supported");
+		return nullptr;
+	}
+
+	switch(n){
+		case 8:  return ts->vec_types[0]; // vec2
+		case 12: return ts->vec_types[1]; // vec3
+		case 16: return ts->vec_types[2]; // vec4
+
+		default:{
+			ham_logapierrorf("Only vec2<f32> vec3<f32> and vec4<f32> currently supported");
 			return nullptr;
 		}
 	}

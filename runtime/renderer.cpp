@@ -42,6 +42,11 @@ ham_renderer *ham_renderer_vcreate(const char *plugin_id, const char *object_id,
 		return nullptr;
 	}
 
+	obj->vtable = obj_vtable;
+	((ham_renderer*)obj)->allocator = allocator;
+	((ham_renderer*)obj)->dso       = dso;
+	((ham_renderer*)obj)->plugin    = plugin;
+
 	const auto ret = (ham_renderer*)obj_vtable->construct(obj, nargs, va);
 	if(!ret){
 		ham_logapierrorf("Failed to construct renderer object '%s'", object_id);
@@ -50,12 +55,6 @@ ham_renderer *ham_renderer_vcreate(const char *plugin_id, const char *object_id,
 		ham_dso_close(dso);
 		return nullptr;
 	}
-
-	obj->vtable = obj_vtable;
-
-	ret->allocator = allocator;
-	ret->dso = dso;
-	ret->plugin = plugin;
 
 	const auto draw_group_vtable = (const ham_object_vtable*)((const ham_renderer_vtable*)obj_vtable)->draw_group_vtable();
 
@@ -150,6 +149,7 @@ ham_draw_group *ham_draw_group_create(
 	const auto vtable = obj->vtable;
 	const auto ptr = (ham_draw_group*)obj;
 
+	ptr->r = r;
 	ptr->num_shapes = num_shapes;
 
 	ptr->num_shape_points = (ham_usize*)ham_allocator_alloc(allocator, alignof(ham_usize), sizeof(ham_usize) * num_shapes);

@@ -29,7 +29,7 @@ bool ham_draw_group_vulkan_init(
 	VmaAllocationCreateInfo alloc_create_info = {
 		.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
 		.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-		.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		.preferredFlags = 0,
 		.memoryTypeBits = 0,
 		.pool = 0,
@@ -42,30 +42,46 @@ bool ham_draw_group_vulkan_init(
 		.pNext = nullptr,
 	};
 
-	VmaAllocationInfo vbo_alloc_info, ibo_alloc_info;
-
 	buffer_create_info.size  = total_vbo_size;
-	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 
-	ham::vk::result res = vmaCreateBuffer(r->vma_allocator, &buffer_create_info, &alloc_create_info, &group->vbo, &group->vbo_alloc, &vbo_alloc_info);
+	ham::vk::result res = vmaCreateBuffer(r->vma_allocator, &buffer_create_info, &alloc_create_info, &group->vbo, &group->vbo_alloc, nullptr);
 	if(res != VK_SUCCESS){
 		ham_logapierrorf("Error in vmaCreateBuffer: %s", res.to_str());
 		return false;
 	}
 
 	buffer_create_info.size  = total_ibo_size;
-	buffer_create_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	buffer_create_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 
-	res = vmaCreateBuffer(r->vma_allocator, &buffer_create_info, &alloc_create_info, &group->ibo, &group->ibo_alloc, &ibo_alloc_info);
+	res = vmaCreateBuffer(r->vma_allocator, &buffer_create_info, &alloc_create_info, &group->ibo, &group->ibo_alloc, nullptr);
 	if(res != VK_SUCCESS){
 		ham_logapierrorf("Error in vmaCreateBuffer: %s", res.to_str());
 		vmaDestroyBuffer(r->vma_allocator, group->vbo, group->vbo_alloc);
 		return false;
 	}
 
-	void *vbo_mem, *ibo_mem;
+	buffer_create_info.size  = num_shapes * sizeof(VkDrawIndexedIndirectCommand);
+	buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+
+	res = vmaCreateBuffer(r->vma_allocator, &buffer_create_info, &alloc_create_info, &group->cbo, &group->cbo_alloc, nullptr);
+	if(res != VK_SUCCESS){
+		ham_logapierrorf("Error in vmaCreateBuffer: %s", res.to_str());
+		vmaDestroyBuffer(r->vma_allocator, group->ibo, group->vbo_alloc);
+		vmaDestroyBuffer(r->vma_allocator, group->vbo, group->vbo_alloc);
+		return false;
+	}
+
+	void *vbo_mem, *ibo_mem, *cbo_mem;
 	vmaMapMemory(r->vma_allocator, group->vbo_alloc, &vbo_mem);
 	vmaMapMemory(r->vma_allocator, group->ibo_alloc, &ibo_mem);
+	vmaMapMemory(r->vma_allocator, group->cbo_alloc, &cbo_mem);
+
+	VkDrawIndexedIndirectCommand draw_cmd;
+
+	ham::std_vector<VkVertexInputBindingDescription> bindings;
+
+	ham_i32 vert_off = 0, vert_idx_off = 0;
 
 	ham_usize vbo_off = 0, ibo_off = 0;
 	for(ham_usize i = 0; i < num_shapes; i++){
@@ -74,37 +90,50 @@ bool ham_draw_group_vulkan_init(
 		const auto num_points  = ham_super(group)->num_shape_points[i];
 		const auto num_indices = ham_super(group)->num_shape_indices[i];
 
+		const auto indices_size = num_indices * sizeof(ham_u32);
+
 		const auto verts   = ham_shape_vertices(shape);
 		const auto norms   = ham_shape_normals(shape);
 		const auto uvs     = ham_shape_uvs(shape);
 		const auto indices = ham_shape_indices(shape);
 
-		const auto verts_size   = num_points * sizeof(ham_vec3);
-		const auto uvs_size     = num_points * sizeof(ham_vec2);
-		const auto indices_size = num_indices * sizeof(ham_u32);
+		draw_cmd.indexCount    = num_indices;
+		draw_cmd.instanceCount = 1;
+		draw_cmd.firstIndex    = ibo_off / sizeof(ham_u32);
+		draw_cmd.vertexOffset  = vert_idx_off;
+		draw_cmd.firstInstance = 0;
 
-		memcpy((char*)vbo_mem + vbo_off, verts, verts_size);
-		vbo_off += verts_size;
+		// write interlaced points: (pos, norm, uv)+
+		for(ham_usize i = 0; i < num_points; i++){
+			memcpy((char*)vbo_mem + vbo_off, verts + i, sizeof(ham_vec3));
+			vbo_off += sizeof(ham_vec3);
 
-		memcpy((char*)vbo_mem + vbo_off, norms, verts_size);
-		vbo_off += verts_size;
+			memcpy((char*)vbo_mem + vbo_off, norms + i, sizeof(ham_vec3));
+			vbo_off += sizeof(ham_vec3);
 
-		memcpy((char*)vbo_mem + vbo_off, uvs, uvs_size);
-		vbo_off += uvs_size;
+			memcpy((char*)vbo_mem + vbo_off, uvs + i, sizeof(ham_vec2));
+			vbo_off += sizeof(ham_vec2);
+		}
 
 		memcpy((char*)ibo_mem + ibo_off, indices, indices_size);
 		ibo_off += indices_size;
+
+		memcpy((char*)cbo_mem + (i * sizeof(VkDrawIndexedIndirectCommand)), &draw_cmd, sizeof(VkDrawIndexedIndirectCommand));
+
+		vert_idx_off += num_points;
 	}
 
 	vmaUnmapMemory(r->vma_allocator, group->vbo_alloc);
 	vmaUnmapMemory(r->vma_allocator, group->ibo_alloc);
+	vmaUnmapMemory(r->vma_allocator, group->cbo_alloc);
 
 	return true;
 }
 
 void ham_draw_group_vulkan_fini(ham_draw_group_vulkan *group){
-	vmaDestroyBuffer(((ham_renderer_vulkan*)ham_super(group)->r)->vma_allocator, group->vbo, group->vbo_alloc);
+	vmaDestroyBuffer(((ham_renderer_vulkan*)ham_super(group)->r)->vma_allocator, group->cbo, group->cbo_alloc);
 	vmaDestroyBuffer(((ham_renderer_vulkan*)ham_super(group)->r)->vma_allocator, group->ibo, group->ibo_alloc);
+	vmaDestroyBuffer(((ham_renderer_vulkan*)ham_super(group)->r)->vma_allocator, group->vbo, group->vbo_alloc);
 }
 
 HAM_C_API_END

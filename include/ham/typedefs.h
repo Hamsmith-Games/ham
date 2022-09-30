@@ -172,11 +172,11 @@ typedef double ham_f64;
 #endif
 
 /**
- * @defgroup HAM_VECS Vector types
+ * @defgroup HAM_VECS Vectors
  * @{
  */
 
-typedef union ham_vec2{
+typedef union alignas(8) ham_vec2{
 	struct { ham_f32 x, y; };
 	ham_f32 data[2];
 } ham_vec2;
@@ -186,13 +186,198 @@ typedef union ham_vec3{
 	ham_f32 data[3];
 } ham_vec3;
 
-typedef union ham_vec4{
+typedef union alignas(16) ham_vec4{
 	struct { ham_f32 x, y, z, w; };
 	ham_f32 data[4];
 #ifdef HAM_SIMD
 	ham_v4f32 v4f32;
 #endif
 } ham_vec4;
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup HAM_MATRICES Matrices
+ * @{
+ */
+
+typedef union alignas(16) ham_mat2{
+	ham_vec2 cols[2];
+	ham_f32 data[2*2];
+} ham_mat2;
+
+typedef union ham_mat3{
+	ham_vec3 cols[3];
+	ham_f32 data[3*3];
+} ham_mat3;
+
+typedef union alignas(32) ham_mat4{
+	ham_vec4 cols[4];
+	ham_f32 data[4*4];
+} ham_mat4;
+
+ham_constexpr ham_nothrow static inline ham_mat2 ham_mat2_identity(){
+	return (ham_mat2){
+		.data = {
+			1.f, 0.f,
+			0.f, 1.f
+		}
+	};
+}
+
+ham_constexpr ham_nothrow static inline ham_mat3 ham_mat3_identity(){
+	return (ham_mat3){
+		.data = {
+			1.f, 0.f, 0.f,
+			0.f, 1.f, 0.f,
+			0.f, 0.f, 1.f
+		}
+	};
+}
+
+ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_identity(){
+	return (ham_mat4){
+		.data = {
+			1.f, 0.f, 0.f, 0.f,
+			0.f, 1.f, 0.f, 0.f,
+			0.f, 0.f, 1.f, 0.f,
+			0.f, 0.f, 0.f, 1.f,
+		}
+	};
+}
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup HAM_COLORS Colors
+ * @{
+ */
+
+typedef enum ham_color_format{
+	HAM_R8U,
+	HAM_RG8U,
+	HAM_RGB8U,
+	HAM_RGBA8U,
+
+	HAM_R8I,
+	HAM_RG8I,
+	HAM_RGB8I,
+	HAM_RGBA8I,
+
+	HAM_R16U,
+	HAM_RG16U,
+	HAM_RGB16U,
+	HAM_RGBA16U,
+
+	HAM_R16I,
+	HAM_RG16I,
+	HAM_RGB16I,
+	HAM_RGBA16I,
+
+	HAM_R32U,
+	HAM_RG32U,
+	HAM_RGB32U,
+	HAM_RGBA32U,
+
+	HAM_R32I,
+	HAM_RG32I,
+	HAM_RGB32I,
+	HAM_RGBA32I,
+
+	HAM_R32F,
+	HAM_RG32F,
+	HAM_RGB32F,
+	HAM_RGBA32F,
+
+	HAM_DEPTH16,
+	HAM_DEPTH32,
+	HAM_DEPTH32F,
+
+	HAM_DEPTH24_STENCIL8,
+
+	HAM_COLOR_FORMAT_COUNT
+} ham_color_format;
+
+typedef union alignas(ham_u32) ham_color_u8{
+	struct { ham_u8 r, g, b, a; };
+	ham_u8 data[4];
+} ham_color_u8;
+
+typedef union alignas(ham_u32) ham_color_i8{
+	struct { ham_i8 r, g, b, a; };
+	ham_i8 data[4];
+} ham_color_i8;
+
+typedef union alignas(ham_u64) ham_color_u16{
+	struct { ham_u16 r, g, b, a; };
+	ham_u16 data[4];
+} ham_color_u16;
+
+typedef union alignas(ham_u64) ham_color_i16{
+	struct { ham_i16 r, g, b, a; };
+	ham_i16 data[4];
+} ham_color_i16;
+
+typedef union alignas(ham_u64) ham_color_u32{
+	struct { ham_u32 r, g, b, a; };
+	ham_u32 data[4];
+} ham_color_u32;
+
+typedef union alignas(ham_u64) ham_color_i32{
+	struct { ham_i32 r, g, b, a; };
+	ham_i32 data[4];
+} ham_color_i32;
+
+typedef union alignas(ham_u64) ham_color_f32{
+	struct { ham_f32 r, g, b, a; };
+	ham_f32 data[4];
+} ham_color_f32;
+
+typedef struct alignas(ham_u16) ham_color_d16{
+	ham_u16 value;
+} ham_color_d16;
+
+typedef struct alignas(ham_u32) ham_color_d32{
+	ham_u32 value;
+} ham_color_d32;
+
+typedef struct alignas(ham_u32) ham_color_d32f{
+	ham_f32 value;
+} ham_color_d32f;
+
+typedef struct alignas(ham_u32) ham_color_d24_s8{
+	unsigned int depth: 24;
+	unsigned int stencil: 8;
+} ham_color_d24_s8;
+
+typedef ham_color_u8  ham_color;
+typedef ham_color_f32 ham_colorf;
+
+ham_constexpr static inline ham_color_f32 ham_color_u8_to_f32(ham_color_u8 col){
+	return (ham_color_f32){
+		.data = {
+			col.data[0] / 255.f,
+			col.data[0] / 255.f,
+			col.data[0] / 255.f,
+			col.data[0] / 255.f,
+		}
+	};
+}
+
+ham_constexpr static inline ham_color_u8 ham_color_f32_to_u8(ham_color_f32 col){
+	return (ham_color_u8){
+		.data = {
+			(ham_u8)(col.data[0] * 255.f),
+			(ham_u8)(col.data[1] * 255.f),
+			(ham_u8)(col.data[2] * 255.f),
+			(ham_u8)(col.data[3] * 255.f),
+		}
+	};
+}
 
 /**
  * @}
@@ -930,9 +1115,6 @@ namespace ham{
 	class exception: public std::exception{
 		public:
 			virtual const char *api() const noexcept = 0;
-
-		private:
-			const char *m_api;
 	};
 
 	template<typename Handle, auto Destroyer, auto NullHandle = Handle(0)>

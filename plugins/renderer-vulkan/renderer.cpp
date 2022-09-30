@@ -28,6 +28,10 @@ HAM_PLUGIN(
 	ham_renderer_on_unload_vulkan
 )
 
+//
+// Devices
+//
+
 ham_nonnull_args(1)
 static inline bool ham_renderer_vulkan_init_phys_device(ham_renderer_vulkan *r){
 	ham_u32 num_devices = 0;
@@ -202,17 +206,22 @@ static inline bool ham_renderer_vulkan_init_logical_device(ham_renderer_vulkan *
 	return true;
 }
 
+//
+// Swapchain
+//
+
 ham_nonnull_args(1)
 static inline bool ham_renderer_vulkan_init_swapchain(ham_renderer_vulkan *r){
-	if(!ham::vk::get_swapchain_info(r->vk_fns, r->vk_phys_dev, r->vk_surface, &r->vk_swapchain_info)){
+	ham::vk::swapchain_info swapchain_info;
+	if(!ham::vk::get_swapchain_info(r->vk_fns, r->vk_phys_dev, r->vk_surface, &swapchain_info)){
 		ham_logapierrorf("Error getting swapchain info");
 		return false;
 	}
 
 	ham_logapidebugf(
 		"Got swapchain with extent %ux%u",
-		r->vk_swapchain_info.capabilities.currentExtent.width,
-		r->vk_swapchain_info.capabilities.currentExtent.height
+		swapchain_info.capabilities.currentExtent.width,
+		swapchain_info.capabilities.currentExtent.height
 	);
 
 	VkSurfaceFormatKHR desired_format;
@@ -223,7 +232,7 @@ static inline bool ham_renderer_vulkan_init_swapchain(ham_renderer_vulkan *r){
 	best_format.format = VK_FORMAT_B8G8R8A8_SRGB;
 	best_format.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 
-	for(const auto &format : r->vk_swapchain_info.surface_formats){
+	for(const auto &format : swapchain_info.surface_formats){
 		ham_logapidebugf("Found swapchain format: %s %s", ham::vk::format_to_str(format.format), ham::vk::color_space_to_str(format.colorSpace));
 
 		if(format.format == desired_format.format && format.colorSpace == desired_format.colorSpace){
@@ -235,7 +244,7 @@ static inline bool ham_renderer_vulkan_init_swapchain(ham_renderer_vulkan *r){
 	VkPresentModeKHR desired_mode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
 	VkPresentModeKHR best_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
-	for(auto mode : r->vk_swapchain_info.present_modes){
+	for(auto mode : swapchain_info.present_modes){
 		if(mode == desired_mode){
 			best_mode = desired_mode;
 			break;
@@ -245,9 +254,9 @@ static inline bool ham_renderer_vulkan_init_swapchain(ham_renderer_vulkan *r){
 		}
 	}
 
-	const ham_u32 image_count = (r->vk_swapchain_info.capabilities.maxImageCount > 0) ?
-		ham_min(r->vk_swapchain_info.capabilities.minImageCount + 1, r->vk_swapchain_info.capabilities.maxImageCount) :
-		r->vk_swapchain_info.capabilities.minImageCount + 1;
+	const ham_u32 image_count = (swapchain_info.capabilities.maxImageCount > 0) ?
+		ham_min(swapchain_info.capabilities.minImageCount + 1, swapchain_info.capabilities.maxImageCount) :
+		swapchain_info.capabilities.minImageCount + 1;
 
 	const ham_u32 queue_fams[] = { r->vk_graphics_family, r->vk_present_family };
 
@@ -259,7 +268,7 @@ static inline bool ham_renderer_vulkan_init_swapchain(ham_renderer_vulkan *r){
 	create_info.minImageCount = image_count;
 	create_info.imageFormat = best_format.format;
 	create_info.imageColorSpace = best_format.colorSpace;
-	create_info.imageExtent = r->vk_swapchain_info.capabilities.currentExtent;
+	create_info.imageExtent = swapchain_info.capabilities.currentExtent;
 	create_info.imageArrayLayers = 1;
 	create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -278,22 +287,34 @@ static inline bool ham_renderer_vulkan_init_swapchain(ham_renderer_vulkan *r){
 	}
 
 	r->vk_swapchain_format = best_format.format;
-	r->vk_swapchain_extent = r->vk_swapchain_info.capabilities.currentExtent;
+	r->vk_swapchain_extent = swapchain_info.capabilities.currentExtent;
+
+	r->vk_surface_caps = swapchain_info.capabilities;
+	r->vk_surface_fmt = best_format;
+	r->vk_present_mode = best_mode;
 
 	return true;
 }
 
 ham_nonnull_args(1)
 static inline void ham_renderer_vulkan_fini_swapchain(ham_renderer_vulkan *r){
-	for(auto &fb : r->vk_swapchain_framebuffers){
-		r->vk_fns.vkDestroyFramebuffer(r->vk_dev, fb, nullptr);
-		fb = nullptr;
+	for(ham_usize i = 0; i < r->vk_num_swapchain_images; i++){
+		r->vk_fns.vkDestroyImageView(r->vk_dev, r->vk_swapchain_views[i], nullptr);
 	}
 
-	for(auto &image_view : r->vk_swapchain_image_views){
-		r->vk_fns.vkDestroyImageView(r->vk_dev, image_view, nullptr);
-		image_view = nullptr;
-	}
+	r->vk_fns.vkDestroyImageView(r->vk_dev, r->vk_swapchain_depth_view, nullptr);
+	r->vk_swapchain_depth_view = nullptr;
+
+	vmaDestroyImage(r->vma_allocator, r->vk_swapchain_depth, r->vk_swapchain_depth_alloc);
+	r->vk_swapchain_depth = nullptr;
+	r->vk_swapchain_depth_alloc = nullptr;
+
+	const auto allocator = ham_super(r)->allocator;
+
+	ham_allocator_delete_array(allocator, r->vk_swapchain_views, r->vk_num_swapchain_images);
+	ham_allocator_delete_array(allocator, r->vk_swapchain_images, r->vk_num_swapchain_images);
+	r->vk_swapchain_views = nullptr;
+	r->vk_swapchain_images = nullptr;
 
 	r->vk_fns.vkDestroySwapchainKHR(r->vk_dev, r->vk_swapchain, nullptr);
 	r->vk_swapchain = nullptr;
@@ -301,47 +322,144 @@ static inline void ham_renderer_vulkan_fini_swapchain(ham_renderer_vulkan *r){
 
 ham_nonnull_args(1)
 static inline bool ham_renderer_vulkan_init_swapchain_images(ham_renderer_vulkan *r){
-	ham_u32 num_images = 0;
-	VkResult res = r->vk_fns.vkGetSwapchainImagesKHR(r->vk_dev, r->vk_swapchain, &num_images, nullptr);
+	ham::vk::result res = r->vk_fns.vkGetSwapchainImagesKHR(r->vk_dev, r->vk_swapchain, &r->vk_num_swapchain_images, nullptr);
 	if(res != VK_SUCCESS){
-		ham_logapierrorf("Error in vkGetSwapchainImagesKHR: %s", ham::vk::result_to_str(res));
+		ham_logapierrorf("Error in vkGetSwapchainImagesKHR: %s", res.to_str());
 		return false;
 	}
-	else if(num_images == 0){
+	else if(r->vk_num_swapchain_images == 0){
 		ham_logapierrorf("No swapchain images could be found");
 		return false;
 	}
 
-	r->vk_swapchain_images.resize(num_images);
-	res = r->vk_fns.vkGetSwapchainImagesKHR(r->vk_dev, r->vk_swapchain, &num_images, r->vk_swapchain_images.data());
-	if(res != VK_SUCCESS){
-		ham_logapierrorf("Error in vkGetSwapchainImagesKHR: %s", ham::vk::result_to_str(res));
+	const auto allocator = ham_super(r)->allocator;
+
+	r->vk_swapchain_images = ham_allocator_new_array(allocator, VkImage, r->vk_num_swapchain_images);
+	if(!r->vk_swapchain_images){
+		ham_logapierrorf("Failed to allocate %u images", r->vk_num_swapchain_images);
+
+		r->vk_num_swapchain_images = 0;
 		return false;
 	}
 
-	r->vk_swapchain_image_views.resize(num_images);
+	r->vk_swapchain_views = ham_allocator_new_array(allocator, VkImageView, r->vk_num_swapchain_images);
+	if(!r->vk_swapchain_views){
+		ham_logapierrorf("Failed to allocate %u image views", r->vk_num_swapchain_images);
+
+		ham_allocator_delete_array(allocator, r->vk_swapchain_images, r->vk_num_swapchain_images);
+
+		r->vk_swapchain_views = nullptr;
+		r->vk_num_swapchain_images = 0;
+		return false;
+	}
+
+	res = r->vk_fns.vkGetSwapchainImagesKHR(r->vk_dev, r->vk_swapchain, &r->vk_num_swapchain_images, r->vk_swapchain_images);
+	if(res != VK_SUCCESS){
+		ham_logapierrorf("Error in vkGetSwapchainImagesKHR: %s", res.to_str());
+
+		ham_allocator_delete_array(allocator, r->vk_swapchain_views, r->vk_num_swapchain_images);
+		ham_allocator_delete_array(allocator, r->vk_swapchain_images, r->vk_num_swapchain_images);
+
+		r->vk_swapchain_views = nullptr;
+		r->vk_swapchain_images = nullptr;
+		r->vk_num_swapchain_images = 0;
+		return false;
+	}
+
+	VkImageCreateInfo depth_info{
+		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.imageType = VK_IMAGE_TYPE_2D,
+		.format = VK_FORMAT_D32_SFLOAT_S8_UINT,
+		.extent = VkExtent3D{ .width = r->vk_swapchain_extent.width, .height = r->vk_swapchain_extent.height, .depth = 1 },
+		.mipLevels = 1,
+		.arrayLayers = 1,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.tiling = VK_IMAGE_TILING_OPTIMAL,
+		.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		.queueFamilyIndexCount = 0,
+		.pQueueFamilyIndices = nullptr,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
+	};
+
+	VmaAllocationCreateInfo alloc_info{
+		.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+		.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+		.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+	};
+
+	res = vmaCreateImage(r->vma_allocator, &depth_info, &alloc_info, &r->vk_swapchain_depth, &r->vk_swapchain_depth_alloc, nullptr);
+	if(res != VK_SUCCESS){
+		ham_logapierrorf("Error in vmaCreateImage: %s", res.to_str());
+
+		ham_allocator_delete_array(allocator, r->vk_swapchain_views, r->vk_num_swapchain_images);
+		ham_allocator_delete_array(allocator, r->vk_swapchain_images, r->vk_num_swapchain_images);
+
+		r->vk_swapchain_views = nullptr;
+		r->vk_swapchain_images = nullptr;
+		r->vk_num_swapchain_images = 0;
+		return false;
+	}
 
 	VkImageViewCreateInfo view_create_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, nullptr, 0 };
 
 	view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	view_create_info.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
 
-	view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	view_create_info.subresourceRange.baseMipLevel = 0;
 	view_create_info.subresourceRange.levelCount = 1;
 	view_create_info.subresourceRange.baseArrayLayer = 0;
 	view_create_info.subresourceRange.layerCount = 1;
 
-	for(ham_u32 i = 0; i < num_images; i++){
+	view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+	view_create_info.image = r->vk_swapchain_depth;
+	view_create_info.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+	res = r->vk_fns.vkCreateImageView(r->vk_dev, &view_create_info, nullptr, &r->vk_swapchain_depth_view);
+	if(res != VK_SUCCESS){
+		ham_logapierrorf("Error in vkCreateImageView: %s", res.to_str());
+
+		vmaDestroyImage(r->vma_allocator, r->vk_swapchain_depth, r->vk_swapchain_depth_alloc);
+
+		ham_allocator_delete_array(allocator, r->vk_swapchain_views, r->vk_num_swapchain_images);
+		ham_allocator_delete_array(allocator, r->vk_swapchain_images, r->vk_num_swapchain_images);
+
+		r->vk_swapchain_depth = nullptr;
+		r->vk_swapchain_depth_alloc = nullptr;
+		r->vk_swapchain_views = nullptr;
+		r->vk_swapchain_images = nullptr;
+		r->vk_num_swapchain_images = 0;
+		return false;
+	}
+
+	view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+	for(ham_u32 i = 0; i < r->vk_num_swapchain_images; i++){
 		view_create_info.image = r->vk_swapchain_images[i];
 		view_create_info.format = r->vk_swapchain_format;
 
-		res = r->vk_fns.vkCreateImageView(r->vk_dev, &view_create_info, nullptr, &r->vk_swapchain_image_views[i]);
+		res = r->vk_fns.vkCreateImageView(r->vk_dev, &view_create_info, nullptr, &r->vk_swapchain_views[i]);
 		if(res != VK_SUCCESS){
 			ham_logapierrorf("Error in vkCreateImageView: %s", ham::vk::result_to_str(res));
-			for(ham_i64 j = (i - 1); j >= 0; j--){
-				r->vk_fns.vkDestroyImageView(r->vk_dev, r->vk_swapchain_image_views[j], nullptr);
+			for(ham_i64 j = 0; j < i; j++){
+				r->vk_fns.vkDestroyImageView(r->vk_dev, r->vk_swapchain_views[j], nullptr);
 			}
+
+			r->vk_fns.vkDestroyImageView(r->vk_dev, r->vk_swapchain_depth_view, nullptr);
+			r->vk_swapchain_depth_view = nullptr;
+
+			vmaDestroyImage(r->vma_allocator, r->vk_swapchain_depth, r->vk_swapchain_depth_alloc);
+			r->vk_swapchain_depth = nullptr;
+			r->vk_swapchain_depth_alloc = nullptr;
+
+			ham_allocator_delete_array(allocator, r->vk_swapchain_views, r->vk_num_swapchain_images);
+			ham_allocator_delete_array(allocator, r->vk_swapchain_images, r->vk_num_swapchain_images);
+			r->vk_swapchain_views = nullptr;
+			r->vk_swapchain_images = nullptr;
+
+			r->vk_num_swapchain_images = 0;
 			return false;
 		}
 	}
@@ -349,13 +467,164 @@ static inline bool ham_renderer_vulkan_init_swapchain_images(ham_renderer_vulkan
 	return true;
 }
 
-ham_nonnull_args(1)
-static inline bool ham_renderer_vulkan_init_pipeline_layout(ham_renderer_vulkan *r){
-	ham::vk::pipeline_layout_create_info layout_create_info(nullptr, 0, 0, nullptr, 0, nullptr);
+//
+// Render passes
+//
 
-	r->vk_pipeline_layout = ham::vk::create_pipeline_layout(r->vk_fns, r->vk_dev, layout_create_info);
-	if(!r->vk_pipeline_layout){
-		ham_logapierrorf("Error creating pipeline layout");
+ham_nonnull_args(1)
+static inline bool ham_renderer_vulkan_init_screen_render_pass(ham_renderer_vulkan *r){
+	VkAttachmentDescription attach_descs[] = {
+		{
+			.flags = 0,
+			.format = r->vk_swapchain_format,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+		},
+		{
+			.flags = 0,
+			.format = VK_FORMAT_D32_SFLOAT_S8_UINT,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
+		}
+	};
+
+	VkAttachmentReference color_attachments[] = {
+		{
+			.attachment = 0,
+			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		}
+	};
+
+	VkAttachmentReference depth_attachment{
+		.attachment = 1,
+		.layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
+	};
+
+	VkSubpassDescription subpasses[] = {
+		{
+			.flags = 0,
+			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.inputAttachmentCount = 0, .pInputAttachments = nullptr,
+			.colorAttachmentCount = (ham_u32)std::size(color_attachments),
+			.pColorAttachments = color_attachments,
+			.pResolveAttachments = nullptr,
+			.pDepthStencilAttachment = &depth_attachment,
+			.preserveAttachmentCount = 0, .pPreserveAttachments = nullptr,
+		}
+	};
+
+	VkSubpassDependency dependencies[] = {
+		{
+			.srcSubpass = VK_SUBPASS_EXTERNAL,
+			.dstSubpass = 0,
+			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.srcAccessMask = 0,
+			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			.dependencyFlags = 0,
+		}
+	};
+
+	ham::vk::render_pass_create_info create_info(
+		nullptr, 0,
+		(ham_u32)std::size(attach_descs), attach_descs,
+		(ham_u32)std::size(subpasses), subpasses,
+		(ham_u32)std::size(dependencies), dependencies
+	);
+
+	const auto res = r->vk_fns.vkCreateRenderPass(r->vk_dev, create_info.ptr(), nullptr, &r->vk_render_pass_screen);
+	if(res != VK_SUCCESS){
+		ham_logapierrorf("Error in vkCreateRenderPass: %s", ham::vk::result_to_str(res));
+		return false;
+	}
+
+	return true;
+}
+
+ham_nonnull_args(1)
+static inline bool ham_renderer_vulkan_init_data_render_pass(ham_renderer_vulkan *r){
+	VkAttachmentDescription attach_descs[] = {
+		{
+			.flags = 0,
+			.format = r->vk_swapchain_format,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		},
+		{
+			.flags = 0,
+			.format = VK_FORMAT_D32_SFLOAT_S8_UINT,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		}
+	};
+
+	VkAttachmentReference color_attachments[] = {
+		{
+			.attachment = 0,
+			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		}
+	};
+
+	VkAttachmentReference depth_attachment{
+		.attachment = 1,
+		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	};
+
+	VkSubpassDescription subpasses[] = {
+		{
+			.flags = 0,
+			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.inputAttachmentCount = 0, .pInputAttachments = nullptr,
+			.colorAttachmentCount = (ham_u32)std::size(color_attachments),
+			.pColorAttachments = color_attachments,
+			.pResolveAttachments = nullptr,
+			.pDepthStencilAttachment = &depth_attachment,
+			.preserveAttachmentCount = 0, .pPreserveAttachments = nullptr,
+		}
+	};
+
+	VkSubpassDependency dependencies[] = {
+		{
+			.srcSubpass = VK_SUBPASS_EXTERNAL,
+			.dstSubpass = 0,
+			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.srcAccessMask = 0,
+			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			.dependencyFlags = 0,
+		}
+	};
+
+	ham::vk::render_pass_create_info create_info(
+		nullptr, 0,
+		(ham_u32)std::size(attach_descs), attach_descs,
+		(ham_u32)std::size(subpasses), subpasses,
+		(ham_u32)std::size(dependencies), dependencies
+	);
+
+	const auto res = r->vk_fns.vkCreateRenderPass(r->vk_dev, create_info.ptr(), nullptr, &r->vk_render_pass_screen);
+	if(res != VK_SUCCESS){
+		ham_logapierrorf("Error in vkCreateRenderPass: %s", ham::vk::result_to_str(res));
 		return false;
 	}
 
@@ -364,54 +633,76 @@ static inline bool ham_renderer_vulkan_init_pipeline_layout(ham_renderer_vulkan 
 
 ham_nonnull_args(1)
 static inline bool ham_renderer_vulkan_init_render_passes(ham_renderer_vulkan *r){
-	VkAttachmentDescription attach_desc{
-		.flags = 0,
-		.format = r->vk_swapchain_format,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
-		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-	};
+	if(!ham_renderer_vulkan_init_screen_render_pass(r)){
+		ham_logapierrorf("Error initializing screen render pass");
+		return false;
+	}
 
-	VkAttachmentReference attach_ref{
-		.attachment = 0,
-		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-	};
+//	if(!ham_renderer_vulkan_init_data_render_pass(r)){
+//		ham_logapierrorf("Error initializing data render pass");
+//		r->vk_fns.vkDestroyRenderPass(r->vk_dev, r->vk_render_pass_screen, nullptr);
+//		r->vk_render_pass_screen = nullptr;
+//		return false;
+//	}
 
-	VkSubpassDescription subpass{
-		.flags = 0,
-		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-		.inputAttachmentCount = 0, .pInputAttachments = nullptr,
-		.colorAttachmentCount = 1,
-			.pColorAttachments = &attach_ref,
-			.pResolveAttachments = nullptr,
-		.pDepthStencilAttachment = nullptr,
-		.preserveAttachmentCount = 0, .pPreserveAttachments = nullptr,
-	};
+	return true;
+}
 
-	VkSubpassDependency dependency{
-		.srcSubpass = VK_SUBPASS_EXTERNAL,
-		.dstSubpass = 0,
-		.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		.srcAccessMask = 0,
-		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-		.dependencyFlags = 0,
-	};
+ham_nonnull_args(1)
+static inline void ham_renderer_vulkan_fini_render_passes(ham_renderer_vulkan *r){
+	r->vk_fns.vkDestroyRenderPass(r->vk_dev, r->vk_render_pass_screen, nullptr);
+	//r->vk_fns.vkDestroyRenderPass(r->vk_dev, r->vk_render_pass_data, nullptr);
 
-	ham::vk::render_pass_create_info create_info(
-		nullptr, 0,
-		1, &attach_desc,
-		1, &subpass,
-		1, &dependency
-	);
+	r->vk_render_pass_screen = nullptr;
+	//r->vk_render_pass_data = nullptr;
+}
 
-	const auto res = r->vk_fns.vkCreateRenderPass(r->vk_dev, create_info.ptr(), nullptr, &r->vk_render_pass);
+//
+// Descriptor sets
+//
+
+ham_nonnull_args(1)
+static inline bool ham_renderer_vulkan_init_descriptor_set_layouts(ham_renderer_vulkan *r){
+	VkDescriptorSetLayoutBinding vertex_layout_binding{};
+	vertex_layout_binding.binding = 0;
+	vertex_layout_binding.descriptorCount = 1;
+	vertex_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	vertex_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	vertex_layout_binding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutCreateInfo layout_create_info{};
+	layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layout_create_info.bindingCount = 1;
+	layout_create_info.pBindings = &vertex_layout_binding;
+
+	const ham::vk::result res = r->vk_fns.vkCreateDescriptorSetLayout(r->vk_dev, &layout_create_info, nullptr, &r->vk_descriptor_set_layout);
 	if(res != VK_SUCCESS){
-		ham_logapierrorf("Error in vkCreateRenderPass: %s", ham::vk::result_to_str(res));
+		ham_logapierrorf("Error in vkCreateDescriptorSetLayout: %s", res.to_str());
+		return false;
+	}
+
+	return true;
+}
+
+ham_nonnull_args(1)
+static inline void ham_renderer_vulkan_fini_descriptor_set_layouts(ham_renderer_vulkan *r){
+	r->vk_fns.vkDestroyDescriptorSetLayout(r->vk_dev, r->vk_descriptor_set_layout, nullptr);
+	r->vk_descriptor_set_layout = nullptr;
+}
+
+// TODO: descriptor pools+sets
+
+//
+// Pipelines
+//
+
+ham_nonnull_args(1)
+static inline bool ham_renderer_vulkan_init_pipeline_layout(ham_renderer_vulkan *r){
+	ham::vk::pipeline_layout_create_info layout_create_info(nullptr, 0, 1, &r->vk_descriptor_set_layout, 0, nullptr);
+
+	r->vk_pipeline_layout = ham::vk::create_pipeline_layout(r->vk_fns, r->vk_dev, layout_create_info);
+	if(!r->vk_pipeline_layout){
+		ham_logapierrorf("Error creating pipeline layout");
 		return false;
 	}
 
@@ -431,6 +722,7 @@ static inline bool ham_renderer_vulkan_init_pipeline(ham_renderer_vulkan *r){
 		const auto path_len = plugin_dir.len + filename.len() + 1;
 
 		if(path_len >= HAM_PATH_BUFFER_SIZE){
+			shader_path[plugin_dir.len] = '\0';
 			ham_logerrorf(
 				"ham_renderer_vulkan_init_shaders",
 				"Path to %s shader too long (%zu, max %d): %s/%s",
@@ -524,11 +816,23 @@ static inline bool ham_renderer_vulkan_init_pipeline(ham_renderer_vulkan *r){
 
 	ham::vk::pipeline_dynamic_state_create_info dynamic_state_create_info(nullptr, 0, (ham_u32)std::size(dynamic_states), dynamic_states);
 
+	const auto point_attribs_size = (sizeof(ham_vec3) * 2) + sizeof(ham_vec2);
+
+	VkVertexInputBindingDescription binding_descs[] = {
+		{ 0, point_attribs_size, VK_VERTEX_INPUT_RATE_VERTEX },
+	};
+
+	VkVertexInputAttributeDescription attrib_descs[] = {
+		{ .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
+		{ .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = sizeof(ham_vec3) },
+		{ .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 2 * sizeof(ham_vec3) },
+	};
+
 	ham::vk::pipeline_vertex_input_state_create_info vertex_input_state_create_info(
 		nullptr,
 		0,
-		0, nullptr, // bindings
-		0, nullptr // attribs
+		(ham_u32)std::size(binding_descs), binding_descs, // bindings
+		(ham_u32)std::size(attrib_descs), attrib_descs // attribs
 	);
 
 	ham::vk::pipeline_input_assembly_state_create_info input_assembly_state_create_info(nullptr, 0, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN, VK_FALSE);
@@ -596,6 +900,21 @@ static inline bool ham_renderer_vulkan_init_pipeline(ham_renderer_vulkan *r){
 				i32 base_pipeline_index
 	*/
 
+	VkPipelineDepthStencilStateCreateInfo depth_state_info{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.depthTestEnable = false,
+		.depthWriteEnable = true,
+		.depthCompareOp = VK_COMPARE_OP_LESS,
+		.depthBoundsTestEnable = false,
+		.stencilTestEnable = false,
+		.front = { },
+		.back = { },
+		.minDepthBounds = 0.f,
+		.maxDepthBounds = 1.f
+	};
+
 	ham::vk::graphics_pipeline_create_info create_info(
 		nullptr, 0,
 		(ham_u32)std::size(stages), stages,
@@ -605,11 +924,11 @@ static inline bool ham_renderer_vulkan_init_pipeline(ham_renderer_vulkan *r){
 		viewport_state_create_info.ptr(),
 		rasterization_state_create_info.ptr(),
 		multisample_state_create_info.ptr(),
-		nullptr,
+		&depth_state_info,
 		color_blend_state_create_info.ptr(),
 		dynamic_state_create_info.ptr(),
 		r->vk_pipeline_layout,
-		r->vk_render_pass,
+		r->vk_render_pass_screen,
 		0,
 		VK_NULL_HANDLE,
 		-1
@@ -628,14 +947,31 @@ static inline bool ham_renderer_vulkan_init_pipeline(ham_renderer_vulkan *r){
 	return true;
 }
 
+//
+// Framebuffers
+//
+
 ham_nonnull_args(1)
 static inline bool ham_renderer_vulkan_init_framebuffers(ham_renderer_vulkan *r){
-	r->vk_swapchain_framebuffers.resize(r->vk_swapchain_images.size());
+	const auto allocator = ham_super(r)->allocator;
 
-	for(ham_usize i = 0; i < r->vk_swapchain_images.size(); i++){
-		VkImageView attachments[] = { r->vk_swapchain_image_views[i] };
+	r->vk_swapchain_framebuffers = ham_allocator_new_array(allocator, VkFramebuffer, r->vk_num_swapchain_images);
+	if(!r->vk_swapchain_framebuffers){
+		ham_logapierrorf("Error allocating memory for %u framebuffers", r->vk_num_swapchain_images);
+		return false;
+	}
 
-		ham::vk::framebuffer_create_info create_info(nullptr, 0, r->vk_render_pass, 1, attachments, r->vk_swapchain_extent.width, r->vk_swapchain_extent.height, 1);
+	for(ham_usize i = 0; i < r->vk_num_swapchain_images; i++){
+		VkImageView attachments[] = { r->vk_swapchain_views[i], r->vk_swapchain_depth_view };
+
+		ham::vk::framebuffer_create_info create_info(
+			nullptr, 0,
+			r->vk_render_pass_screen,
+			(ham_u32)std::size(attachments), attachments,
+			r->vk_swapchain_extent.width,
+			r->vk_swapchain_extent.height,
+			1
+		);
 
 		const auto res = r->vk_fns.vkCreateFramebuffer(r->vk_dev, create_info.ptr(), nullptr, &r->vk_swapchain_framebuffers[i]);
 		if(res != VK_SUCCESS){
@@ -649,6 +985,22 @@ static inline bool ham_renderer_vulkan_init_framebuffers(ham_renderer_vulkan *r)
 
 	return true;
 }
+
+ham_nonnull_args(1)
+static inline void ham_renderer_vulkan_fini_framebuffers(ham_renderer_vulkan *r){
+	const auto allocator = ham_super(r)->allocator;
+
+	for(ham_u32 i = 0; i < r->vk_num_swapchain_images; i++){
+		r->vk_fns.vkDestroyFramebuffer(r->vk_dev, r->vk_swapchain_framebuffers[i], nullptr);
+	}
+
+	ham_allocator_delete_array(allocator, r->vk_swapchain_framebuffers, r->vk_num_swapchain_images);
+	r->vk_swapchain_framebuffers = nullptr;
+}
+
+//
+// Command buffers/pools
+//
 
 ham_nonnull_args(1)
 static inline bool ham_renderer_vulkan_init_command_pools(ham_renderer_vulkan *r){
@@ -749,22 +1101,56 @@ static inline bool ham_renderer_vulkan_fill_command_buffers(ham_renderer_vulkan 
 		VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr, 0, nullptr
 	};
 
-	ham::vk::result res = r->vk_fns.vkBeginCommandBuffer(r->vk_cmd_bufs[frame_idx], &begin_info);
+	const auto cmd_buf = r->vk_cmd_bufs[frame_idx];
+
+	ham::vk::result res = r->vk_fns.vkBeginCommandBuffer(cmd_buf, &begin_info);
 	if(res != VK_SUCCESS){
 		ham_logapierrorf("Error in vkBeginCommandBuffer: %s", res.to_str());
 		return false;
 	}
 
-	constexpr VkClearValue clear_color = { .color = { .float32 = { 0.f, 0.f, 0.f, 1.f } } };
+//	VkImageMemoryBarrier depth_barrier{
+//		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+//		.pNext = nullptr,
+//		.srcAccessMask = 0,
+//		.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+//		.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+//		.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+//		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+//		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+//		.image = r->vk_swapchain_depth,
+//		.subresourceRange = {
+//			.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+//			.baseMipLevel = 0,
+//			.levelCount = 1,
+//			.baseArrayLayer = 0,
+//			.layerCount = 1,
+//		},
+//	};
+
+//	r->vk_fns.vkCmdPipelineBarrier(
+//		r->vk_cmd_bufs[frame_idx],
+//		VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+//		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+//		0,
+//		0, nullptr,
+//		0, nullptr,
+//		1, &depth_barrier
+//	);
+
+	const VkClearValue clear_values[] = {
+		{ .color = { .float32 = { 0.f, 0.f, 0.f, 1.f } } },
+		{ .depthStencil = { .depth = 1.f, .stencil = 0 } }
+	};
 
 	const VkRenderPassBeginInfo render_pass_info{
 		VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, nullptr,
-		r->vk_render_pass, r->vk_swapchain_framebuffers[swapchain_idx],
+		r->vk_render_pass_screen, r->vk_swapchain_framebuffers[swapchain_idx],
 		{ .offset = { 0, 0 }, .extent = r->vk_swapchain_extent },
-		1, &clear_color
+		(ham_u32)std::size(clear_values), clear_values
 	};
 
-	r->vk_fns.vkCmdBeginRenderPass(r->vk_cmd_bufs[frame_idx], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+	r->vk_fns.vkCmdBeginRenderPass(cmd_buf, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 
 	const VkViewport viewport{
 		.x = 0.f,
@@ -780,14 +1166,22 @@ static inline bool ham_renderer_vulkan_fill_command_buffers(ham_renderer_vulkan 
 		.extent = r->vk_swapchain_extent
 	};
 
-	r->vk_fns.vkCmdBindPipeline(r->vk_cmd_bufs[frame_idx], VK_PIPELINE_BIND_POINT_GRAPHICS, r->vk_pipeline);
-	r->vk_fns.vkCmdSetViewport(r->vk_cmd_bufs[frame_idx], 0, 1, &viewport);
-	r->vk_fns.vkCmdSetScissor(r->vk_cmd_bufs[frame_idx], 0, 1, &scissor);
-	r->vk_fns.vkCmdDraw(r->vk_cmd_bufs[frame_idx], 4, 1, 0, 0);
+	r->vk_fns.vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, r->vk_pipeline);
+	r->vk_fns.vkCmdSetViewport(cmd_buf, 0, 1, &viewport);
+	r->vk_fns.vkCmdSetScissor(cmd_buf, 0, 1, &scissor);
 
-	r->vk_fns.vkCmdEndRenderPass(r->vk_cmd_bufs[frame_idx]);
+	VkBuffer screen_vbos[] = { r->screen_draw_group->vbo };
+	VkDeviceSize screen_vbo_offsets[] = { 0 };
 
-	res = r->vk_fns.vkEndCommandBuffer(r->vk_cmd_bufs[frame_idx]);
+	r->vk_fns.vkCmdBindVertexBuffers(cmd_buf, 0, 1, screen_vbos, screen_vbo_offsets);
+	r->vk_fns.vkCmdBindIndexBuffer(cmd_buf, r->screen_draw_group->ibo, 0, VK_INDEX_TYPE_UINT32);
+
+	r->vk_fns.vkCmdDrawIndexedIndirect(cmd_buf, r->screen_draw_group->cbo, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+	//r->vk_fns.vkCmdDrawIndexed(cmd_buf, 4, 1, 0, 0, 0);
+
+	r->vk_fns.vkCmdEndRenderPass(cmd_buf);
+
+	res = r->vk_fns.vkEndCommandBuffer(cmd_buf);
 	if(res != VK_SUCCESS){
 		ham_logapierrorf("Error in vkEndCommandBuffer: %s", res.to_str());
 		return false;
@@ -796,10 +1190,15 @@ static inline bool ham_renderer_vulkan_fill_command_buffers(ham_renderer_vulkan 
 	return true;
 }
 
+//
+// Utility functions
+//
+
 ham_nonnull_args(1)
 static inline bool ham_renderer_vulkan_recreate_swapchain(ham_renderer_vulkan *r){
 	r->vk_fns.vkDeviceWaitIdle(r->vk_dev);
 
+	ham_renderer_vulkan_fini_framebuffers(r);
 	ham_renderer_vulkan_fini_swapchain(r);
 
 	if(!ham_renderer_vulkan_init_swapchain(r)){
@@ -816,20 +1215,17 @@ static inline bool ham_renderer_vulkan_recreate_swapchain(ham_renderer_vulkan *r
 
 	if(!ham_renderer_vulkan_init_framebuffers(r)){
 		ham_logapierrorf("Error initializing framebuffers");
-
-		for(auto &view : r->vk_swapchain_image_views){
-			r->vk_fns.vkDestroyImageView(r->vk_dev, view, nullptr);
-			view = nullptr;
-		}
-
-		r->vk_fns.vkDestroySwapchainKHR(r->vk_dev, r->vk_swapchain, nullptr);
-		r->vk_swapchain = nullptr;
+		ham_renderer_vulkan_fini_swapchain(r);
 		return false;
 	}
 
 	r->swapchain_dirty = false;
 	return true;
 }
+
+//
+// Ctor/dtor
+//
 
 ham_nonnull_args(1)
 static inline ham_renderer_vulkan *ham_renderer_vulkan_ctor(ham_renderer_vulkan *mem, ham_usize nargs, va_list va){
@@ -838,40 +1234,32 @@ static inline ham_renderer_vulkan *ham_renderer_vulkan_ctor(ham_renderer_vulkan 
 		return nullptr;
 	}
 
-	const auto ret = new(mem) ham_renderer_vulkan;
+	const auto r = new(mem) ham_renderer_vulkan;
 
-	memset(&ret->vma_vk_fns, 0, sizeof(ret->vma_vk_fns));
+	memset(&r->vk_fns, 0, sizeof(r->vk_fns));
+	memset(&r->vma_vk_fns, 0, sizeof(r->vma_vk_fns));
 
 #define HAM_GET_ARG(ret_, va_, t_) \
 	ret_ = va_arg((va_), t_); \
 	if(!(ret_)){ \
 		ham_logapierrorf("NULL " #t_ " passed"); \
-		std::destroy_at(ret); \
+		std::destroy_at(r); \
 		return nullptr; \
 	}
 
-	HAM_GET_ARG(ret->vk_inst, va, VkInstance);
-	HAM_GET_ARG(ret->vk_surface, va, VkSurfaceKHR);
+	HAM_GET_ARG(r->vk_inst, va, VkInstance);
+	HAM_GET_ARG(r->vk_surface, va, VkSurfaceKHR);
 
-	HAM_GET_ARG(ret->vk_fns.vkGetInstanceProcAddr, va, PFN_vkGetInstanceProcAddr);
+	HAM_GET_ARG(r->vk_fns.vkGetInstanceProcAddr, va, PFN_vkGetInstanceProcAddr);
 
 #undef HAM_GET_ARG
 
-	return ret;
-}
-
-ham_nonnull_args(1)
-ham_nothrow static inline void ham_renderer_vulkan_dtor(ham_renderer_vulkan *r){
-	std::destroy_at(r);
-}
-
-ham_nonnull_args(1)
-static inline bool ham_renderer_vulkan_init(ham_renderer_vulkan *r){
 #define HAM_RESOLVE_VK(fn_id) \
 	r->vk_fns.fn_id = (PFN_##fn_id)r->vk_fns.vkGetInstanceProcAddr(r->vk_inst, #fn_id); \
 	if(!r->vk_fns.fn_id){ \
 		ham_logapierrorf("Could not resolve function \"" #fn_id "\""); \
-		return false; \
+		std::destroy_at(r); \
+		return nullptr; \
 	}
 
 	HAM_RESOLVE_VK(vkGetDeviceProcAddr)
@@ -893,12 +1281,14 @@ static inline bool ham_renderer_vulkan_init(ham_renderer_vulkan *r){
 
 	if(!ham_renderer_vulkan_init_phys_device(r)){
 		ham_logapierrorf("Error initializing physical device");
-		return false;
+		std::destroy_at(r);
+		return nullptr;
 	}
 
 	if(!ham_renderer_vulkan_init_logical_device(r)){
 		ham_logapierrorf("Error initializing logical device");
-		return false;
+		std::destroy_at(r);
+		return nullptr;
 	}
 
 #define HAM_RESOLVE_VK_DEV(fn_id) \
@@ -906,7 +1296,8 @@ static inline bool ham_renderer_vulkan_init(ham_renderer_vulkan *r){
 	if(!r->vk_fns.fn_id){ \
 		ham_logapierrorf("Could not resolve function \"" #fn_id "\""); \
 		r->vk_fns.vkDestroyDevice(r->vk_dev, nullptr); \
-		return false; \
+		std::destroy_at(r); \
+		return nullptr; \
 	}
 
 	HAM_RESOLVE_VK_DEV(vkDeviceWaitIdle)
@@ -933,6 +1324,9 @@ static inline bool ham_renderer_vulkan_init(ham_renderer_vulkan *r){
 	HAM_RESOLVE_VK_DEV(vkCreateGraphicsPipelines)
 	HAM_RESOLVE_VK_DEV(vkDestroyPipeline)
 
+	HAM_RESOLVE_VK_DEV(vkCreateDescriptorSetLayout)
+	HAM_RESOLVE_VK_DEV(vkDestroyDescriptorSetLayout)
+
 	HAM_RESOLVE_VK_DEV(vkCreateFramebuffer)
 	HAM_RESOLVE_VK_DEV(vkDestroyFramebuffer)
 
@@ -945,12 +1339,17 @@ static inline bool ham_renderer_vulkan_init(ham_renderer_vulkan *r){
 	HAM_RESOLVE_VK_DEV(vkEndCommandBuffer)
 	HAM_RESOLVE_VK_DEV(vkResetCommandBuffer)
 
+	HAM_RESOLVE_VK_DEV(vkCmdPipelineBarrier)
 	HAM_RESOLVE_VK_DEV(vkCmdBeginRenderPass)
 	HAM_RESOLVE_VK_DEV(vkCmdEndRenderPass)
 	HAM_RESOLVE_VK_DEV(vkCmdBindPipeline)
+	HAM_RESOLVE_VK_DEV(vkCmdBindVertexBuffers)
+	HAM_RESOLVE_VK_DEV(vkCmdBindIndexBuffer)
 	HAM_RESOLVE_VK_DEV(vkCmdSetViewport)
 	HAM_RESOLVE_VK_DEV(vkCmdSetScissor)
 	HAM_RESOLVE_VK_DEV(vkCmdDraw)
+	HAM_RESOLVE_VK_DEV(vkCmdDrawIndexed)
+	HAM_RESOLVE_VK_DEV(vkCmdDrawIndexedIndirect)
 
 	HAM_RESOLVE_VK_DEV(vkCreateSemaphore)
 	HAM_RESOLVE_VK_DEV(vkDestroySemaphore)
@@ -972,125 +1371,7 @@ static inline bool ham_renderer_vulkan_init(ham_renderer_vulkan *r){
 
 	ham::indirect_function<void(ham_renderer_vulkan*)> cleanup_fn = [](ham_renderer_vulkan *r){
 		r->vk_fns.vkDestroyDevice(r->vk_dev, nullptr);
-	};
-
-	if(!ham_renderer_vulkan_init_swapchain(r)){
-		ham_logapierrorf("Error initializing swapchain");
-		cleanup_fn(r);
-		return false;
-	}
-
-	// add swapchain to cleanup
-	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
-		r->vk_fns.vkDestroySwapchainKHR(r->vk_dev, r->vk_swapchain, nullptr);
-		old(r);
-	};
-
-	if(!ham_renderer_vulkan_init_swapchain_images(r)){
-		ham_logapierrorf("Error initializing swapchain images");
-		cleanup_fn(r);
-		return false;
-	}
-
-	// add swapchain image views to cleanup
-	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
-		for(auto view : r->vk_swapchain_image_views){
-			r->vk_fns.vkDestroyImageView(r->vk_dev, view, nullptr);
-		}
-
-		old(r);
-	};
-
-	if(!ham_renderer_vulkan_init_pipeline_layout(r)){
-		ham_logapierrorf("Error initializing pipeline layout");
-
-		cleanup_fn(r);
-		return false;
-	}
-
-	// add pipeline layout to cleanup
-	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
-		r->vk_fns.vkDestroyPipelineLayout(r->vk_dev, r->vk_pipeline_layout, nullptr);
-		old(r);
-	};
-
-	if(!ham_renderer_vulkan_init_render_passes(r)){
-		ham_logapierrorf("Error initializing render passes");
-		cleanup_fn(r);
-		return false;
-	}
-
-	// add render passes to cleanup
-	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
-		r->vk_fns.vkDestroyRenderPass(r->vk_dev, r->vk_render_pass, nullptr);
-		old(r);
-	};
-
-	if(!ham_renderer_vulkan_init_pipeline(r)){
-		ham_logapierrorf("Error initializing pipeline");
-		cleanup_fn(r);
-		return false;
-	}
-
-	// add pipeline to cleanup
-	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
-		r->vk_fns.vkDestroyPipeline(r->vk_dev, r->vk_pipeline, nullptr);
-		old(r);
-	};
-
-	if(!ham_renderer_vulkan_init_framebuffers(r)){
-		ham_logapierrorf("Error initializing framebuffers");
-		cleanup_fn(r);
-		return false;
-	}
-
-	// add framebuffers to cleanup
-	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
-		for(auto fb : r->vk_swapchain_framebuffers){
-			r->vk_fns.vkDestroyFramebuffer(r->vk_dev, fb, nullptr);
-		}
-
-		old(r);
-	};
-
-	if(!ham_renderer_vulkan_init_command_pools(r)){
-		ham_logapierrorf("Error initializing command pools");
-		cleanup_fn(r);
-		return false;
-	}
-
-	// add command pools to cleanup
-	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
-		r->vk_fns.vkDestroyCommandPool(r->vk_dev, r->vk_cmd_pool, nullptr);
-		old(r);
-	};
-
-	if(!ham_renderer_vulkan_init_command_buffers(r)){
-		ham_logapierrorf("Error initializing command buffers");
-		cleanup_fn(r);
-		return false;
-	}
-
-	// add command buffers to cleanup
-	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
-		r->vk_fns.vkFreeCommandBuffers(r->vk_dev, r->vk_cmd_pool, ham_impl_max_queued_frames, r->vk_cmd_bufs);
-		old(r);
-	};
-
-	if(!ham_renderer_vulkan_init_sync_objects(r)){
-		ham_logapierrorf("Error initializing synchronization objects");
-		cleanup_fn(r);
-		return false;
-	}
-
-	// add sync objs to cleanup
-	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
-		for(ham_u32 i = 0; i < ham_impl_max_queued_frames; i++){
-			r->vk_fns.vkDestroyFence(r->vk_dev, r->vk_frame_fences[i], nullptr);
-			r->vk_fns.vkDestroySemaphore(r->vk_dev, r->vk_render_sems[i], nullptr);
-			r->vk_fns.vkDestroySemaphore(r->vk_dev, r->vk_img_sems[i], nullptr);
-		}
-		old(r);
+		std::destroy_at(r);
 	};
 
 	VmaAllocatorCreateInfo vma_allocator_info = {};
@@ -1104,17 +1385,169 @@ static inline bool ham_renderer_vulkan_init(ham_renderer_vulkan *r){
 	if(vk_res != VK_SUCCESS){
 		ham_logapierrorf("Error in vmaCreateAllocator: %s", ham::vk::result_to_str(vk_res));
 		cleanup_fn(r);
-		return false;
+		return nullptr;
 	}
 
-	return true;
+	// add vma to cleanup
+	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
+		vmaDestroyAllocator(r->vma_allocator);
+		old(r);
+	};
+
+	if(!ham_renderer_vulkan_init_swapchain(r)){
+		ham_logapierrorf("Error initializing swapchain");
+		cleanup_fn(r);
+		return nullptr;
+	}
+
+	// add swapchain to cleanup
+	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
+		r->vk_fns.vkDestroySwapchainKHR(r->vk_dev, r->vk_swapchain, nullptr);
+		old(r);
+	};
+
+	if(!ham_renderer_vulkan_init_swapchain_images(r)){
+		ham_logapierrorf("Error initializing swapchain images");
+		cleanup_fn(r);
+		return nullptr;
+	}
+
+	// add swapchain images to cleanup
+	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
+		const auto allocator = ham_super(r)->allocator;
+
+		for(ham_u32 i = 0; i < r->vk_num_swapchain_images; i++){
+			const auto view = r->vk_swapchain_views[i];
+			r->vk_fns.vkDestroyImageView(r->vk_dev, view, nullptr);
+		}
+
+		r->vk_fns.vkDestroyImageView(r->vk_dev, r->vk_swapchain_depth_view, nullptr);
+		vmaDestroyImage(r->vma_allocator, r->vk_swapchain_depth, r->vk_swapchain_depth_alloc);
+
+		ham_allocator_delete_array(allocator, r->vk_swapchain_views, r->vk_num_swapchain_images);
+		ham_allocator_delete_array(allocator, r->vk_swapchain_images, r->vk_num_swapchain_images);
+
+		old(r);
+	};
+
+	if(!ham_renderer_vulkan_init_descriptor_set_layouts(r)){
+		ham_logapierrorf("Error initializing descriptor set layouts");
+		cleanup_fn(r);
+		return nullptr;
+	}
+
+	// add descriptor set layouts to cleanup
+	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
+		ham_renderer_vulkan_fini_descriptor_set_layouts(r);
+		old(r);
+	};
+
+	if(!ham_renderer_vulkan_init_pipeline_layout(r)){
+		ham_logapierrorf("Error initializing pipeline layout");
+		cleanup_fn(r);
+		return nullptr;
+	}
+
+	// add pipeline layout to cleanup
+	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
+		r->vk_fns.vkDestroyPipelineLayout(r->vk_dev, r->vk_pipeline_layout, nullptr);
+		old(r);
+	};
+
+	if(!ham_renderer_vulkan_init_render_passes(r)){
+		ham_logapierrorf("Error initializing render passes");
+		cleanup_fn(r);
+		return nullptr;
+	}
+
+	// add render passes to cleanup
+	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
+		r->vk_fns.vkDestroyRenderPass(r->vk_dev, r->vk_render_pass_screen, nullptr);
+		old(r);
+	};
+
+	if(!ham_renderer_vulkan_init_pipeline(r)){
+		ham_logapierrorf("Error initializing pipeline");
+		cleanup_fn(r);
+		return nullptr;
+	}
+
+	// add pipeline to cleanup
+	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
+		r->vk_fns.vkDestroyPipeline(r->vk_dev, r->vk_pipeline, nullptr);
+		old(r);
+	};
+
+	if(!ham_renderer_vulkan_init_framebuffers(r)){
+		ham_logapierrorf("Error initializing framebuffers");
+		cleanup_fn(r);
+		return nullptr;
+	}
+
+	// add framebuffers to cleanup
+	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
+		const auto allocator = ham_super(r)->allocator;
+
+		for(ham_u32 i = 0; i < r->vk_num_swapchain_images; i++){
+			const auto fb = r->vk_swapchain_framebuffers[i];
+			r->vk_fns.vkDestroyFramebuffer(r->vk_dev, fb, nullptr);
+		}
+
+		ham_allocator_delete_array(allocator, r->vk_swapchain_framebuffers, r->vk_num_swapchain_images);
+
+		old(r);
+	};
+
+	if(!ham_renderer_vulkan_init_command_pools(r)){
+		ham_logapierrorf("Error initializing command pools");
+		cleanup_fn(r);
+		return nullptr;
+	}
+
+	// add command pools to cleanup
+	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
+		r->vk_fns.vkDestroyCommandPool(r->vk_dev, r->vk_cmd_pool, nullptr);
+		old(r);
+	};
+
+	if(!ham_renderer_vulkan_init_command_buffers(r)){
+		ham_logapierrorf("Error initializing command buffers");
+		cleanup_fn(r);
+		return nullptr;
+	}
+
+	// add command buffers to cleanup
+	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
+		r->vk_fns.vkFreeCommandBuffers(r->vk_dev, r->vk_cmd_pool, ham_impl_max_queued_frames, r->vk_cmd_bufs);
+		old(r);
+	};
+
+	if(!ham_renderer_vulkan_init_sync_objects(r)){
+		ham_logapierrorf("Error initializing synchronization objects");
+		cleanup_fn(r);
+		return nullptr;
+	}
+
+	/*
+	// add sync objs to cleanup
+	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
+		for(ham_u32 i = 0; i < ham_impl_max_queued_frames; i++){
+			r->vk_fns.vkDestroyFence(r->vk_dev, r->vk_frame_fences[i], nullptr);
+			r->vk_fns.vkDestroySemaphore(r->vk_dev, r->vk_render_sems[i], nullptr);
+			r->vk_fns.vkDestroySemaphore(r->vk_dev, r->vk_img_sems[i], nullptr);
+		}
+		old(r);
+	};
+	*/
+
+	return r;
 }
 
 ham_nonnull_args(1)
-static inline void ham_renderer_vulkan_fini(ham_renderer_vulkan *r){
+ham_nothrow static inline void ham_renderer_vulkan_dtor(ham_renderer_vulkan *r){
 	r->vk_fns.vkDeviceWaitIdle(r->vk_dev);
 
-	vmaDestroyAllocator(r->vma_allocator);
+	ham_draw_group_destroy(ham_super(r->screen_draw_group));
 
 	for(ham_u32 i = 0; i < ham_impl_max_queued_frames; i++){
 		r->vk_fns.vkDestroyFence(r->vk_dev, r->vk_frame_fences[i], nullptr);
@@ -1127,13 +1560,47 @@ static inline void ham_renderer_vulkan_fini(ham_renderer_vulkan *r){
 	r->vk_fns.vkDestroyCommandPool(r->vk_dev, r->vk_cmd_pool, nullptr);
 
 	r->vk_fns.vkDestroyPipeline(r->vk_dev, r->vk_pipeline, nullptr);
-	r->vk_fns.vkDestroyRenderPass(r->vk_dev, r->vk_render_pass, nullptr);
+	r->vk_fns.vkDestroyRenderPass(r->vk_dev, r->vk_render_pass_screen, nullptr);
 	r->vk_fns.vkDestroyPipelineLayout(r->vk_dev, r->vk_pipeline_layout, nullptr);
 
+	ham_renderer_vulkan_fini_descriptor_set_layouts(r);
+	ham_renderer_vulkan_fini_framebuffers(r);
 	ham_renderer_vulkan_fini_swapchain(r);
 
+	vmaDestroyAllocator(r->vma_allocator);
+
 	r->vk_fns.vkDestroyDevice(r->vk_dev, nullptr);
+
+	std::destroy_at(r);
 }
+
+//
+// init/fini
+//
+
+ham_nonnull_args(1)
+static inline bool ham_renderer_vulkan_init(ham_renderer_vulkan *r){
+	const ham_shape *const shapes[] = {
+		ham_shape_unit_square()
+	};
+
+	r->screen_draw_group = (ham_draw_group_vulkan*)ham_draw_group_create(ham_super(r), 1, shapes);
+	if(!r->screen_draw_group){
+		ham_logapierrorf("Error creating screen draw group");
+		return false;
+	}
+
+	return true;
+}
+
+ham_nonnull_args(1)
+static inline void ham_renderer_vulkan_fini(ham_renderer_vulkan *r){
+
+}
+
+//
+// Loop/frame
+//
 
 ham_nonnull_args(1)
 static inline void ham_renderer_vulkan_loop(ham_renderer_vulkan *r, ham_f64 dt){

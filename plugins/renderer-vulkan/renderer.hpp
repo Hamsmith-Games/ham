@@ -1,13 +1,21 @@
 #ifndef HAM_RENDERER_VULKAN_RENDERER_HPP
 #define HAM_RENDERER_VULKAN_RENDERER_HPP 1
 
-#include "ham/renderer-object.h"
+#include "ham/renderer-object.h" // IWYU pragma: keep
 
-#include "vulkan.hpp"
+#include "vulkan.hpp" // IWYU pragma: keep
 
 #include "vk_mem_alloc.h"
 
 HAM_C_API_BEGIN
+
+struct ham_vertex_uniform_data{
+	ham_mat4 view_proj;
+};
+
+struct ham_fragment_uniform_data{
+	float time;
+};
 
 typedef struct ham_renderer_vulkan ham_renderer_vulkan;
 typedef struct ham_draw_group_vulkan ham_draw_group_vulkan;
@@ -17,7 +25,11 @@ constexpr ham_usize ham_impl_max_queued_frames = 3;
 struct ham_renderer_vulkan{
 	ham_derive(ham_renderer)
 
-	bool swapchain_dirty = false;
+	bool swapchain_dirty;
+
+	// TODO: global uniform buffers
+
+	ham_draw_group_vulkan *screen_draw_group;
 
 	VkInstance vk_inst;
 	VkSurfaceKHR vk_surface;
@@ -31,12 +43,19 @@ struct ham_renderer_vulkan{
 	VkSwapchainKHR vk_swapchain;
 	VkFormat vk_swapchain_format;
 	VkExtent2D vk_swapchain_extent;
-	ham::std_vector<VkImage> vk_swapchain_images;
-	ham::std_vector<VkImageView> vk_swapchain_image_views;
-	ham::std_vector<VkFramebuffer> vk_swapchain_framebuffers;
+
+	ham_u32 vk_num_swapchain_images;
+	VkImage *vk_swapchain_images;
+	VkImage vk_swapchain_depth;
+	VkImageView vk_swapchain_depth_view;
+	VmaAllocation vk_swapchain_depth_alloc;
+	VkImageView *vk_swapchain_views;
+	VkFramebuffer *vk_swapchain_framebuffers;
 
 	VkPipelineLayout vk_pipeline_layout;
-	VkRenderPass vk_render_pass;
+	VkDescriptorSetLayout vk_descriptor_set_layout;
+	VkRenderPass vk_render_pass_data;
+	VkRenderPass vk_render_pass_screen;
 	VkPipeline vk_pipeline;
 
 	VkCommandPool vk_cmd_pool;
@@ -47,19 +66,25 @@ struct ham_renderer_vulkan{
 	VkFence vk_frame_fences[ham_impl_max_queued_frames];
 
 	ham_vk_fns vk_fns;
-	ham::vk::swapchain_info vk_swapchain_info;
+
+	VkSurfaceCapabilitiesKHR vk_surface_caps;
+	VkSurfaceFormatKHR vk_surface_fmt;
+	VkPresentModeKHR vk_present_mode;
 
 	VmaVulkanFunctions vma_vk_fns;
 	VmaAllocator vma_allocator;
 
-	ham_u32 frame_counter = 0;
+	ham_u32 frame_counter;
 };
 
 struct ham_draw_group_vulkan{
 	ham_derive(ham_draw_group)
 
-	VkBuffer vbo, ibo;
-	VmaAllocation vbo_alloc, ibo_alloc;
+	// TODO: group uniform buffer
+	// TODO: instance attribute buffer
+
+	VkBuffer vbo, ibo, cbo;
+	VmaAllocation vbo_alloc, ibo_alloc, cbo_alloc;
 };
 
 ham_private ham_draw_group_vulkan *ham_draw_group_vulkan_ctor(ham_draw_group_vulkan *mem, ham_u32 nargs, va_list va);

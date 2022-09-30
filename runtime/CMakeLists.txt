@@ -26,6 +26,7 @@ find_package(Threads REQUIRED)
 set(
 	HAM_SOURCES
 	${HAM_HEADERS}
+	typesys.cpp
 	object.cpp
 	memory.cpp
 	log.cpp

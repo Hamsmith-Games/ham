@@ -71,9 +71,13 @@ struct ham_engine_client{
 	ham_renderer *renderer = nullptr;
 };
 
+ham_nonnull_args(1)
+static inline bool ham_engine_client_init_vulkan(ham_engine_client *engine);
+
 static inline ham_engine_client *ham_engine_client_construct(ham_engine_client *mem, ham_usize nargs, va_list va){
 	(void)nargs; (void)va;
-	return new(mem) ham_engine_client;
+	const auto ret = new(mem) ham_engine_client;
+	return ret;
 }
 
 static inline void ham_engine_client_destroy(ham_engine_client *engine){
@@ -140,7 +144,7 @@ static inline const char *vk_result_to_str(VkResult res){
 	}
 }
 
-static inline bool ham_engine_client_init_vulkan(ham_engine_client *engine){
+bool ham_engine_client_init_vulkan(ham_engine_client *engine){
 	ham_u32 vk_ext_count;
 	if(!SDL_Vulkan_GetInstanceExtensions(engine->window, &vk_ext_count, nullptr)){
 		ham_logapierrorf("Error in SDL_Vulkan_GetInstanceExtensions: %s", SDL_GetError());
@@ -253,7 +257,7 @@ static inline bool ham_engine_client_init(ham_engine *engine_base){
 		HAM_ENGINE_CLIENT_API_NAME,
 		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 		1024, 768,
-		SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN
+		SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
 	);
 	if(!engine->window){
 		ham_logapierrorf("Error in SDL_CreateWindow: %s", SDL_GetError());

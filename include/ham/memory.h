@@ -55,9 +55,17 @@ static inline void ham_allocator_free(const ham_allocator *allocator, void *mem)
 	allocator->free(mem, allocator->user);
 }
 
+
+
 #ifdef __cplusplus
 #	define ham_allocator_new(allocator, t, ...) (new(ham_allocator_alloc((allocator), alignof(t), sizeof(t))) t(__VA_ARGS__))
 #	define ham_allocator_delete(allocator, ptr) (std::destroy_at((ptr)), ham_allocator_free((allocator), (ptr)))
+#	define ham_allocator_new_array(allocator, t, n) (new(ham_allocator_alloc((allocator), alignof(t), sizeof(t) * n)) t[n])
+#	define ham_allocator_delete_array(allocator, ptr, n) \
+		([](const auto allocator_, const auto ptr_, const auto n_){ \
+			for(ham_usize i = 0; i < n_; i++) std::destroy_at(ptr_ + i); \
+			ham_allocator_free(allocator_, ptr_); \
+		}((allocator), (ptr), (n)))
 #else
 #	define ham_allocator_new(allocator t) ((t*)ham_allocator_alloc((allocator), alignof(t), sizeof(t)))
 #	define ham_allocator_free(allocator, ptr) (ham_allocator_free((allocator), (ptr)))

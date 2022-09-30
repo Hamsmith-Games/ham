@@ -1,3 +1,21 @@
+/*
+ * Ham Runtime
+ * Copyright (C) 2022  Hamsmith Ltd.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #ifndef HAM_FUNCTIONAL_H
 #define HAM_FUNCTIONAL_H 1
 
@@ -8,6 +26,39 @@
  */
 
 #include "memory.h"
+
+typedef bool(*ham_ptr_iterate_fn)(void *ptr, void *user);
+
+static inline ham_usize ham_ptr_iterate(
+	void *beg, void *end,
+	ham_usize byte_step,
+	ham_ptr_iterate_fn fn, void *user
+){
+	if(beg == end) return 0;
+	else if((char*)end < (char*)beg) return (ham_usize)-1;
+
+	if(fn){
+		ham_usize counter = 0;
+		for(auto it = (char*)beg; it < (char*)end; it += byte_step){
+			if(!fn(it, user)) return counter;
+			++counter;
+		}
+
+		return counter;
+	}
+	else{
+		return ((ham_uptr)end - (ham_uptr)beg)/byte_step;
+	}
+}
+
+#ifdef __GNUC__
+
+#define ham_iterate(elem, beg_, end_) \
+	for(ham_typeof(beg_) elem = (beg_); elem < (end_); ++elem)
+
+#endif // __GNUC__
+
+
 
 #ifdef __cplusplus
 

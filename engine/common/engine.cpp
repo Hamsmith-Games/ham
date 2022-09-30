@@ -42,14 +42,6 @@ ham_uptr ham_impl_engine_thread_main(void *user){
 
 	const char *engine_name = vtable->info()->type_id;
 
-	ham_logdebugf("ham-engine", "Posting engine semaphore...");
-
-	if(!ham_sem_post(engine->sem)){
-		ham_logerrorf("ham-engine", "Error posting engine semaphore");
-		engine->status = 1;
-		return 1;
-	}
-
 	ham_logdebugf("ham-engine", "Waiting for engine mutex...");
 
 	if(!ham_mutex_lock(engine->mut)){
@@ -69,8 +61,27 @@ ham_uptr ham_impl_engine_thread_main(void *user){
 
 	const auto engine_vt = (const ham_engine_vtable*)vtable;
 
+	if(!vtable->construct(ham_super(engine), 0, nullptr)){
+		ham_logerrorf("ham-engine", "Error constructing engine object '%s' (%p)", engine_name, engine);
+
+		ham_plugin_fini(engine->plugin);
+		ham_logdebugf("ham-engine", "Finished plugin (%p)", engine->plugin);
+
+		engine->status = 1;
+		ham_mutex_unlock(engine->mut);
+		return 1;
+	}
+
+	ham_logdebugf("ham-engine", "Constructed engine object '%s' (%p)", engine_name, engine);
+
 	if(!engine_vt->init(engine)){
 		ham_logerrorf("ham-engine", "Error initializing engine object '%s' (%p)", engine_name, engine);
+
+		vtable->destroy(ham_super(engine));
+		ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
+
+		ham_plugin_fini(engine->plugin);
+		ham_logdebugf("ham-engine", "Finished plugin (%p)", engine->plugin);
 
 		engine->status = 1;
 		ham_mutex_unlock(engine->mut);
@@ -79,67 +90,93 @@ ham_uptr ham_impl_engine_thread_main(void *user){
 
 	ham_logdebugf("ham-engine", "Initialized engine object '%s' (%p)", engine_name, engine);
 
-	ham_logdebugf("ham-engine", "Waiting for engine semaphore posts...");
+	ham_logdebugf("ham-engine", "Posting engine semaphore...");
 
-	if(!ham_sem_wait(engine->sem)){
-		ham_logerrorf("ham-engine", "Error in ham_sem_wait");
+	if(!ham_sem_post(engine->sem)){
+		ham_logerrorf("ham-engine", "Error posting engine semaphore");
+		engine->status = 1;
 
 		engine_vt->fini(engine);
 		ham_logdebugf("ham-engine", "Finished engine object '%s' (%p)", engine_name, engine);
 
+		vtable->destroy(ham_super(engine));
+		ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
+
 		ham_plugin_fini(engine->plugin);
 		ham_logdebugf("ham-engine", "Finished plugin (%p)", engine->plugin);
 
-		engine->status = 1;
-		ham_mutex_unlock(engine->mut);
 		return 1;
+	}
+
+	ham_logdebugf("ham-engine", "Waiting for engine launch condition...");
+
+	// prevent spurious wakeups
+	while(!engine->running){
+		if(!ham_cond_wait(engine->cond, engine->mut)){
+			ham_logerrorf("ham-engine", "Error in ham_cond_wait");
+
+			engine_vt->fini(engine);
+			ham_logdebugf("ham-engine", "Finished engine object '%s' (%p)", engine_name, engine);
+
+			vtable->destroy(ham_super(engine));
+			ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
+
+			ham_plugin_fini(engine->plugin);
+			ham_logdebugf("ham-engine", "Finished plugin (%p)", engine->plugin);
+
+			engine->status = 1;
+			return 1;
+		}
 	}
 
 	ham_mutex_unlock(engine->mut);
-
-	if(!ham_sem_wait(engine->sem)){
-		ham_logerrorf("ham-engine", "Error in ham_sem_wait");
-
-		engine_vt->fini(engine);
-		ham_logdebugf("ham-engine", "Finished engine object '%s' (%p)", engine_name, engine);
-
-		ham_plugin_fini(engine->plugin);
-		ham_logdebugf("ham-engine", "Finished plugin (%p)", engine->plugin);
-
-		engine->status = 1;
-		return 1;
-	}
+	ham_logdebugf("ham-engine", "Unlocked engine mutex");
 
 	ham_logdebugf("ham-engine", "Running main loop");
 
 	ham_ticker ticker;
 	ham_ticker_reset(&ticker);
 
-	ham_f64 excess_dt = 0.0;
+	ham_f64 old_dt = engine->min_dt, ddt = 1.0;
 
 	ham_u32 frame_count = 0;
 	ham_f64 frame_dt_accum = 0.0;
+	ham_f64 frame_ddt_accum = 0.0;
 
-	while(engine->running.load(std::memory_order_relaxed)){
-		const ham_f64 min_dt = ham_max(engine->min_dt.load(std::memory_order_relaxed) - excess_dt, 0.0);
+	const auto loop_fn = engine_vt->loop;
+
+	while(engine->running){
+		const auto req_min_dt = engine->min_dt;
+
+		const ham_f64 min_dt = ham_max(req_min_dt - ddt, 0.0);
 		const ham_f64 dt = ham_ticker_tick(&ticker, min_dt);
-		excess_dt = dt - min_dt;
+		ddt = dt - req_min_dt;
 
-		engine_vt->loop(engine, dt);
+		loop_fn(engine, dt);
 
 		++frame_count;
 		frame_dt_accum += dt;
+		frame_ddt_accum += ddt;
+
+		old_dt = dt;
 
 		if(frame_dt_accum >= 1.0){
 			const auto fps = (ham_f64)frame_count / frame_dt_accum;
-			ham_logdebugf("ham-engine", "FPS: %f", fps);
+			const auto avg_ddt = frame_ddt_accum / (ham_f64)frame_count;
+			ham_logdebugf("ham-engine", "FPS: %f, ddt: %f", fps, avg_ddt);
 			frame_count = 0;
 			frame_dt_accum = 0.0;
+			frame_ddt_accum = 0.0;
 		}
 	}
 
+	ham_sem_wait(engine->sem);
+
 	engine_vt->fini(engine);
 	ham_logdebugf("ham-engine", "Finished engine object '%s' (%p)", engine_name, engine);
+
+	vtable->destroy(ham_super(engine));
+	ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
 
 	ham_plugin_fini(engine->plugin);
 	ham_logdebugf("ham-engine", "Finished plugin (%p)", engine->plugin);
@@ -336,39 +373,34 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 	ham_logapiinfof("Engine plugin: %s v%d.%d.%d", plugin_display_name.ptr, plugin_version.major, plugin_version.minor, plugin_version.patch);
 
 	const auto engine_info = ham_super(data.vtable)->info();
-	const auto engine_name = engine_info->type_id;
+	//const auto engine_name = engine_info->type_id;
 
 	const auto allocator = ham_current_allocator();
 
-	const auto mem = (ham_object*)ham_allocator_alloc(allocator, engine_info->alignment, engine_info->size);
-	if(!mem){
+	const auto obj = (ham_object*)ham_allocator_alloc(allocator, engine_info->alignment, engine_info->size);
+	if(!obj){
 		ham_logapierrorf("Failed to allocate memory for engine");
 		ham_plugin_unload(data.plugin);
 		ham_dso_close(data.dso_handle);
 		return nullptr;
 	}
 
-	mem->vtable = ham_super(data.vtable);
+	memset(obj, 0, engine_info->size);
 
-	const auto engine = (ham_engine*)ham_super(data.vtable)->construct(mem, 0, nullptr);
-	if(!engine){
-		ham_logapierrorf("Failed to construct engine object");
-		ham_plugin_unload(data.plugin);
-		ham_dso_close(data.dso_handle);
-		return nullptr;
-	}
+	obj->vtable = ham_super(data.vtable);
 
-	ham_logapidebugf("Constructed engine object '%s' (%p)", engine_name, engine);
+	const auto engine = (ham_engine*)obj;
 
-	ham_super(engine)->vtable = ham_super(data.vtable);
 	engine->allocator  = allocator;
 	engine->plugin     = data.plugin;
 	engine->dso_handle = data.dso_handle;
 	engine->status     = 0;
 	engine->mut        = ham_mutex_create(HAM_MUTEX_NORMAL);
 	engine->sem        = ham_sem_create(0);
+	engine->cond       = ham_cond_create();
+	engine->subsys_mut = ham_mutex_create(HAM_MUTEX_NORMAL);
 
-	if(!engine->mut || !engine->sem){
+	if(!engine->mut || !engine->sem || !engine->cond || !engine->subsys_mut){
 		if(!engine->mut){
 			ham_logapierrorf("Error creating engine mutex");
 		}
@@ -383,9 +415,21 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 			ham_sem_destroy(engine->sem);
 		}
 
+		if(!engine->cond){
+			ham_logapierrorf("Error creating engine condition variable");
+		}
+		else{
+			ham_cond_destroy(engine->cond);
+		}
 
-		ham_super(data.vtable)->destroy((ham_object*)engine);
-		ham_logapidebugf("Destroyed engine object '%s' (%p)", engine_name, engine);
+		if(!engine->subsys_mut){
+			ham_logapierrorf("Error creating engine subsystem mutex");
+		}
+		else{
+			ham_mutex_destroy(engine->subsys_mut);
+		}
+
+		ham_allocator_free(allocator, obj);
 
 		ham_plugin_unload(data.plugin);
 		ham_dso_close(data.dso_handle);
@@ -401,9 +445,10 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 
 		ham_mutex_destroy(engine->mut);
 		ham_sem_destroy(engine->sem);
+		ham_cond_destroy(engine->cond);
+		ham_mutex_destroy(engine->subsys_mut);
 
-		ham_super(data.vtable)->destroy((ham_object*)engine);
-		ham_logapidebugf("Destroyed engine object '%s' (%p)", engine_name, engine);
+		ham_allocator_free(allocator, obj);
 
 		ham_plugin_unload(data.plugin);
 		ham_dso_close(data.dso_handle);
@@ -418,58 +463,81 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 ham_nothrow void ham_engine_destroy(ham_engine *engine){
 	if(ham_unlikely(engine == NULL)) return;
 
+	for(int i = 0; i < engine->num_subsystems; i++){
+		const auto subsys = engine->subsystems[i];
+		ham_impl_engine_subsys_destroy(subsys);
+	}
 
+	ham_thread_destroy(engine->thd);
+	ham_mutex_destroy(engine->mut);
+	ham_sem_destroy(engine->sem);
+	ham_cond_destroy(engine->cond);
+	ham_mutex_destroy(engine->subsys_mut);
+
+	ham_plugin_unload(engine->plugin);
+	ham_dso_close(engine->dso_handle);
+
+	ham_allocator_free(engine->allocator, engine);
 }
 
 ham_nothrow bool ham_engine_request_exit(ham_engine *engine){
 	if(!ham_check(engine != NULL)) return false;
-	engine->running.store(false, std::memory_order_relaxed);
+	engine->running = false;
+
 	return true;
 }
 
 int ham_engine_exec(ham_engine *engine){
 	if(!engine) return -1;
 
-	if(!ham_sem_post(engine->sem)){
-		ham_logapierrorf("Error posting engine semaphore");
-		engine->status = -1;
-	}
-	else if(!ham_mutex_lock(engine->mut)){
-		ham_logapierrorf("Error locking engine mutex");
-		engine->status = -1;
+	if(engine->status != 0){
+		ham_engine_destroy(engine);
+		return engine->status;
 	}
 
-	if(engine->status == 0){
-		engine->running.store(true, std::memory_order_relaxed);
-		if(!ham_sem_post(engine->sem)){
-			engine->running.store(false, std::memory_order_relaxed);
-			engine->status = 1;
-		}
-		else{
-			ham::scoped_lock lock(engine->subsys_mut);
-			for(int i = 0; i < engine->num_subsystems; i++){
-				const auto subsys = engine->subsystems[i];
-				if(!ham_engine_subsys_launch(subsys)){
-					ham_logapierrorf("Failed to launch subsystem %d", i);
-				}
+	if(!ham_mutex_lock(engine->mut)){
+		ham_logapierrorf("Error locking engine mutex");
+		ham_engine_destroy(engine);
+		return 1;
+	}
+	else if(!ham_cond_broadcast(engine->cond)){
+		ham_logapierrorf("Error signaling engine thread");
+		ham_mutex_unlock(engine->mut);
+		ham_engine_destroy(engine);
+		return 1;
+	}
+	else{
+		ham::scoped_lock lock(engine->subsys_mut);
+		for(int i = 0; i < engine->num_subsystems; i++){
+			const auto subsys = engine->subsystems[i];
+			if(!ham_engine_subsys_launch(subsys)){
+				ham_logapierrorf("Failed to launch subsystem %d", i);
+				ham_mutex_unlock(engine->mut);
+				ham_engine_destroy(engine);
+				return 2;
 			}
 		}
 	}
 
-	const auto dso_handle = engine->dso_handle;
-	const auto vtable = (const ham_engine_vtable*)ham_super(engine)->vtable;
+	engine->running = true;
+	ham_mutex_unlock(engine->mut);
 
 	ham_ticker ticker;
 	ham_ticker_reset(&ticker);
 
-	while(engine->running.load(std::memory_order_relaxed)){
-		const ham_f64 dt = ham_ticker_tick(&ticker, engine->min_dt.load(std::memory_order_relaxed));
+	while(engine->running){
+		const ham_f64 dt = ham_ticker_tick(&ticker, engine->min_dt);
 		(void)dt;
 
 		// TODO
 	}
 
-	ham_mutex_unlock(engine->mut);
+	for(int i = 0; i < engine->num_subsystems; i++){
+		const auto subsys = engine->subsystems[i];
+		ham_impl_engine_subsys_request_exit(subsys);
+	}
+
+	ham_sem_post(engine->sem);
 
 	ham_uptr engine_ret;
 	if(!ham_thread_join(engine->thd, &engine_ret)){
@@ -483,18 +551,7 @@ int ham_engine_exec(ham_engine *engine){
 
 	const int result = engine->status;
 
-	ham_thread_destroy(engine->thd);
-	ham_mutex_destroy(engine->mut);
-	ham_sem_destroy(engine->sem);
-
-	ham_super(vtable)->destroy((ham_object*)engine);
-
-	const auto engine_info = ham_super(vtable)->info();
-	const auto engine_name = engine_info->type_id;
-
-	ham_logapidebugf("Destroyed engine object '%s' (%p)", engine_name, engine);
-
-	ham_dso_close(dso_handle);
+	ham_engine_destroy(engine);
 
 	return result;
 }

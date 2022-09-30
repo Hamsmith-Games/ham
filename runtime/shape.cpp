@@ -77,6 +77,47 @@ static inline ham_shape *ham_shape_create(
 	return ptr;
 }
 
+const ham_shape *ham_shape_unit_square(){
+	static ham_vec3 verts[] = {
+		{ .data = { -0.5f, -0.5f, 0.f } },
+		{ .data = {  0.5f, -0.5f, 0.f } },
+		{ .data = {  0.5f,  0.5f, 0.f } },
+		{ .data = { -0.5f,  0.5f, 0.f } },
+	};
+
+	static ham_vec3 norms[] = {
+		{ .data = { 0.f, 0.f, 1.f } },
+		{ .data = { 0.f, 0.f, 1.f } },
+		{ .data = { 0.f, 0.f, 1.f } },
+		{ .data = { 0.f, 0.f, 1.f } },
+	};
+
+	static ham_vec2 uvs[] = {
+		{ .data = { 0.f, 0.f } },
+		{ .data = { 1.f, 0.f } },
+		{ .data = { 1.f, 1.f } },
+		{ .data = { 0.f, 1.f } },
+	};
+
+	static ham_u32 indices[] = {
+		0, 1, 2, 3
+	};
+
+	static const ham_shape ret{
+		.allocator = nullptr,
+		.kind = HAM_SHAPE_SQUARE,
+		.vertex_order = HAM_VERTEX_TRIANGLE_FAN,
+		.num_points = 4,
+		.num_indices = 4,
+		.verts = verts,
+		.norms = norms,
+		.uvs = uvs,
+		.indices = indices
+	};
+
+	return &ret;
+}
+
 ham_shape *ham_shape_create_quad(const ham_vec2 *points){
 	const ham_vec3 verts[] = {
 		ham_vec3{ points[0].x, points[0].y, 0.f },

@@ -33,24 +33,25 @@ HAM_C_API_BEGIN
 struct ham_engine{
 	ham_derive(ham_object)
 
-	const ham_allocator *allocator = nullptr;
-	ham_plugin *plugin = nullptr;
-	ham_dso_handle dso_handle = nullptr;
-	int status = 0;
+	const ham_allocator *allocator;
+	ham_plugin *plugin;
+	ham_dso_handle dso_handle;
+	int status;
 
-	ham_mutex *mut = nullptr;
-	ham_sem *sem = nullptr;
+	ham_mutex *mut;
+	ham_sem *sem;
+	ham_cond *cond;
 
-	std::atomic_bool running = false;
-	std::atomic<ham_f64> min_dt = 1.0/144.0;
+	volatile bool running;
+	volatile ham_f64 min_dt;
 
-	ham_thread *thd = nullptr;
+	ham_thread *thd;
 
-	ham_path_buffer_utf8 game_dir = { 0 };
+	ham_path_buffer_utf8 game_dir;
 
-	ham::mutex subsys_mut;
-	ham_u8 num_subsystems = 0;
-	ham_engine_subsys *subsystems[HAM_ENGINE_MAX_SUBSYSTEMS] = { nullptr };
+	ham_mutex *subsys_mut;
+	ham_u8 num_subsystems;
+	ham_engine_subsys *subsystems[HAM_ENGINE_MAX_SUBSYSTEMS];
 };
 
 struct ham_engine_vtable{

@@ -222,7 +222,7 @@ ham_plugin *ham_plugin_load(ham_dso_handle dso, const char *plugin_id){
 	);
 
 	if(!data.plug_vtable){
-		ham_logapierrorf("Failed to find plugin by id: %s", plugin_id);
+		ham_logapiwarnf("Failed to find plugin by id: %s", plugin_id);
 		return nullptr;
 	}
 	else if(total_num_syms == (usize)-1){
@@ -240,11 +240,17 @@ ham_plugin *ham_plugin_load(ham_dso_handle dso, const char *plugin_id){
 	ptr->plugin_vtable = data.plug_vtable;
 	ptr->object_vtables = std::move(data.obj_vtables);
 
-	ham_dso_path(dso, sizeof(ptr->dir_path), ptr->dir_path);
-
-	const auto slash_idx = ham::str8((const char*)ptr->dir_path).rfind("/");
-	if(slash_idx != ham::str8::npos){
-		ptr->dir_path[slash_idx] = '\0';
+	if(!ham_dso_path(dso, sizeof(ptr->dir_path), ptr->dir_path)){
+		ham_logapiwarnf("Failed to find DSO path");
+	}
+	else{
+		const auto slash_idx = ham::str8((const char*)ptr->dir_path).rfind("/");
+		if(slash_idx != ham::str8::npos){
+			ptr->dir_path[slash_idx] = '\0';
+		}
+		else{
+			ptr->dir_path[0] = '\0';
+		}
 	}
 
 	return ptr;

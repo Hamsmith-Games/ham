@@ -106,6 +106,11 @@ typedef bool(*ham_engine_subsys_init_fn)(ham_engine *engine, void *user);
 typedef void(*ham_engine_subsys_fini_fn)(ham_engine *engine, void *user);
 typedef void(*ham_engine_subsys_loop_fn)(ham_engine *engine, ham_f64 dt, void *user);
 
+//! @cond ignore
+ham_engine_api ham_nothrow void ham_impl_engine_subsys_destroy(ham_engine_subsys *subsys);
+ham_engine_api ham_nothrow bool ham_impl_engine_subsys_request_exit(ham_engine_subsys *subsys);
+//! @endcond
+
 /**
  * Create a new engine subsystem.
  * @param engine engine to create the subsystem in

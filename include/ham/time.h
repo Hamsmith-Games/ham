@@ -103,9 +103,7 @@ ham_nothrow static inline ham_f64 ham_ticker_tick(ham_ticker *ticker, ham_f64 mi
 		const ham_f64 sleep_dt = min_dt - dt;
 
 		ham_duration sleep_rem = ham_duration_from_seconds64(sleep_dt);
-		while(sleep_rem.tv_sec > 0 || sleep_rem.tv_nsec > 0){
-			sleep_rem = ham_sleep(sleep_rem);
-		}
+		sleep_rem = ham_sleep(sleep_rem);
 
 		ham_timepoint_now(&ticker->loop, clk_id);
 		dur = ham_timepoint_diff(ticker->end, ticker->loop);

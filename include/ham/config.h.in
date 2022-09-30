@@ -312,7 +312,25 @@
 #	define HAM_RELEASE
 #endif
 
+#if defined(__MINGW__) || defined(_MSVC_VER)
+#	ifdef HAM_DEBUG
+#		define ham_breakpoint() (__debugbreak())
+#	else
+#		define ham_breakpoint()
+#	endif
+#endif
+
 #ifdef __GNUC__
+
+#	include <signal.h>
+
+#	if defined(HAM_DEBUG) && !defined(ham_breakpoint)
+#		define ham_breakpoint() (raise(SIGTRAP))
+#	endif
+
+#	define ham_lam(result_, args, body) \
+		({	result_ ham_impl_lam__(HAM_EAT args) body \
+			ham_impl_lam__; })
 
 #	define HAM_DIAGNOSTIC_PUSH() _Pragma("GCC diagnostic push")
 #	define HAM_DIAGNOSTIC_POP() _Pragma("GCC diagnostic pop")
@@ -394,12 +412,15 @@
 #ifdef _MSVC_VER
 #	define HAM_DIAGNOSTIC_PUSH()
 #	define HAM_DIAGNOSTIC_POP()
-
 #	define HAM_DIAGNOSTIC_IGNORE_MACRO_REDEFINED()
 #endif
 
 #define ham_popcnt ham_popcnt32
 #define ham_lzcnt  ham_lzcnt32
+
+#ifndef ham_breakpoint
+#	define ham_breakpoint()
+#endif
 
 #ifndef ham_nonnull_args
 #	define ham_nonnull_args(...)

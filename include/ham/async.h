@@ -185,25 +185,37 @@ namespace ham{
 	using recursive_mutex = basic_mutex<mutex_kind::recursive>;
 	using errorcheck_mutex = basic_mutex<mutex_kind::errorcheck>;
 
+	class mutex_lock_error: public exception{
+		public:
+			const char *api() const noexcept override{ return "ham::basic_mutex"; }
+			const char *what() const noexcept override{ return "Error locking mutex"; }
+	};
+
 	template<typename Mutex>
 	class unique_lock{
 		public:
-			unique_lock(Mutex &mut, bool lock_now = true) noexcept
+			explicit unique_lock(Mutex &mut, bool lock_now = true)
 				: m_mut(&mut), m_locked(lock_now ? mut.lock() : false)
-			{}
+			{
+				if(lock_now && !m_locked){
+					throw mutex_lock_error();
+				}
+			}
 
 			~unique_lock(){
 				if(m_locked) m_mut->unlock();
 			}
 
 			bool lock() noexcept{
-				if(m_locked) return true;
-				return (m_locked = m_mut->lock());
+				if(!m_mut) return false;
+				else if(m_locked) return true;
+				else return (m_locked = m_mut->lock());
 			}
 
 			bool unlock() noexcept{
-				if(!m_locked) return true;
-				return (m_locked = !m_mut->unlock());
+				if(!m_mut) return false;
+				else if(!m_locked) return true;
+				else return (m_locked = !m_mut->unlock());
 			}
 
 		private:
@@ -213,8 +225,44 @@ namespace ham{
 			friend class cond;
 	};
 
+	template<>
+	class unique_lock<ham_mutex*>{
+		public:
+			explicit unique_lock(ham_mutex *mut, bool lock_now = true)
+				: m_mut(mut), m_locked(lock_now ? ham_mutex_lock(mut) : false)
+			{
+				if(lock_now && !m_locked){
+					throw mutex_lock_error();
+				}
+			}
+
+			~unique_lock(){
+				if(m_locked) ham_mutex_unlock(m_mut);
+			}
+
+			bool lock() noexcept{
+				if(!m_mut) return false;
+				else if(m_locked) return true;
+				else return (m_locked = ham_mutex_lock(m_mut));
+			}
+
+			bool unlock() noexcept{
+				if(!m_mut) return false;
+				else if(!m_locked) return true;
+				else return (m_locked = !ham_mutex_unlock(m_mut));
+			}
+
+		private:
+			ham_mutex *m_mut;
+			bool m_locked;
+
+			friend class cond;
+	};
+
 	template<typename Mutex>
 	unique_lock(Mutex&) -> unique_lock<std::remove_reference_t<Mutex>>;
+
+	unique_lock(ham_mutex*) -> unique_lock<ham_mutex*>;
 
 	template<typename ... Muts>
 	class scoped_lock{
@@ -238,8 +286,35 @@ namespace ham{
 			std::tuple<std::remove_reference_t<Muts>*...> m_muts;
 	};
 
+	template<>
+	class scoped_lock<>{};
+
+	template<typename ... Muts>
+	class scoped_lock<ham_mutex*, Muts...>{
+		public:
+			scoped_lock(ham_mutex *cmut, Muts &... muts)
+				: m_cmut(ham_mutex_lock(cmut) ? cmut : nullptr)
+				, m_inner(muts...)
+			{
+				if(!m_cmut){
+					throw mutex_lock_error();
+				}
+			}
+
+			~scoped_lock(){
+				if(m_cmut) ham_mutex_unlock(m_cmut);
+			}
+
+		private:
+			ham_mutex *m_cmut;
+			scoped_lock<Muts...> m_inner;
+	};
+
 	template<typename ... Muts>
 	scoped_lock(Muts&...) -> scoped_lock<std::remove_reference_t<Muts>...>;
+
+	template<typename ... Muts>
+	scoped_lock(ham_mutex*, Muts&...) -> scoped_lock<ham_mutex*, std::remove_reference_t<Muts>...>;
 
 	//
 	// Condition variables

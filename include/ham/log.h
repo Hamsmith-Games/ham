@@ -105,6 +105,12 @@ static inline void ham_logf(ham_log_level level, const char *api, const char *fm
 		return;
 	}
 
+#ifdef HAM_DEBUG
+	if(level > HAM_LOG_WARNING){
+		ham_breakpoint();
+	}
+#endif
+
 	va_list va0;
 	va_start(va0, fmt_str);
 	const int len = vsnprintf(ham_impl_message_buf, HAM_MESSAGE_BUFFER_SIZE-1, fmt_str, va0);
