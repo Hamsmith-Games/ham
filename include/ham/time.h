@@ -116,7 +116,7 @@ ham_nothrow static inline ham_f64 ham_ticker_tick(ham_ticker *ticker, ham_f64 ta
 
 	const ham_f64 sleep_dt = ham_max(target_dt - dt, 0.0);
 	ham_duration sleep_rem = ham_duration_from_seconds64(sleep_dt);
-	while(sleep_rem.tv_nsec > 0){
+	while((sleep_rem.tv_sec + sleep_rem.tv_sec) != 0){
 		sleep_rem = ham_sleep(sleep_rem);
 	}
 

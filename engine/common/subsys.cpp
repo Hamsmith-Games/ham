@@ -34,7 +34,7 @@ struct ham_engine_subsys{
 	void *user;
 
 	volatile bool running = false;
-	volatile ham_f64 min_dt = 0.0;
+	volatile ham_f64 min_dt = 1.0/60.0;
 
 	ham::thread thread;
 	ham::mutex mut;
@@ -60,12 +60,14 @@ static inline ham_uptr ham_engine_subsys_thread_routine(void *data){
 	ham_ticker ticker;
 	ham_ticker_reset(&ticker);
 
-	//ham_f64 excess_dt = 0.0;
-
 	while(subsys->running){
-		//const auto min_dt = subsys->min_dt - excess_dt;
-		const auto dt = ham_ticker_tick(&ticker, subsys->min_dt);
-		//excess_dt = ham_max(dt - min_dt, 0.0);
+		const auto min_dt = subsys->min_dt;
+
+		ham_f64 dt = ham_ticker_tick(&ticker, min_dt);
+		while(dt < min_dt){
+			dt += ham_ticker_tick(&ticker, min_dt - dt);
+		}
+
 		subsys->loop_fn(subsys->engine, dt, subsys->user);
 	}
 
