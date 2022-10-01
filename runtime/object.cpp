@@ -60,7 +60,7 @@ void ham_object_manager_destroy(ham_object_manager *manager){
 		[](void *mem, void *user) -> bool{
 			const auto man = (ham_object_manager*)user;
 			const auto ptr = (ham_object*)mem;
-			man->obj_vtable->destroy(ptr);
+			man->obj_vtable->dtor(ptr);
 			return true;
 		},
 		manager
@@ -117,7 +117,7 @@ ham_object *ham_object_vnew(ham_object_manager *manager, ham_usize nargs, va_lis
 
 	const auto vtable = manager->obj_vtable;
 
-	const auto ret = vtable->construct(mem, nargs, va);
+	const auto ret = vtable->ctor(mem, nargs, va);
 	if(!ret){
 		ham_logapierrorf("Failed to construct object");
 		ham_colony_erase(manager->instances, mem);
@@ -139,7 +139,7 @@ bool ham_object_delete(ham_object_manager *manager, ham_object *obj){
 		[](void *mem, void *user) -> bool{
 			const auto man = (ham_object_manager*)user;
 			const auto ptr = (ham_object*)mem;
-			man->obj_vtable->destroy(ptr);
+			man->obj_vtable->dtor(ptr);
 			return true;
 		},
 		manager

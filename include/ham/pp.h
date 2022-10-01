@@ -37,7 +37,7 @@
 //! @endcond
 
 /**
- * Perform explicit macro expansion.
+ * @brief Perform explicit macro expansion.
  */
 #define HAM_EXPAND(...) HAM_IMPL_EXPAND3(__VA_ARGS__)
 
@@ -47,12 +47,12 @@
 //! @endcond
 
 /**
- * Concatenate two preprocessor tokens.
+ * @brief Concatenate two preprocessor tokens.
  */
 #define HAM_CONCAT(a, b) HAM_IMPL_CONCAT(a, b)
 
 /**
- * Eat a set of parentheses.
+ * @brief Eat a set of parentheses.
  */
 #define HAM_EAT(...) __VA_ARGS__
 
@@ -86,7 +86,7 @@
 //! @endcond
 
 /**
- * Get the number of arguments passed in.
+ * @brief Get the number of arguments passed in.
  */
 #define HAM_NARGS(...) HAM_IMPL_NARGS(__VA_ARGS__, HAM_IMPL_RSEQ_N)
 
@@ -119,7 +119,7 @@
 //! @endcond
 
 /**
- * Repeat \p expr \p n times.
+ * @brief Repeat \p expr \p n times.
  */
 #define HAM_REPEAT(n, expr) HAM_IMPL_REPEAT_N(n, expr)
 
@@ -146,12 +146,12 @@
 //! @endcond
 
 /**
- * Map a function to \p n passed arguments.
+ * @brief Map \p f to \p n passed arguments.
  */
 #define HAM_MAP_N(n, f, ...) HAM_IMPL_MAP_N(n, f __VA_OPT__(,) __VA_ARGS__)
 
 /**
- * Map a function to all passed arguments.
+ * @brief Map \p f to all passed arguments.
  */
 #define HAM_MAP(f, ...) HAM_MAP_N(HAM_NARGS(__VA_ARGS__), f __VA_OPT__(,) __VA_ARGS__)
 

@@ -56,25 +56,10 @@ string(
 )
 
 configure_file(
-	include/ham/engine/config.h.in
-	${CMAKE_CURRENT_BINARY_DIR}/include/ham/engine/config.h
+	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/config.h.in
+	${HAM_ENGINE_BINARY_INCLUDE_DIR}/ham/engine/config.h
 	@ONLY
 	NEWLINE_STYLE UNIX
-)
-
-##
-# Headers and include dirs
-##
-
-set(HAM_ENGINE_SOURCE_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
-set(HAM_ENGINE_BINARY_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
-
-set(
-	HAM_ENGINE_SOURCE_HEADERS
-	${HAM_ENGINE_BINARY_INCLUDE_DIR}/ham/engine/config.h
-
-	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine.h
-	${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine-object.h
 )
 
 ##
@@ -102,10 +87,12 @@ set_target_properties(
 	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-set_target_properties(
-	ham-engine-server-manager PROPERTIES
-	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
+if(TARGET ham-engine-server-manager)
+	set_target_properties(
+		ham-engine-server-manager PROPERTIES
+		RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+	)
+endif()
 
 set_target_properties(
 	ham-engine-editor PROPERTIES
@@ -158,4 +145,17 @@ if(HAM_INSTALL_ENGINE)
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	)
+
+    if(TARGET ham-engine-server-manager)
+		install(
+			FILES LICENSE.md
+			DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/ham-engine-server-manager
+		)
+
+	    install(
+			TARGETS ham-engine-server-manager
+			RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+			LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+		)
+    endif()
 endif()

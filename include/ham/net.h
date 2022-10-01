@@ -21,7 +21,7 @@
 
 /**
  * @defgroup HAM_NET Networking
- * @ingroup HAM_ENGINE
+ * @ingroup HAM
  * @{
  */
 

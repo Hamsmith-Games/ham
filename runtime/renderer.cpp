@@ -47,7 +47,7 @@ ham_renderer *ham_renderer_vcreate(const char *plugin_id, const char *object_id,
 	((ham_renderer*)obj)->dso       = dso;
 	((ham_renderer*)obj)->plugin    = plugin;
 
-	const auto ret = (ham_renderer*)obj_vtable->construct(obj, nargs, va);
+	const auto ret = (ham_renderer*)obj_vtable->ctor(obj, nargs, va);
 	if(!ret){
 		ham_logapierrorf("Failed to construct renderer object '%s'", object_id);
 		ham_allocator_free(allocator, obj);
@@ -61,7 +61,7 @@ ham_renderer *ham_renderer_vcreate(const char *plugin_id, const char *object_id,
 	ret->draw_groups = ham_object_manager_create(draw_group_vtable);
 	if(!ret->draw_groups){
 		ham_logapierrorf("Failed to create object manager for draw groups");
-		obj_vtable->destroy(obj);
+		obj_vtable->dtor(obj);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
@@ -72,7 +72,7 @@ ham_renderer *ham_renderer_vcreate(const char *plugin_id, const char *object_id,
 	if(!renderer_vt->init(ret)){
 		ham_logapierrorf("Failed to initialize renderer object '%s'", object_id);
 		ham_object_manager_destroy(ret->draw_groups);
-		obj_vtable->destroy(obj);
+		obj_vtable->dtor(obj);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
@@ -107,7 +107,7 @@ void ham_renderer_destroy(ham_renderer *r){
 
 	renderer_vt->fini(r);
 
-	obj_vt->destroy(ham_super(r));
+	obj_vt->dtor(ham_super(r));
 
 	ham_allocator_free(allocator, r);
 

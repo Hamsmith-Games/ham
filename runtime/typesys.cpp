@@ -9,6 +9,7 @@ struct ham_type{
 	const ham_typeset *ts;
 	ham_u32 flags;
 	ham_usize alignment, size;
+	const ham_type *nodes;
 };
 
 struct ham_typeset{
@@ -100,8 +101,6 @@ ham_typeset *ham_typeset_create(){
 		constexpr auto alignment = alignof(void*);
 		ptr->str_types[i] = ham_impl_typeset_new_type(ptr, HAM_TYPE_STRING, (ham_type_info_flag)(HAM_TYPE_INFO_STRING_UTF8 + i), alignof(ham_str8), sizeof(ham_str8));
 	}
-
-	const auto f32_type = ptr->float_types[1];
 
 	constexpr ham_usize vec_sizes[] = {
 		sizeof(ham_vec2),

@@ -39,7 +39,7 @@ HAM_C_API_BEGIN
 // Byte hashing functions
 //
 
-ham_constexpr static inline ham_u32 ham_hash_fnv1a_32(const char *bytes, ham_usize len){
+ham_constexpr ham_nothrow static inline ham_u32 ham_hash_fnv1a_32(const char *bytes, ham_usize len){
 	ham_u32 hash = HAM_FNV1A_OFFSET_BIAS_32;
 
 	for(const char *it = bytes; it != (bytes + len); ++it){
@@ -50,7 +50,7 @@ ham_constexpr static inline ham_u32 ham_hash_fnv1a_32(const char *bytes, ham_usi
 	return hash;
 }
 
-ham_constexpr static inline ham_u64 ham_hash_fnv1a_64(const char *bytes, ham_usize len){
+ham_constexpr ham_nothrow static inline ham_u64 ham_hash_fnv1a_64(const char *bytes, ham_usize len){
 	ham_u64 hash = HAM_FNV1A_OFFSET_BIAS_64;
 
 	for(const char *it = bytes; it != (bytes + len); ++it){
@@ -65,8 +65,8 @@ ham_constexpr static inline ham_u64 ham_hash_fnv1a_64(const char *bytes, ham_usi
 // UUID hashing functions
 //
 
-ham_constexpr static inline ham_u32 ham_uuid_hash32(ham_uuid uuid){ return ham_hash_fnv1a_32(uuid.bytes, 16); }
-ham_constexpr static inline ham_u64 ham_uuid_hash64(ham_uuid uuid){ return ham_hash_fnv1a_64(uuid.bytes, 16); }
+ham_constexpr ham_nothrow static inline ham_u32 ham_uuid_hash32(ham_uuid uuid){ return ham_hash_fnv1a_32(uuid.bytes, 16); }
+ham_constexpr ham_nothrow static inline ham_u64 ham_uuid_hash64(ham_uuid uuid){ return ham_hash_fnv1a_64(uuid.bytes, 16); }
 
 #define ham_uuid_hash ham_uuid_hash64
 
@@ -74,11 +74,11 @@ ham_constexpr static inline ham_u64 ham_uuid_hash64(ham_uuid uuid){ return ham_h
 // String hashing functions
 //
 
-ham_constexpr static inline ham_u32 ham_str_hash32_utf8(ham_str8 str){
+ham_constexpr ham_nothrow static inline ham_u32 ham_str_hash32_utf8(ham_str8 str){
 	return ham_hash_fnv1a_32(str.ptr, str.len);
 }
 
-ham_constexpr static inline ham_u32 ham_str_hash32_utf16(ham_str16 str){
+ham_constexpr ham_nothrow static inline ham_u32 ham_str_hash32_utf16(ham_str16 str){
 	ham_u32 hash = HAM_FNV1A_OFFSET_BIAS_32;
 
 	for(ham_usize i = 0 ; i < str.len; i++){
@@ -97,7 +97,7 @@ ham_constexpr static inline ham_u32 ham_str_hash32_utf16(ham_str16 str){
 	return hash;
 }
 
-ham_constexpr static inline ham_u32 ham_str_hash32_utf32(ham_str32 str){
+ham_constexpr ham_nothrow static inline ham_u32 ham_str_hash32_utf32(ham_str32 str){
 	ham_u32 hash = HAM_FNV1A_OFFSET_BIAS_32;
 
 	for(ham_usize i = 0 ; i < str.len; i++){
@@ -118,11 +118,11 @@ ham_constexpr static inline ham_u32 ham_str_hash32_utf32(ham_str32 str){
 	return hash;
 }
 
-ham_constexpr static inline ham_u64 ham_str_hash64_utf8(ham_str8 str){
+ham_constexpr ham_nothrow static inline ham_u64 ham_str_hash64_utf8(ham_str8 str){
 	return ham_hash_fnv1a_64(str.ptr, str.len);
 }
 
-ham_constexpr static inline ham_u64 ham_str_hash64_utf16(ham_str16 str){
+ham_constexpr ham_nothrow static inline ham_u64 ham_str_hash64_utf16(ham_str16 str){
 	ham_u64 hash = HAM_FNV1A_OFFSET_BIAS_64;
 
 	for(ham_usize i = 0 ; i < str.len; i++){
@@ -141,7 +141,7 @@ ham_constexpr static inline ham_u64 ham_str_hash64_utf16(ham_str16 str){
 	return hash;
 }
 
-ham_constexpr static inline ham_u64 ham_str_hash64_utf32(ham_str32 str){
+ham_constexpr ham_nothrow static inline ham_u64 ham_str_hash64_utf32(ham_str32 str){
 	ham_u64 hash = HAM_FNV1A_OFFSET_BIAS_64;
 
 	for(ham_usize i = 0 ; i < str.len; i++){
@@ -236,29 +236,31 @@ namespace ham{
 	}
 }
 
-template<>
-struct std::hash<ham::str8>: ham::hash_functor<ham::str8>{};
+namespace std{
+	template<>
+	struct hash<ham::str8>: ham::hash_functor<ham::str8>{};
 
-template<>
-struct std::hash<ham::str16>: ham::hash_functor<ham::str16>{};
+	template<>
+	struct hash<ham::str16>: ham::hash_functor<ham::str16>{};
 
-template<>
-struct std::hash<ham::str32>: ham::hash_functor<ham::str32>{};
+	template<>
+	struct hash<ham::str32>: ham::hash_functor<ham::str32>{};
 
-template<>
-struct std::hash<ham::uuid>: ham::hash_functor<ham::uuid>{};
+	template<>
+	struct hash<ham::uuid>: ham::hash_functor<ham::uuid>{};
 
-template<>
-struct std::hash<ham_str8>: ham::hash_functor<ham_str8>{};
+	template<>
+	struct hash<ham_str8>: ham::hash_functor<ham_str8>{};
 
-template<>
-struct std::hash<ham_str16>: ham::hash_functor<ham_str16>{};
+	template<>
+	struct hash<ham_str16>: ham::hash_functor<ham_str16>{};
 
-template<>
-struct std::hash<ham_str32>: ham::hash_functor<ham_str32>{};
+	template<>
+	struct hash<ham_str32>: ham::hash_functor<ham_str32>{};
 
-template<>
-struct std::hash<ham_uuid>: ham::hash_functor<ham_uuid>{};
+	template<>
+	struct hash<ham_uuid>: ham::hash_functor<ham_uuid>{};
+}
 
 #endif
 

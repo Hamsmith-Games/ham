@@ -22,7 +22,7 @@
 /**
  * @defgroup HAM_MATH Math
  * @ingroup HAM
- * #{
+ * @{
  */
 
 #include "typedefs.h"
@@ -249,7 +249,7 @@ ham_nonnull_args(1, 2, 3)
 ham_nothrow static inline void ham_arat_div(ham_arat *ret, const ham_arat *lhs, const ham_arat *rhs){ mpq_div(ret->mpq, lhs->mpq, rhs->mpq); }
 
 /**
- *
+ * @}
  */
 
 /**

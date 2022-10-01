@@ -39,7 +39,7 @@ HAM_C_API_BEGIN
 static_assert(sizeof(float)  == 4,  "Ham expects 32-bit floats");
 static_assert(sizeof(double) == 8, "Ham expects 64-bit doubles");
 
-typedef struct alignas(char) { char _pad; } ham_unit;
+typedef struct alignas(char) ham_unit{ char _pad; } ham_unit;
 
 static_assert(sizeof (ham_unit) == 1, "ham_unit is improperly sized.");
 static_assert(alignof(ham_unit) == 1, "ham_unit is improperly aligned.");
@@ -1065,7 +1065,7 @@ HAM_C_API_END
 #include <type_traits>
 #include <exception>
 
-#include "fmt/format.h"
+#include "fmt/format.h" // IWYU pragma: keep
 
 namespace ham{
 	namespace typedefs{
@@ -1508,9 +1508,11 @@ inline std::basic_ostream<Char> &operator<<(std::basic_ostream<Char> &stream, co
 	return stream.write(str.ptr, str.len);
 }
 
-template<typename Char>
-struct fmt::formatter<ham::basic_str<Char>>
-	: public fmt::formatter<fmt::basic_string_view<Char>>{};
+namespace fmt{
+	template<typename Char>
+	struct formatter<ham::basic_str<Char>>
+		: public formatter<basic_string_view<Char>>{};
+}
 
 #endif // __cplusplus
 

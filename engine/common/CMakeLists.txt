@@ -18,7 +18,7 @@
 
 ham_add_library(
 	ham-engine SHARED
-	${HAM_ENGINE_SOURCE_HEADERS}
+	${HAM_ENGINE_HEADERS}
 	engine.cpp
 	subsys.cpp
 	sys.cpp

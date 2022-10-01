@@ -76,7 +76,7 @@ static inline ham_uptr ham_impl_engine_thread_main(void *user){
 
 	const auto engine_vt = (const ham_engine_vtable*)vtable;
 
-	if(!vtable->construct(ham_super(engine), 0, nullptr)){
+	if(!vtable->ctor(ham_super(engine), 0, nullptr)){
 		ham_logerrorf("ham-engine", "Error constructing engine object '%s' (%p)", engine_name, engine);
 
 		ham_plugin_fini(engine->plugin);
@@ -92,7 +92,7 @@ static inline ham_uptr ham_impl_engine_thread_main(void *user){
 	if(!engine_vt->init(engine)){
 		ham_logerrorf("ham-engine", "Error initializing engine object '%s' (%p)", engine_name, engine);
 
-		vtable->destroy(ham_super(engine));
+		vtable->dtor(ham_super(engine));
 		ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
 
 		ham_plugin_fini(engine->plugin);
@@ -114,7 +114,7 @@ static inline ham_uptr ham_impl_engine_thread_main(void *user){
 		engine_vt->fini(engine);
 		ham_logdebugf("ham-engine", "Finished engine object '%s' (%p)", engine_name, engine);
 
-		vtable->destroy(ham_super(engine));
+		vtable->dtor(ham_super(engine));
 		ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
 
 		ham_plugin_fini(engine->plugin);
@@ -133,7 +133,7 @@ static inline ham_uptr ham_impl_engine_thread_main(void *user){
 			engine_vt->fini(engine);
 			ham_logdebugf("ham-engine", "Finished engine object '%s' (%p)", engine_name, engine);
 
-			vtable->destroy(ham_super(engine));
+			vtable->dtor(ham_super(engine));
 			ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
 
 			ham_plugin_fini(engine->plugin);
@@ -186,7 +186,7 @@ static inline ham_uptr ham_impl_engine_thread_main(void *user){
 	engine_vt->fini(engine);
 	ham_logdebugf("ham-engine", "Finished engine object '%s' (%p)", engine_name, engine);
 
-	vtable->destroy(ham_super(engine));
+	vtable->dtor(ham_super(engine));
 	ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
 
 	ham_plugin_fini(engine->plugin);

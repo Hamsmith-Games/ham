@@ -107,7 +107,7 @@ ham_define_object_x( \
 	( .init = ham_impl_init_##derived_draw_group, .fini = ham_impl_fini_##derived_draw_group ) \
 ) \
 static inline const ham_draw_group_vtable *ham_impl_draw_group_vtable_##derived_renderer(){ \
-	return (const ham_draw_group_vtable*)(ham_impl_object_vtable_name(derived_draw_group)());\
+	return (const ham_draw_group_vtable*)(ham_impl_object_vtable_name(derived_draw_group)()); \
 } \
 static inline bool ham_impl_init_##derived_renderer(ham_renderer *r){ return (init_fn)((derived_renderer*)r); } \
 static inline void ham_impl_fini_##derived_renderer(ham_renderer *r){ (fini_fn)((derived_renderer*)r); } \

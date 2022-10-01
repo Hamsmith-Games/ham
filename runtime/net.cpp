@@ -54,7 +54,7 @@ ham_net *ham_net_create(const char *plugin_id, const char *obj_id){
 
 	mem->vtable = obj_vt;
 
-	const auto ptr = (ham_net*)obj_vt->construct((ham_object*)mem, 0, nullptr);
+	const auto ptr = (ham_net*)obj_vt->ctor((ham_object*)mem, 0, nullptr);
 	if(!ptr){
 		ham_logapierrorf("Failed to construct object '%s'", obj_info->type_id);
 		ham_allocator_free(allocator, mem);
@@ -69,7 +69,7 @@ ham_net *ham_net_create(const char *plugin_id, const char *obj_id){
 
 	if(!net_vt->init(ptr)){
 		ham_logapierrorf("Failed to initialize net object '%s'", obj_info->type_id);
-		obj_vt->destroy(mem);
+		obj_vt->dtor(mem);
 		ham_allocator_free(allocator, mem);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dll);
@@ -86,7 +86,7 @@ void ham_net_destroy(ham_net *net){
 	const auto dso = net->dso;
 
 	((const ham_net_vtable*)vtable)->fini(net);
-	vtable->destroy((ham_object*)net);
+	vtable->dtor((ham_object*)net);
 
 	ham_dso_close(dso);
 }
