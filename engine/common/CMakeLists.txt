@@ -22,6 +22,7 @@ ham_add_library(
 	engine.cpp
 	subsys.cpp
 	sys.cpp
+	world.cpp
 )
 
 add_library(ham::engine ALIAS ham-engine)
@@ -33,4 +34,9 @@ target_include_directories(
 	$<BUILD_INTERFACE:${HAM_ENGINE_SOURCE_INCLUDE_DIR}>
 	$<BUILD_INTERFACE:${HAM_ENGINE_BINARY_INCLUDE_DIR}>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+target_link_libraries(
+	ham-engine PRIVATE
+	robin_hood::robin_hood
 )

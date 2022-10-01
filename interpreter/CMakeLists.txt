@@ -26,4 +26,4 @@ add_executable(hami main.cpp)
 add_executable(ham::interpreter ALIAS hami)
 
 target_link_libraries(hami PRIVATE ${HAM_CPU_LIBS})
-target_link_libraries(hami PUBLIC ham::ham readline::readline)
+target_link_libraries(hami PUBLIC ham::runtime readline::readline)

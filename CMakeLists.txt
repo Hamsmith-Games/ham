@@ -287,7 +287,7 @@ macro(ham_add_executable TGT)
 	add_executable(${TGT} ${ARGN})
 
 	target_compile_features(${TGT} PRIVATE c_std_17 cxx_std_20)
-	target_link_libraries(${TGT} PUBLIC ham::ham)
+	target_link_libraries(${TGT} PUBLIC ham::runtime)
 	target_link_libraries(${TGT} PRIVATE ${HAM_CPU_FLAGS})
 
 	set_target_properties(
@@ -309,7 +309,7 @@ endmacro()
 macro(ham_add_library TGT)
 	add_library(${TGT} ${ARGN})
 	target_compile_features(${TGT} PRIVATE c_std_17 cxx_std_20)
-	target_link_libraries(${TGT} PRIVATE ham::ham ${HAM_CPU_FLAGS})
+	target_link_libraries(${TGT} PRIVATE ham::runtime ${HAM_CPU_FLAGS})
 	set_target_properties(
 		${TGT} PROPERTIES
 		C_STANDARD 17

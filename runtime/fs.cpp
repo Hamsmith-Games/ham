@@ -30,6 +30,7 @@
 #	define access _access
 #	define open _open
 #else
+#	include <sys/mman.h>
 #	include <fcntl.h>
 #	include <unistd.h>
 #endif
@@ -292,7 +293,7 @@ ham_file *ham_file_open_utf8(ham_str8 path, ham_u32 flags){
 //ham_file *ham_file_open_utf32(ham_str32 path, ham_u32 flags);
 
 void ham_file_close(ham_file *file){
-	if(!file) return;
+	if(!ham_check(file != NULL)) return;
 
 	if(close(file->fd) != 0){
 		ham_logapiwarnf("Error in close: %s", strerror(errno));
@@ -329,7 +330,7 @@ ham_usize ham_file_read(ham_file *file, void *buf, ham_usize max_len){
 }
 
 ham_usize ham_file_write(ham_file *file, const void *buf, ham_usize len){
-	if(!file) return (usize)-1;
+	if(!ham_check(file != NULL)) return (usize)-1;
 	else if(!len) return 0;
 	else if(!buf) return (usize)-1;
 
@@ -343,7 +344,7 @@ ham_usize ham_file_write(ham_file *file, const void *buf, ham_usize len){
 }
 
 ham_usize ham_file_seek(ham_file *file, ham_usize off){
-	if(!file) return (usize)-1;
+	if(!ham_check(file != NULL)) return (usize)-1;
 
 	const off_t res = lseek(file->fd, off, SEEK_SET);
 	if(res == (off_t)-1){
@@ -355,7 +356,7 @@ ham_usize ham_file_seek(ham_file *file, ham_usize off){
 }
 
 ham_usize ham_file_tell(const ham_file *file){
-	if(!file) return (usize)-1;
+	if(!ham_check(file != NULL)) return (usize)-1;
 
 	const off_t res = lseek(file->fd, 0, SEEK_CUR);
 	if(res == (off_t)-1){
@@ -364,6 +365,37 @@ ham_usize ham_file_tell(const ham_file *file){
 	}
 
 	return (usize)res;
+}
+
+void *ham_file_map(ham_file *file, ham_file_open_flags flags, ham_usize from, ham_usize len){
+	if(!ham_check(file != NULL)) return nullptr;
+
+	int prot = 0;
+
+	if(flags & HAM_OPEN_READ)  prot |= PROT_READ;
+	if(flags & HAM_OPEN_WRITE) prot |= PROT_WRITE;
+
+	if(prot == 0) prot = PROT_READ;
+
+	const auto res = mmap(nullptr, len, prot, MAP_SHARED, file->fd, from);
+	if(res == MAP_FAILED){
+		ham_logapierrorf("Error in mmap: %s", strerror(errno));
+		return nullptr;
+	}
+
+	return res;
+}
+
+bool ham_file_unmap(ham_file *file, void *mapping, ham_usize len){
+	if(!ham_check(file != NULL)) return false;
+
+	const auto res = munmap(mapping, len);
+	if(res != 0){
+		ham_logapierrorf("Error in munmap: %s", strerror(errno));
+		return false;
+	}
+
+	return true;
 }
 
 HAM_C_API_END

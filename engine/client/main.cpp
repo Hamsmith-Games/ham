@@ -21,6 +21,7 @@
 
 #include "ham/engine-object.h"
 #include "ham/renderer.h"
+#include "ham/net.h"
 #include "ham/plugin.h"
 #include "ham/log.h"
 
@@ -28,6 +29,8 @@
 #include "SDL_vulkan.h"
 
 #include <vulkan/vulkan_core.h>
+
+using namespace ham::typedefs;
 
 static inline bool ham_engine_client_on_load(){
 	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) != 0){
@@ -77,6 +80,7 @@ static inline bool ham_engine_client_init_vulkan(ham_engine_client *engine);
 static inline ham_engine_client *ham_engine_client_construct(ham_engine_client *mem, ham_usize nargs, va_list va){
 	(void)nargs; (void)va;
 	const auto ret = new(mem) ham_engine_client;
+	ham_super(ret)->min_dt = 1.0/60.0;
 	return ret;
 }
 
@@ -328,25 +332,43 @@ struct ham_engine_client_render_subsys{
 	ham_renderer *renderer;
 };
 
+class net_subsystem: public ham::engine::subsys_base<net_subsystem>{
+	public:
+		net_subsystem(ham_engine *engine)
+			: subsys_base(engine, "client-net"){}
+
+	protected:
+		bool init(ham_engine *engine){
+			set_min_dt(1.f/60.f);
+
+			m_net = ham_net_create(HAM_NET_STEAMWORKS_PLUGIN_NAME, HAM_NET_STEAMWORKS_OBJECT_NAME);
+			if(!m_net){
+				ham_loginfof("ham-client-net", "Error creating ham_net");
+				return false;
+			}
+
+			ham_loginfof("ham-client-net", "Net subsystem initialized");
+			return true;
+		}
+
+		void fini(ham_engine *engine) noexcept{
+			ham_net_destroy(m_net);
+		}
+
+		void loop(ham_engine *engine, f64 dt){
+			ham_net_loop(m_net, dt);
+		}
+
+	private:
+		ham_net *m_net;
+
+		friend class ham::engine::subsys_base<net_subsystem>;
+};
+
 int main(int argc, char *argv[]){
 	const auto engine = ham_engine_create(HAM_ENGINE_CLIENT_API_NAME, HAM_ENGINE_CLIENT_OBJ_NAME, argc, argv);
 
-	const auto render_subsys = ham_engine_subsys_create(
-		engine, HAM_LIT_UTF8("render-subsys"),
-		[]/* init */(ham_engine *engine, void *user) -> bool{ return true; },
-		[]/* fini */(ham_engine *engine, void *user) -> void{ },
-		[]/* loop */(ham_engine *engine, ham_f64 dt, void *user) -> void{ },
-		nullptr
-	);
-	if(!render_subsys){
-		ham_logerrorf("ham-engine-client", "Failed to create render subsystem");
-		ham_engine_destroy(engine);
-		return 1;
-	}
-
-	ham_engine_subsys_set_min_dt(render_subsys, 1.0/144.0);
-
-	// TODO: create subsystems
+	net_subsystem net_subsys{engine};
 
 	return ham_engine_exec(engine);
 }

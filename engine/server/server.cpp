@@ -24,6 +24,8 @@
 
 #include "ham/net.h"
 
+static ham_engine *ham_gengine = nullptr;
+
 ham_extern_c ham_public ham_export ham_nothrow ham_u32 ham_net_steam_appid(){ return 480; }
 
 static inline bool ham_engine_server_on_load(){ return true; }
@@ -46,7 +48,7 @@ HAM_PLUGIN(
 struct ham_engine_server{
 	ham_derive(ham_engine)
 
-	ham_net *net = nullptr;
+	ham_net *net;
 };
 
 static inline ham_engine_server *ham_engine_server_construct(ham_engine_server *mem, ham_usize nargs, va_list va){
@@ -79,7 +81,6 @@ static inline void ham_engine_server_fini(ham_engine *engine_base){
 static inline void ham_engine_server_loop(ham_engine *engine_base, ham_f64 dt){
 	const auto engine = (ham_engine_server*)engine_base;
 	ham_net_loop(engine->net, dt);
-	ham_engine_request_exit(ham_super(engine));
 }
 
 ham_define_object_x(
@@ -95,6 +96,17 @@ ham_define_object_x(
 )
 
 int main(int argc, char *argv[]){
-	const auto ctx = ham_engine_create(HAM_ENGINE_SERVER_API_NAME, HAM_ENGINE_SERVER_OBJ_NAME, argc, argv);
-	return ham_engine_exec(ctx);
+	const auto engine = ham_engine_create(HAM_ENGINE_SERVER_API_NAME, HAM_ENGINE_SERVER_OBJ_NAME, argc, argv);
+
+	ham_gengine = engine;
+
+	static const auto sig_handler = +[](int){ ham_engine_request_exit(ham_gengine); }; // this will be U.B. in a signal handler :/
+
+	struct sigaction exit_sigaction{};
+	exit_sigaction.sa_handler = sig_handler;
+
+	sigaction(SIGTERM, &exit_sigaction, nullptr);
+	sigaction(SIGINT,  &exit_sigaction, nullptr);
+
+	return ham_engine_exec(engine);
 }

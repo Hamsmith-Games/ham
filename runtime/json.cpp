@@ -1,6 +1,8 @@
 #include "ham/json.h"
-#include "ham/memory.h"
+
 #include "ham/check.h"
+#include "ham/memory.h"
+#include "ham/fs.h"
 
 #include "yyjson.h"
 
@@ -37,6 +39,38 @@ ham_json_document *ham_json_document_create(ham_str8 json){
 	}
 
 	return ptr;
+}
+
+ham_json_document *ham_json_document_open(ham_str8 path){
+	const auto file = ham_file_open_utf8(path, HAM_OPEN_READ);
+	if(!file){
+		ham_logapierrorf("Error opening file: %.*s", (int)path.len, path.ptr);
+		return nullptr;
+	}
+
+	ham_file_info file_info;
+	if(!ham_file_get_info(file, &file_info)){
+		ham_logapierrorf("Failed to get file info: %.*s", (int)path.len, path.ptr);
+		ham_file_close(file);
+		return nullptr;
+	}
+
+	const auto mapping = ham_file_map(file, HAM_OPEN_READ, 0, file_info.size);
+	if(!mapping){
+		ham_logapierrorf("Failed to map file contents: %.*s", (int)path.len, path.ptr);
+		ham_file_close(file);
+		return nullptr;
+	}
+
+	const auto ret = ham_json_document_create(ham_str8{ (const ham_char8*)mapping, file_info.size-1 });
+	ham_file_unmap(file, mapping, file_info.size);
+	ham_file_close(file);
+
+	if(!ret){
+		ham_logapierrorf("Failed to create JSON document from file: %.*s", (int)path.len, path.ptr);
+	}
+
+	return ret;
 }
 
 void ham_json_document_destroy(ham_json_document *doc){
@@ -80,6 +114,19 @@ ham_json_type ham_json_get_type(const ham_json_value *json){
 		default: return HAM_JSON_TYPE_COUNT;
 	}
 }
+
+//
+// Type introspection
+//
+
+bool ham_json_is_object(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_obj((yyjson_val*)json) : false; }
+bool ham_json_is_array(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_arr((yyjson_val*)json) : false; }
+bool ham_json_is_bool(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_bool((yyjson_val*)json) : false; }
+bool ham_json_is_nat(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_uint((yyjson_val*)json) : false; }
+bool ham_json_is_int(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_int((yyjson_val*)json) : false; }
+bool ham_json_is_real(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_real((yyjson_val*)json) : false; }
+bool ham_json_is_str(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_str((yyjson_val*)json) : false; }
+bool ham_json_is_raw(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_raw((yyjson_val*)json) : false; }
 
 //
 // Object values

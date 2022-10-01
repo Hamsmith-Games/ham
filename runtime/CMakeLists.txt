@@ -63,6 +63,7 @@ else()
 endif()
 
 add_library(ham SHARED ${HAM_SOURCES})
+add_library(ham::runtime ALIAS ham)
 
 set_target_properties(
 	ham PROPERTIES
@@ -90,6 +91,7 @@ target_link_libraries(
 	    gmp::gmp
 		mpfr::mpfr
 		magic::magic
+		fmt::fmt
 )
 
 target_link_libraries(
@@ -105,5 +107,3 @@ target_link_libraries(
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	target_link_options(ham PRIVATE "-Wl,--enable-new-dtags")
 endif()
-
-add_library(ham::ham ALIAS ham)

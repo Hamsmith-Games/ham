@@ -91,6 +91,8 @@ HAM_C_API_END
 
 #ifdef __cplusplus
 
+#include "fmt/format.h"
+
 namespace ham{
 	namespace detail{
 		template<typename Char> struct str_buffer_ctype;
@@ -195,6 +197,7 @@ namespace ham{
 		public:
 			using ctype = detail::str_buffer_ctype_t<Char>;
 
+			using value_type = Char;
 			using char_type = Char;
 			using str_type = basic_str<Char>;
 
@@ -223,11 +226,11 @@ namespace ham{
 				return *this;
 			}
 
-			operator basic_str<Char>() const& noexcept{ return get(); }
+			operator str_type() const& noexcept{ return get(); }
 
-			operator basic_str<Char>() const&& = delete;
+			operator str_type() const&& = delete;
 
-			int compare(const basic_str<Char> &other) const noexcept{ return get().compare(other); }
+			int compare(const str_type &other) const noexcept{ return get().compare(other); }
 
 			bool operator==(const basic_str<Char> &other) const noexcept{ return get() == other; }
 			bool operator!=(const basic_str<Char> &other) const noexcept{ return get() != other; }
@@ -236,7 +239,7 @@ namespace ham{
 			bool operator> (const basic_str<Char> &other) const noexcept{ return get() >  other; }
 			bool operator>=(const basic_str<Char> &other) const noexcept{ return get() >= other; }
 
-			basic_str_buffer &operator+=(const basic_str<Char> &str){
+			basic_str_buffer &operator+=(const str_type &str){
 				if(!append(str)){
 					// TODO: throw exception?
 				}
@@ -244,7 +247,7 @@ namespace ham{
 				return *this;
 			}
 
-			basic_str_buffer operator+(const basic_str<Char> &str) const{
+			basic_str_buffer operator+(const str_type &str) const{
 				basic_str_buffer ret = *this;
 				ret += str;
 				return ret;
@@ -258,11 +261,11 @@ namespace ham{
 				return detail::str_buffer_ctype_resize<Char>(m_handle.get(), req_size, fill);
 			}
 
-			bool append(const basic_str<Char> &str){
+			bool append(const str_type &str){
 				return detail::str_buffer_ctype_append<Char>(m_handle.get(), str);
 			}
 
-			bool prepend(const basic_str<Char> &str){
+			bool prepend(const str_type &str){
 				return detail::str_buffer_ctype_prepend<Char>(m_handle.get(), str);
 			}
 
@@ -286,6 +289,22 @@ namespace ham{
 
 			usize len() const noexcept{ return get().len(); }
 
+			bool push_back(Char ch){ return append(str_type(&ch, 1)); }
+
+			Char *begin() noexcept{ return ptr(); }
+
+			Char *end() noexcept{
+				const auto str_ = get();
+				return str_.ptr + str_.len;
+			}
+
+			const Char *begin() const noexcept{ return ptr(); }
+
+			const Char *end() const noexcept{
+				const auto str_ = get();
+				return str_.ptr + str_.len;
+			}
+
 		private:
 			unique_handle<ctype*, detail::str_buffer_ctype_destroy<Char>> m_handle;
 	};
@@ -293,6 +312,31 @@ namespace ham{
 	using str_buffer_utf8  = basic_str_buffer<char8>;
 	using str_buffer_utf16 = basic_str_buffer<char16>;
 	using str_buffer_utf32 = basic_str_buffer<char32>;
+
+	template<typename ... Args>
+	str8 format_buffered(
+		usize buf_size, char *buf,
+		fmt::format_string<Args...> fmt_str, Args &&... args
+	){
+		if(buf_size < 2) return str8();
+
+		const auto fmt_res = fmt::format_to_n(
+			buf, buf_size-1,
+			fmt_str, std::forward<Args>(args)...
+		);
+
+		return str8(buf, fmt_res.size);
+	}
+
+	template<typename ... Args>
+	str_buffer_utf8 format(fmt::format_string<Args...> fmt_str, Args &&... args){
+		str_buffer_utf8 ret;
+		fmt::format_to(
+			std::back_inserter(ret),
+			fmt_str, std::forward<Args>(args)...
+		);
+		return ret;
+	}
 
 	using str_buffer = basic_str_buffer<uchar>;
 
@@ -314,6 +358,10 @@ template<typename Char>
 inline std::basic_ostream<Char> &operator<<(std::basic_ostream<Char> &stream, const ham::basic_str_buffer<Char> &str){
 	return stream << str.get();
 }
+
+template<typename Char>
+struct fmt::formatter<ham::basic_str_buffer<Char>>
+	: fmt::formatter<ham::basic_str<Char>>{};
 
 #endif // __cplusplus
 

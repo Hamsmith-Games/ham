@@ -20,4 +20,4 @@ add_executable(hamc main.cpp)
 add_executable(ham::compiler ALIAS hamc)
 
 target_link_libraries(hamc PRIVATE ${HAM_CPU_LIBS})
-target_link_libraries(hamc PUBLIC ham::ham)
+target_link_libraries(hamc PUBLIC ham::runtime)

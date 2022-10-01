@@ -22,6 +22,7 @@
 #include "ham/plugin.h"
 #include "ham/check.h"
 #include "ham/fs.h"
+#include "ham/json.h"
 
 #include <unistd.h>
 #include <getopt.h>
@@ -29,18 +30,32 @@
 
 HAM_C_API_BEGIN
 
+static ham_engine *ham_impl_gengine = nullptr;
+
+ham_extern_c ham_public ham_export ham_nothrow ham_u32 ham_net_steam_appid(){ return ham_impl_gengine->app_info.appid; }
+
 struct ham_impl_engine_data{
 	ham::str8 vtable_id;
 	ham_dso_handle dso_handle = nullptr;
 	ham_plugin *plugin = nullptr;
 	const ham_engine_vtable *vtable = nullptr;
+	ham_app_info app_info;
 };
 
-ham_uptr ham_impl_engine_thread_main(void *user){
+static inline ham_uptr ham_impl_engine_thread_main(void *user){
 	const auto engine = reinterpret_cast<ham_engine*>(user);
 	const auto vtable = ham_super(engine)->vtable;
 
 	const char *engine_name = vtable->info()->type_id;
+
+	ham_loginfof(
+		"ham-engine",
+		"Creating engine for app: %s v%d.%d.%d",
+		engine->app_info.display_name,
+		engine->app_info.version.major,
+		engine->app_info.version.minor,
+		engine->app_info.version.patch
+	);
 
 	ham_logdebugf("ham-engine", "Waiting for engine mutex...");
 
@@ -137,36 +152,32 @@ ham_uptr ham_impl_engine_thread_main(void *user){
 	ham_ticker ticker;
 	ham_ticker_reset(&ticker);
 
-	ham_f64 old_dt = engine->min_dt, ddt = 1.0;
-
-	ham_u32 frame_count = 0;
+	ham_u32 total_frame_count = 0, frame_count = 0;
 	ham_f64 frame_dt_accum = 0.0;
-	ham_f64 frame_ddt_accum = 0.0;
 
 	const auto loop_fn = engine_vt->loop;
 
 	while(engine->running){
 		const auto req_min_dt = engine->min_dt;
 
-		const ham_f64 min_dt = ham_max(req_min_dt - ddt, 0.0);
-		const ham_f64 dt = ham_ticker_tick(&ticker, min_dt);
-		ddt = dt - req_min_dt;
+		ham_f64 dt = ham_ticker_tick(&ticker, req_min_dt);
+		while(dt < req_min_dt){
+			dt += ham_ticker_tick(&ticker, req_min_dt - dt);
+		}
 
 		loop_fn(engine, dt);
 
 		++frame_count;
 		frame_dt_accum += dt;
-		frame_ddt_accum += ddt;
-
-		old_dt = dt;
 
 		if(frame_dt_accum >= 1.0){
 			const auto fps = (ham_f64)frame_count / frame_dt_accum;
-			const auto avg_ddt = frame_ddt_accum / (ham_f64)frame_count;
-			ham_logdebugf("ham-engine", "FPS: %f, ddt: %f", fps, avg_ddt);
+
+			ham_logdebugf("ham-engine", "FPS: %f", fps);
+
+			total_frame_count += frame_count;
 			frame_count = 0;
 			frame_dt_accum = 0.0;
-			frame_ddt_accum = 0.0;
 		}
 	}
 
@@ -215,7 +226,7 @@ static void ham_impl_show_help(const char *argv0){
 		"        -h|--help:             Print this help message and exit\n"
 		"        -v|--version:          Print the version string and exit\n"
 		"        -V|--verbose:          Print more log messages\n"
-		"        -g|--game-dir DIR:     Set the game directory\n"
+		"        -a|--app-dir DIR:      Set the game directory\n"
 		"\n"
 		,
 		exec_name
@@ -227,18 +238,122 @@ static struct option ham_impl_long_options[] = {
 	{ "help",		no_argument,		0, 0 },
 	{ "version",	no_argument,		0, 0 },
 	{ "verbose",	no_argument,		0, 0 },
-	{ "game-dir",	required_argument,	0, 0 },
+	{ "app-dir",	required_argument,	0, 0 },
 	{ 0,            0,                  0, 0 },
 };
+
+static inline bool ham_app_info_init(ham_str8 json_path, ham_app_info *ret){
+	const auto json_doc = ham_json_document_open(json_path);
+	if(!json_doc){
+		ham_logapierrorf("Failed to open app JSON: %.*s", (int)json_path.len, json_path.ptr);
+		return false;
+	}
+
+	const auto json_root = ham_json_document_root(json_doc);
+
+	const auto appinfo = ham_json_object_get(json_root, "app-info");
+	if(!appinfo){
+		ham_logapierrorf("Failed to get \"app-info\" object from app JSON");
+		ham_json_document_destroy(json_doc);
+		return false;
+	}
+
+	const auto appinfo_get = [appinfo](const ham_json_value **ret, const char *elem) -> bool{
+		*ret = ham_json_object_get(appinfo, elem);
+		if(!*ret){
+			ham_logapierrorf("Failed to get \"app-info.%s\" from app JSON", elem);
+			return false;
+		}
+
+		return true;
+	};
+
+	const ham_json_value
+		*appinfo_id,
+		*appinfo_name,
+		*appinfo_display_name,
+		*appinfo_author,
+		*appinfo_version,
+		*appinfo_license,
+		*appinfo_desc
+	;
+	if(
+		!appinfo_get(&appinfo_id,           "id") ||
+		!appinfo_get(&appinfo_name,         "name") ||
+		!appinfo_get(&appinfo_display_name, "display-name") ||
+		!appinfo_get(&appinfo_author,       "author") ||
+		!appinfo_get(&appinfo_version,       "version") ||
+		!appinfo_get(&appinfo_license,      "license") ||
+		!appinfo_get(&appinfo_desc,         "desc")
+	){
+		ham_json_document_destroy(json_doc);
+		return false;
+	}
+
+	// Value checking
+
+	if(!ham_json_is_nat(appinfo_id)){
+		ham_logapierrorf("Invalid type for \"app-info.id\": expected uint");
+		ham_json_document_destroy(json_doc);
+		return false;
+	}
+
+	const auto version_len = ham_json_array_iterate(appinfo_version, nullptr, nullptr);
+	if(version_len != 3){
+		ham_logapierrorf("Invalid version array: bad length (expected 3)");
+		ham_json_document_destroy(json_doc);
+		return false;
+	}
+
+	const auto appinfo_ver_major = ham_json_array_get(appinfo_version, 0);
+	const auto appinfo_ver_minor = ham_json_array_get(appinfo_version, 1);
+	const auto appinfo_ver_patch = ham_json_array_get(appinfo_version, 2);
+
+	if(
+	   !ham_json_is_nat(appinfo_ver_major) ||
+	   !ham_json_is_nat(appinfo_ver_minor) ||
+	   !ham_json_is_nat(appinfo_ver_patch)
+	){
+		ham_logapierrorf("Invalid version array: bad element type (expected uint)");
+		ham_json_document_destroy(json_doc);
+		return false;
+	}
+
+	// TODO: check if strings overflow or mayber use str_buffer_utf8
+
+	// Write good values
+
+	ret->appid = ham_json_get_nat(appinfo_id);
+
+	ret->version.major = ham_json_get_nat(appinfo_ver_major);
+	ret->version.minor = ham_json_get_nat(appinfo_ver_minor);
+	ret->version.patch = ham_json_get_nat(appinfo_ver_patch);
+
+	const auto name = ham_json_get_str(appinfo_name);
+	memcpy(ret->name, name.ptr, name.len);
+	ret->name[name.len] = '\0';
+
+	const auto display_name = ham_json_get_str(appinfo_display_name);
+	memcpy(ret->display_name, display_name.ptr, display_name.len);
+	ret->display_name[display_name.len] = '\0';
+
+	const auto author = ham_json_get_str(appinfo_author);
+	memcpy(ret->author, author.ptr, author.len);
+	ret->author[author.len] = '\0';
+
+	ham_json_document_destroy(json_doc);
+
+	return true;
+}
 
 ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int argc, char **argv){
 	ham_path_buffer path_buf;
 
-	const char *game_dir = getcwd(path_buf, HAM_PATH_BUFFER_SIZE);
+	const char *app_dir = getcwd(path_buf, HAM_PATH_BUFFER_SIZE);
 
 	while(1){
 		int option_index = 0;
-		const int getopt_res = getopt_long(argc, argv, "hvVg:", ham_impl_long_options, &option_index);
+		const int getopt_res = getopt_long(argc, argv, "hvVa:", ham_impl_long_options, &option_index);
 
 		if(getopt_res == -1){
 			break;
@@ -256,7 +371,7 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 					}
 
 					case 3:{
-						game_dir = optarg;
+						app_dir = optarg;
 						break;
 					}
 
@@ -277,8 +392,8 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 				break;
 			}
 
-			case 'g':{
-				game_dir = optarg;
+			case 'a':{
+				app_dir = optarg;
 				break;
 			}
 
@@ -302,33 +417,58 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 		fprintf(stderr, "\n");
 	}
 
-	const ham::str8 game_path_str = { game_dir, strlen(game_dir) };
+	const ham::str8 app_path_str = { app_dir, strlen(app_dir) };
 
-	if(!ham_path_exists_utf8(game_path_str)){
-		fprintf(stderr, "Game directory does not exist: %s\n", game_dir);
+	if(!ham_path_exists_utf8(app_path_str)){
+		fprintf(stderr, "App directory does not exist: %s\n", app_dir);
 		exit(1);
 	}
 
 	constexpr ham::str8 plugin_subdir = "/plugins/";
 	constexpr ham::str8 plugin_min_name = "libx" HAM_PLATFORM_DSO_EXT;
 
-	ham_logapiinfof("Game directory: %s", game_dir);
+	ham_logapiinfof("App directory: %s", app_dir);
 
-	ham_impl_engine_data data;
+	constexpr ham::str8 app_json_name = "ham.json";
+	const ham_usize app_json_path_len = (app_path_str.len() + app_json_name.len() + 1);
+
+	if(app_json_path_len >= HAM_PATH_BUFFER_SIZE){
+		ham_logapierrorf("App JSON path too long (%zu, max %d): %s/%s", app_json_path_len, HAM_PATH_BUFFER_SIZE, app_dir, app_json_name.ptr());
+		return nullptr;
+	}
+
+	ham_path_buffer_utf8 app_json_path;
+	memcpy(app_json_path, app_path_str.ptr(), app_path_str.len());
+	app_json_path[app_path_str.len()] = '/';
+	memcpy(app_json_path + app_path_str.len() + 1, app_json_name.ptr(), app_json_name.len());
+	app_json_path[app_json_path_len] = '\0';
+
+	if(!ham_path_exists_utf8(ham::str8(app_json_path, app_json_path_len))){
+		ham_logapierrorf("App JSON does not exist: %s", app_json_path);
+		return nullptr;
+	}
+
+	ham_impl_engine_data data{};
+
+	if(!ham_app_info_init({ app_json_path, app_json_path_len }, &data.app_info)){
+		ham_logapierrorf("Failed to initialize app info from JSON");
+		return nullptr;
+	}
+
 	data.vtable_id = ham::str8(vtable_id);
 
-	if((game_path_str.len() + plugin_subdir.len() + plugin_min_name.len()) >= HAM_PATH_BUFFER_SIZE){
-		ham_logapierrorf("Game directory too long: %zu, max %zu", game_path_str.len(), HAM_PATH_BUFFER_SIZE - (plugin_subdir.len() + plugin_min_name.len() + 1));
+	if((app_path_str.len() + plugin_subdir.len() + plugin_min_name.len()) >= HAM_PATH_BUFFER_SIZE){
+		ham_logapierrorf("App directory too long: %zu, max %zu", app_path_str.len(), HAM_PATH_BUFFER_SIZE - (plugin_subdir.len() + plugin_min_name.len() + 1));
 		return nullptr;
 	}
 	else{
-		ham_path_buffer_utf8 game_plugin_path;
-		memcpy(game_plugin_path, game_path_str.ptr(), game_path_str.len());
-		memcpy(game_plugin_path + game_path_str.len(), plugin_subdir.ptr(), plugin_subdir.len());
-		game_plugin_path[game_path_str.len() + plugin_subdir.len()] = '\0';
+		ham_path_buffer_utf8 app_plugin_path;
+		memcpy(app_plugin_path, app_path_str.ptr(), app_path_str.len());
+		memcpy(app_plugin_path + app_path_str.len(), plugin_subdir.ptr(), plugin_subdir.len());
+		app_plugin_path[app_path_str.len() + plugin_subdir.len()] = '\0';
 
-		if(ham_path_exists_utf8(ham::str8((const char*)game_plugin_path))){
-			if(ham_plugin_find(vtable_id, ham::str8((const char*)game_plugin_path), &data.plugin, &data.dso_handle)){
+		if(ham_path_exists_utf8(ham::str8((const char*)app_plugin_path))){
+			if(ham_plugin_find(vtable_id, ham::str8((const char*)app_plugin_path), &data.plugin, &data.dso_handle)){
 				data.vtable = (const ham_engine_vtable*)ham_plugin_object(data.plugin, ham::str8(obj_id));
 				if(!data.vtable){
 					ham_plugin_unload(data.plugin);
@@ -395,6 +535,7 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 	engine->plugin     = data.plugin;
 	engine->dso_handle = data.dso_handle;
 	engine->status     = 0;
+	engine->min_dt     = 1.0/60.0;
 	engine->mut        = ham_mutex_create(HAM_MUTEX_NORMAL);
 	engine->sem        = ham_sem_create(0);
 	engine->cond       = ham_cond_create();
@@ -436,8 +577,10 @@ ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int arg
 		return nullptr;
 	}
 
-	memcpy(engine->game_dir, game_path_str.ptr(), game_path_str.len());
-	engine->game_dir[game_path_str.len()] = '\0';
+	memcpy(&engine->app_info, &data.app_info, sizeof(ham_app_info));
+
+	memcpy(engine->game_dir, app_path_str.ptr(), app_path_str.len());
+	engine->game_dir[app_path_str.len()] = '\0';
 
 	engine->thd = ham_thread_create(ham_impl_engine_thread_main, engine);
 	if(!engine->thd){
@@ -489,6 +632,8 @@ ham_nothrow bool ham_engine_request_exit(ham_engine *engine){
 
 int ham_engine_exec(ham_engine *engine){
 	if(!engine) return -1;
+
+	ham_impl_gengine = engine;
 
 	if(engine->status != 0){
 		ham_engine_destroy(engine);
@@ -550,6 +695,8 @@ int ham_engine_exec(ham_engine *engine){
 	}
 
 	const int result = engine->status;
+
+	ham_impl_gengine = nullptr;
 
 	ham_engine_destroy(engine);
 

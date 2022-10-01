@@ -1,7 +1,8 @@
 {
 	"app-info": {
-		"id": "480",
+		"id": 480,
 		"name": "test-game",
+		"display-name": "TestGame",
 		"author": "Hamsmith Ltd.",
 		"version": [0, 0, 1],
 		"license": "GPLv3+",

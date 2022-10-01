@@ -24,9 +24,7 @@
  * @{
  */
 
-#include "ham/engine/config.h"
-
-#include "ham/typedefs.h"
+#include "engine/world.h"
 
 #define HAM_ENGINE_VERSION ((ham_version){HAM_ENGINE_VERSION_MAJOR,HAM_ENGINE_VERSION_MINOR,HAM_ENGINE_VERSION_PATCH})
 
@@ -83,6 +81,8 @@ ham_engine_api ham_nothrow void ham_engine_destroy(ham_engine *engine);
  */
 ham_engine_api ham_nothrow bool ham_engine_request_exit(ham_engine *engine);
 
+ham_engine_api ham_nothrow ham_world *ham_engine_world(ham_engine *engine);
+
 /**
  * Execute an engine, destroy it and return an exit code.
  * @note This function calls \ref ham_engine_destroy on the \p engine .
@@ -133,8 +133,21 @@ ham_engine_api ham_engine_subsys *ham_engine_subsys_create(
 
 ham_engine_api ham_nothrow ham_engine *ham_engine_subsys_owner(ham_engine_subsys *subsys);
 
-ham_engine_api ham_nothrow bool ham_engine_subsys_running(ham_engine_subsys *subsys);
+ham_engine_api ham_nothrow bool ham_engine_subsys_running(const ham_engine_subsys *subsys);
 
+/**
+ * Get a subsystems minimum time between loops.
+ * @param subsys subsystem to query
+ * @returns minimum dt of \p subsys , if \p subsys is ``NULL`` 0.0 is returned
+ */
+ham_engine_api ham_nothrow ham_f64 ham_engine_subsys_min_dt(ham_engine_subsys *subsys);
+
+/**
+ * Set a subsystems minimum time between loops.
+ * @param subsys subsystem to query
+ * @param min_dt new minimum dt
+ * @returns whether the minimum dt was successfully set
+ */
 ham_engine_api ham_nothrow bool ham_engine_subsys_set_min_dt(ham_engine_subsys *subsys, ham_f64 min_dt);
 
 /**
@@ -149,6 +162,65 @@ ham_engine_api ham_nothrow bool ham_engine_subsys_launch(ham_engine_subsys *subs
  */
 
 HAM_C_API_END
+
+#ifdef __cplusplus
+
+#include "ham/str_buffer.h"
+
+namespace ham::engine{
+	class subsystem_error: public exception{
+		public:
+			subsystem_error(str_buffer_utf8 msg): m_msg(std::move(msg)){}
+
+			const char *api() const noexcept override{ return "ham::engine::subsys"; }
+			const char *what() const noexcept override{ return m_msg.c_str(); }
+
+		private:
+			str_buffer_utf8 m_msg;
+			const char *m_what;
+	};
+
+	template<typename Derived>
+	class subsys_base{
+		public:
+			ham_engine *owner() const noexcept{ return ham_engine_subsys_owner(m_subsys); }
+
+			bool running() const noexcept{ return ham_engine_subsys_running(m_subsys); }
+
+			bool launch() noexcept{ return ham_engine_subsys_launch(m_subsys); }
+
+			bool set_min_dt(f64 new_min_dt){ return ham_engine_subsys_set_min_dt(m_subsys, new_min_dt); }
+
+		protected:
+			explicit subsys_base(ham_engine *engine, const ham::str8 &name)
+				: m_subsys{ham_engine_subsys_create(engine, name, init_impl, fini_impl, loop_impl, this)}
+			{
+				if(!m_subsys){
+					throw subsystem_error(format("error creating subsystem \"{}\"", name));
+				}
+			}
+
+		private:
+			static bool init_impl(ham_engine *engine, void *user){
+				const auto self = reinterpret_cast<Derived*>(user);
+				return self->init(engine);
+			}
+
+			static void fini_impl(ham_engine *engine, void *user) noexcept{
+				const auto self = reinterpret_cast<Derived*>(user);
+				self->fini(engine);
+			}
+
+			static void loop_impl(ham_engine *engine, ham_f64 dt, void *user){
+				const auto self = reinterpret_cast<Derived*>(user);
+				self->loop(engine, dt);
+			}
+
+			ham_engine_subsys *m_subsys;
+	};
+}
+
+#endif // __cplusplus
 
 /**
  * @}

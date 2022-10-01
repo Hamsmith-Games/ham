@@ -1547,8 +1547,6 @@ ham_nonnull_args(1)
 ham_nothrow static inline void ham_renderer_vulkan_dtor(ham_renderer_vulkan *r){
 	r->vk_fns.vkDeviceWaitIdle(r->vk_dev);
 
-	ham_draw_group_destroy(ham_super(r->screen_draw_group));
-
 	for(ham_u32 i = 0; i < ham_impl_max_queued_frames; i++){
 		r->vk_fns.vkDestroyFence(r->vk_dev, r->vk_frame_fences[i], nullptr);
 		r->vk_fns.vkDestroySemaphore(r->vk_dev, r->vk_render_sems[i], nullptr);

@@ -28,4 +28,4 @@ add_executable(
 )
 
 target_link_libraries(ham-test PRIVATE ${HAM_CPU_LIBS})
-target_link_libraries(ham-test PUBLIC ham::ham)
+target_link_libraries(ham-test PUBLIC ham::runtime)

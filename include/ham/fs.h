@@ -74,6 +74,9 @@ ham_api ham_usize ham_file_write(ham_file *file, const void *buf, ham_usize len)
 ham_api ham_usize ham_file_seek(ham_file *file, ham_usize off);
 ham_api ham_usize ham_file_tell(const ham_file *file);
 
+ham_api void *ham_file_map(ham_file *file, ham_file_open_flags flags, ham_usize from, ham_usize len);
+ham_api bool ham_file_unmap(ham_file *file, void *mapping, ham_usize len);
+
 HAM_C_API_END
 
 #ifdef __cplusplus

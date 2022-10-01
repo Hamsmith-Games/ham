@@ -186,7 +186,7 @@ ham_draw_group *ham_draw_group_create(
 void ham_draw_group_destroy(ham_draw_group *group){
 	if(ham_unlikely(group == NULL)) return;
 
-	const auto vtable    = ((const ham_renderer_vtable*)ham_super(group->r)->vtable)->draw_group_vtable();
+	const auto vtable    = (const ham_draw_group_vtable*)ham_super(group)->vtable;
 	const auto allocator = group->r->allocator;
 
 	vtable->fini(group);

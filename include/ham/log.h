@@ -105,12 +105,6 @@ static inline void ham_logf(ham_log_level level, const char *api, const char *fm
 		return;
 	}
 
-#ifdef HAM_DEBUG
-	if(level > HAM_LOG_WARNING){
-		ham_breakpoint();
-	}
-#endif
-
 	va_list va0;
 	va_start(va0, fmt_str);
 	const int len = vsnprintf(ham_impl_message_buf, HAM_MESSAGE_BUFFER_SIZE-1, fmt_str, va0);
@@ -124,6 +118,12 @@ static inline void ham_logf(ham_log_level level, const char *api, const char *fm
 	const ham_logger *logger = ham_current_logger();
 
 	logger->log(log_tp, level, api, ham_impl_message_buf, logger->user);
+
+#ifdef HAM_DEBUG
+	if(level > HAM_LOG_WARNING){
+		ham_breakpoint();
+	}
+#endif
 }
 
 #define ham_logapif(level, fmt_str, ...) (ham_logf(level, __FUNCTION__, fmt_str __VA_OPT__(,) __VA_ARGS__))

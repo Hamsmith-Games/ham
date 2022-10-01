@@ -83,32 +83,46 @@ ham_constexpr ham_nothrow static inline ham_duration ham_duration_from_seconds64
 
 typedef struct ham_ticker{
 	ham_timepoint loop, end;
+	ham_f64 avg_clock_dt;
 } ham_ticker;
 
 ham_nonnull_args(1)
 ham_nothrow static inline void ham_ticker_reset(ham_ticker *ticker){
 	ham_timepoint_now(&ticker->loop, CLOCK_MONOTONIC);
+
+	const int num_clocks = 2000;
+
+	for(int i = 0; i < num_clocks; i++){
+		ham_sleep(ham_duration{ 0, 0 });
+		ham_timepoint_now(&ticker->end, CLOCK_MONOTONIC);
+	}
+
+	const ham_duration clock_dur = ham_timepoint_diff(ticker->loop, ticker->end);
+	ticker->avg_clock_dt = ham_duration_to_seconds64(clock_dur) / ((ham_f64)num_clocks);
+
+	ham_timepoint_now(&ticker->loop, CLOCK_MONOTONIC);
 	ticker->end = ticker->loop;
 }
 
 ham_nonnull_args(1)
-ham_nothrow static inline ham_f64 ham_ticker_tick(ham_ticker *ticker, ham_f64 min_dt){
+ham_nothrow static inline ham_f64 ham_ticker_tick(ham_ticker *ticker, ham_f64 target_dt){
 	const int clk_id = CLOCK_MONOTONIC;
+
+	target_dt = ham_max(target_dt - ticker->avg_clock_dt, 0.0);
 
 	ham_timepoint_now(&ticker->loop, clk_id);
 	ham_duration dur = ham_timepoint_diff(ticker->end, ticker->loop);
 	ham_f64 dt = ham_duration_to_seconds64(dur);
 
-	if(dt < min_dt){
-		const ham_f64 sleep_dt = min_dt - dt;
-
-		ham_duration sleep_rem = ham_duration_from_seconds64(sleep_dt);
+	const ham_f64 sleep_dt = ham_max(target_dt - dt, 0.0);
+	ham_duration sleep_rem = ham_duration_from_seconds64(sleep_dt);
+	while(sleep_rem.tv_nsec > 0){
 		sleep_rem = ham_sleep(sleep_rem);
-
-		ham_timepoint_now(&ticker->loop, clk_id);
-		dur = ham_timepoint_diff(ticker->end, ticker->loop);
-		dt = ham_duration_to_seconds64(dur);
 	}
+
+	ham_timepoint_now(&ticker->loop, clk_id);
+	dur = ham_timepoint_diff(ticker->end, ticker->loop);
+	dt = ham_duration_to_seconds64(dur);
 
 	ticker->end = ticker->loop;
 	return dt;

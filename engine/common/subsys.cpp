@@ -44,11 +44,6 @@ struct ham_engine_subsys{
 static inline ham_uptr ham_engine_subsys_thread_routine(void *data){
 	const auto subsys = (ham_engine_subsys*)data;
 
-	if(!subsys->init_fn(subsys->engine, subsys->user)){
-		ham_logapierrorf("Error initializing subsystem");
-		return 1;
-	}
-
 	{
 		ham::unique_lock lock(subsys->mut);
 		if(!subsys->cond.wait(lock, [subsys]{ return subsys->running; })){
@@ -57,15 +52,20 @@ static inline ham_uptr ham_engine_subsys_thread_routine(void *data){
 		}
 	}
 
+	if(!subsys->init_fn(subsys->engine, subsys->user)){
+		ham_logapierrorf("Error initializing subsystem");
+		return 1;
+	}
+
 	ham_ticker ticker;
 	ham_ticker_reset(&ticker);
 
-	ham_f64 excess_dt = 0.0;
+	//ham_f64 excess_dt = 0.0;
 
 	while(subsys->running){
-		const auto min_dt = subsys->min_dt - excess_dt;
-		const auto dt = ham_ticker_tick(&ticker, min_dt);
-		excess_dt = ham_max(dt - min_dt, 0.0);
+		//const auto min_dt = subsys->min_dt - excess_dt;
+		const auto dt = ham_ticker_tick(&ticker, subsys->min_dt);
+		//excess_dt = ham_max(dt - min_dt, 0.0);
 		subsys->loop_fn(subsys->engine, dt, subsys->user);
 	}
 
@@ -129,7 +129,7 @@ ham_engine_subsys *ham_engine_subsys_create(
 	subsys->user = user;
 	subsys->min_dt = engine->min_dt;
 
-	subsys->thread = ham::thread(ham_engine_subsys_thread_routine, (void*)subsys);
+	subsys->thread = ham::thread((ham_thread_fn)ham_engine_subsys_thread_routine, (void*)subsys);
 	subsys->thread.set_name(name);
 
 	if(engine->running){
@@ -156,7 +156,7 @@ ham_nothrow ham_engine *ham_engine_subsys_owner(ham_engine_subsys *subsys){
 	return subsys->engine;
 }
 
-ham_nothrow bool ham_engine_subsys_running(ham_engine_subsys *subsys){
+ham_nothrow bool ham_engine_subsys_running(const ham_engine_subsys *subsys){
 	if(!ham_check(subsys != NULL)) return false;
 	return subsys->running;
 }

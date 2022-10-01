@@ -35,6 +35,8 @@ typedef struct ham_json_value ham_json_value;
 
 ham_api ham_json_document *ham_json_document_create(ham_str8 json);
 
+ham_api ham_json_document *ham_json_document_open(ham_str8 path);
+
 ham_api void ham_json_document_destroy(ham_json_document *doc);
 
 ham_api const ham_json_value *ham_json_document_root(const ham_json_document *doc);
@@ -54,6 +56,15 @@ typedef enum ham_json_type{
 } ham_json_type;
 
 ham_api ham_json_type ham_json_get_type(const ham_json_value *json);
+
+ham_api bool ham_json_is_object(const ham_json_value *json);
+ham_api bool ham_json_is_array(const ham_json_value *json);
+ham_api bool ham_json_is_bool(const ham_json_value *json);
+ham_api bool ham_json_is_nat(const ham_json_value *json);
+ham_api bool ham_json_is_int(const ham_json_value *json);
+ham_api bool ham_json_is_real(const ham_json_value *json);
+ham_api bool ham_json_is_str(const ham_json_value *json);
+ham_api bool ham_json_is_raw(const ham_json_value *json);
 
 // Objects
 

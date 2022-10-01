@@ -1065,6 +1065,8 @@ HAM_C_API_END
 #include <type_traits>
 #include <exception>
 
+#include "fmt/format.h"
+
 namespace ham{
 	namespace typedefs{
 		using unit = ham_unit;
@@ -1320,6 +1322,8 @@ namespace ham{
 
 			constexpr operator const ctype&() const noexcept{ return m_val; }
 
+			constexpr operator fmt::basic_string_view<Char>() const noexcept{ return { m_val.ptr, m_val.len }; }
+
 			constexpr basic_str &operator=(const basic_str&) noexcept = default;
 
 			constexpr const Char &operator[](usize idx) const noexcept{ return m_val.ptr[idx]; }
@@ -1503,6 +1507,10 @@ template<typename Char>
 inline std::basic_ostream<Char> &operator<<(std::basic_ostream<Char> &stream, const ham::detail::str_ctype_t<Char> &str){
 	return stream.write(str.ptr, str.len);
 }
+
+template<typename Char>
+struct fmt::formatter<ham::basic_str<Char>>
+	: public fmt::formatter<fmt::basic_string_view<Char>>{};
 
 #endif // __cplusplus
 

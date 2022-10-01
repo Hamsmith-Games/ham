@@ -286,9 +286,7 @@
 
 #endif
 
-#ifdef __MINGW32__
-#	define _GNU_SOURCE 1
-#endif
+#define _GNU_SOURCE 1
 
 #if HAM_PLATFORM == HAM_PLATFORM_WIN32
 #	define ham_import __declspec(dllimport)

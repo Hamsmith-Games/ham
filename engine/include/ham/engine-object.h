@@ -30,6 +30,13 @@
 
 HAM_C_API_BEGIN
 
+struct ham_app_info{
+	ham_u32 appid;
+	ham_version version;
+	ham_name_buffer_utf8 name, display_name, author, license;
+	ham_message_buffer_utf8 description;
+};
+
 struct ham_engine{
 	ham_derive(ham_object)
 
@@ -37,6 +44,8 @@ struct ham_engine{
 	ham_plugin *plugin;
 	ham_dso_handle dso_handle;
 	int status;
+
+	ham_app_info app_info;
 
 	ham_mutex *mut;
 	ham_sem *sem;
