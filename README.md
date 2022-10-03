@@ -71,3 +71,20 @@ A creative environment for developing games and immersive experiences.
 
 <br/>
 <br/>
+<br/>
+<br/>
+
+<h1 align="center">Building the environment</h1>
+
+<br/>
+<br/>
+
+```bash
+mkdir build
+cd build
+cmake ..
+cmake --build . -j $(nproc)
+```
+
+<br/>
+<br/>
