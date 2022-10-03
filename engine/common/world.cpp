@@ -26,10 +26,41 @@ using namespace ham::typedefs;
 
 HAM_C_API_BEGIN
 
+//
+// World management
+//
+
 struct ham_world{
+	const ham_allocator *allocator;
 	ham::mutex mut;
 	robin_hood::unordered_flat_map<const ham_entity_vtable*, ham_object_manager*> obj_mans;
 };
+
+ham_world *ham_world_create(ham_net_socket *sock){
+	const auto allocator = ham_current_allocator();
+
+	const auto ret = ham_allocator_new(allocator, ham_world);
+	if(!ret){
+		ham_logapierrorf("Error allocating ham_world");
+		return nullptr;
+	}
+
+	ret->allocator = allocator;
+
+	return ret;
+}
+
+void ham_world_destroy(ham_world *world){
+	if(ham_unlikely(!world)) return;
+
+	const auto allocator = world->allocator;
+
+	ham_allocator_delete(allocator, world);
+}
+
+//
+// Entities
+//
 
 ham_entity *ham_entity_vcreate(
 	ham_world *world, const ham_entity_vtable *entity_vt,
@@ -75,7 +106,7 @@ ham_entity *ham_entity_vcreate(
 }
 
 void ham_entity_destroy(ham_entity *ent){
-	if(ham_unlikely(ent == NULL)) return;
+	if(ham_unlikely(!ent)) return;
 
 	const auto world = ent->world;
 

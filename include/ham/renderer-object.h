@@ -98,17 +98,13 @@ static inline bool ham_impl_init_##derived_draw_group( \
 ){ \
 	return (derived_draw_group##_init)((derived_draw_group*)group, (derived_renderer*)r, num_shapes, shapes); \
 }\
-static inline void ham_impl_fini_##derived_draw_group(ham_draw_group *group){ \
-	(derived_draw_group##_fini)((derived_draw_group*)group); \
-} \
+static inline void ham_impl_fini_##derived_draw_group(ham_draw_group *group){ (derived_draw_group##_fini)((derived_draw_group*)group); } \
 ham_define_object_x( \
 	2, derived_draw_group, 1, ham_draw_group_vtable, \
 	derived_draw_group##_ctor, derived_draw_group##_dtor, \
 	( .init = ham_impl_init_##derived_draw_group, .fini = ham_impl_fini_##derived_draw_group ) \
 ) \
-static inline const ham_draw_group_vtable *ham_impl_draw_group_vtable_##derived_renderer(){ \
-	return (const ham_draw_group_vtable*)(ham_impl_object_vtable_name(derived_draw_group)()); \
-} \
+static inline const ham_draw_group_vtable *ham_impl_draw_group_vtable_##derived_renderer(){ return (const ham_draw_group_vtable*)(ham_impl_object_vtable_name(derived_draw_group)()); } \
 static inline bool ham_impl_init_##derived_renderer(ham_renderer *r){ return (init_fn)((derived_renderer*)r); } \
 static inline void ham_impl_fini_##derived_renderer(ham_renderer *r){ (fini_fn)((derived_renderer*)r); } \
 static inline void ham_impl_loop_##derived_renderer(ham_renderer *r, ham_f64 dt){ (loop_fn)((derived_renderer*)r, dt); } \
@@ -134,6 +130,17 @@ ham_define_object_x( \
 	)
 
 HAM_C_API_END
+
+#ifdef __cplusplus
+
+namespace ham{
+	namespace detail{
+		template<> struct ham_object_vtable<ham_renderer>: id<ham_renderer_vtable>{};
+		template<> struct ham_object_vtable<ham_draw_group>: id<ham_draw_group_vtable>{};
+	}
+}
+
+#endif // __cplusplus
 
 /**
  * @}

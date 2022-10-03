@@ -16,6 +16,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-ham_add_plugin(ham-net-steam net-steam.cpp)
+ham_add_plugin(
+	ham-net-steam
+	net-steam.h
+	net-steam.cpp
+	net-socket-steam.cpp
+)
 
 target_link_libraries(ham-net-steam PRIVATE Steamworks::Steamworks)

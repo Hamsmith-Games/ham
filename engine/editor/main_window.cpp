@@ -16,12 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "MainWindow.hpp"
+#include "main_window.hpp"
 
-namespace engine = ham::engine;
+namespace editor = ham::engine::editor;
 
-engine::MainWindow::MainWindow(){
+editor::main_window::main_window(){
 	setMinimumSize(854, 480);
 }
 
-engine::MainWindow::~MainWindow(){}
+editor::main_window::~main_window(){}

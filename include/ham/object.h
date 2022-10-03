@@ -195,10 +195,14 @@ HAM_C_API_END
 
 #ifdef __cplusplus
 
+#include "meta.hpp" // IWYU pragma: keep
+
 #include <concepts>
 
 namespace ham{
 	namespace meta{
+		// ham C objects
+
 		template<typename, typename = void>
 		struct is_ham_object: constant_bool<false>{};
 
@@ -211,8 +215,8 @@ namespace ham{
 		template<typename T>
 		constexpr inline bool is_ham_object_v = is_ham_object<T>::value;
 
-		template<typename Obj>
-		concept HamObject = is_ham_object_v<Obj>;
+		template<typename T>
+		concept HamObject = is_ham_object_v<T>;
 
 		template<typename Base, typename Derived, typename Enable = void>
 		struct is_ham_base_of: constant_bool<false>{};
@@ -231,6 +235,18 @@ namespace ham{
 		template<typename Base, typename Derived>
 		concept HamDerived = is_ham_base_of_v<Base, Derived>;
 
+		template<HamObject Obj, usize N = 1, typename Enable = void>
+		struct ham_object_super;
+
+		template<HamObject Obj>
+		struct ham_object_super<Obj, 0>: id<ham_object>{};
+
+		template<HamObject Obj, usize N>
+		struct ham_object_super<Obj, N>: ham_object_super<decltype(Obj::HAM_SUPER_NAME), N-1>{};
+
+		template<HamObject Obj, usize N = 1>
+		using ham_object_super_t = typename ham_object_super<Obj, N>::type;
+
 		template<typename Object>
 		struct ham_object_depth;
 
@@ -238,10 +254,27 @@ namespace ham{
 		struct ham_object_depth<ham_object>: constant_usize<0>{};
 
 		template<HamObject Obj>
-		struct ham_object_depth<Obj>: constant_usize<1 + ham_object_depth<decltype(Obj::HAM_SUPER_NAME)>::value>{};
+		struct ham_object_depth<Obj>: constant_usize<1 + ham_object_depth<ham_object_super_t<Obj>>::value>{};
 
 		template<HamObject Object>
 		constexpr inline usize ham_object_depth_v = ham_object_depth<Object>::value;
+
+		// ham C object vtables
+
+		template<typename T, typename Enable = void>
+		struct is_ham_object_vtable: constant_false{};
+
+		template<>
+		struct is_ham_object_vtable<ham_object_vtable>: constant_true{};
+
+		template<typename T>
+		struct is_ham_object_vtable<T, std::void_t<ham_object_super_t<T>>>: is_ham_object_vtable<ham_object_super_t<T>>{};
+
+		template<typename T>
+		constexpr inline bool is_ham_object_vtable_v = is_ham_object_vtable<T>::value;
+
+		template<typename T>
+		concept HamObjectVTable = is_ham_object_vtable_v<T>;
 
 		// Type for
 
@@ -305,40 +338,122 @@ namespace ham{
 	template<typename Obj>
 	concept HamObject = meta::HamObject<Obj>;
 
+	template<typename T>
+	concept HamObjectVTable = meta::HamObjectVTable<T>;
+
 	template<typename Base, typename Derived>
 	concept HamDerived = meta::HamDerived<Base, Derived>;
+
+	template<HamObject Obj, usize N = 1>
+	static inline auto super(Obj *obj) noexcept{
+		if constexpr(N == 1){
+			return &obj->HAM_SUPER_NAME;
+		}
+		else{
+			return super(&obj->HAM_SUPER_NAME);
+		}
+	}
+
+	namespace detail{
+		template<HamObject Obj>
+		static inline Obj *object_construct_va(const ham_object_vtable *vtable, ham_object *obj, usize nargs, ...){
+			va_list va;
+			va_start(va, nargs);
+			const auto ret = (Obj*)vtable->ctor(obj, nargs, va);
+			va_end(va);
+			return ret;
+		}
+	}
+
+	template<HamObject Obj, typename ... Args>
+	static inline Obj *object_construct(const ham_object_vtable *vtable, ham_object *obj, Args &&... args){
+		return detail::object_construct_va<Obj>(vtable, obj, sizeof...(Args), args...);
+	}
 
 	namespace detail{
 		template<HamObject Obj>
 		struct ham_object_vtable;
 
+		template<HamObject Obj>
+		using ham_object_vtable_t = typename ham_object_vtable<Obj>::type;
+
 		template<HamObject Base, HamDerived<Base> Derived>
-		struct ham_get_super{
+		struct ham_get_base{
 			static Base *get(Derived *ptr) noexcept{
 				if constexpr(std::is_same_v<Derived, Base>){
 					return ptr;
 				}
 				else if constexpr(std::is_same_v<decltype(Derived::HAM_SUPER_NAME), Base>){
-					return ham_super(ptr);
+					return super(ptr);
 				}
 				else{
-					return ham_get_super<Base, decltype(Derived::HAM_SUPER_NAME)>::get(ham_super(ptr));
+					return ham_get_base<Base, decltype(Derived::HAM_SUPER_NAME)>::get(ham_super(ptr));
 				}
 			}
 		};
+
+		template<HamObject Object, HamObjectVTable VTable, meta::cexpr_str Name, typename Ret, typename ... Args>
+		class ham_object_method_info{
+			public:
+				using object_type = Object;
+				using vtable_type = VTable;
+				using super_type  = meta::ham_object_super_t<object_type>;
+				using result_type = Ret;
+				using arg_types = type_tag<Args...>;
+
+				constexpr static str8 name() noexcept{
+					return str8(Name.data(), Name.len());
+				}
+		};
+
+		template<
+			HamObject Object,
+			HamObjectVTable VTable,
+			typename ... MethodInfos
+		>
+		struct ham_object_registration{
+			public:
+				using object_type = Object;
+				using vtable_type = VTable;
+				using super_type  = meta::ham_object_super_t<object_type>;
+
+				using object_ptr       = object_type*;
+				using object_const_ptr = const object_type*;
+				using vtable_ptr       = const vtable_type*;
+
+				ham_object_registration(){
+
+				}
+		};
 	}
 
+	template<typename Impl, typename Object>
+	class object_interface{};
+
 	template<HamObject Object>
-	class basic_object_view{
+	class object_view: public object_interface<object_view<Object>, Object>{
 		public:
 			using object_type = Object;
+			using vtable_type = detail::ham_object_vtable_t<object_type>;
+
+			using interface_type = object_interface<object_view<Object>, Object>;
 
 			template<HamDerived<Object> Derived>
-			basic_object_view(Derived *ptr_) noexcept
-				: m_obj(detail::ham_get_super<Object, Derived>::get(ptr_)){}
+			object_view(Derived *ptr_) noexcept
+				: m_obj(detail::ham_get_base<Object, Derived>::get(ptr_)){}
+
+			auto super() const noexcept -> std::enable_if_t<!std::is_same_v<Object, ham_object>, object_view<meta::ham_object_super_t<Object>>>{
+				return &m_obj->HAM_SUPER_NAME;
+			}
+
+			interface_type *operator->() noexcept{ return this; }
+			const interface_type *operator->() const noexcept{ return this; }
+
+			const vtable_type *vtable() const noexcept{ return detail::ham_get_base<ham_object, Object>::get(m_obj)->vtable; }
 
 			template<HamDerived<Object> Derived>
-			basic_object_view<Derived> dyn_cast(){
+			object_view<Derived> dyn_cast(){
+				// TODO: implement proper type information
 				return nullptr;
 			}
 

@@ -39,6 +39,28 @@ namespace ham::meta{
 
 			constexpr operator basic_str<Char>() const noexcept{ return basic_str(m_ptr, N-1); }
 
+			constexpr bool operator==(cexpr_str<Char, N> other) const noexcept{
+				for(usize i = 0; i < size(); i++){
+					if(m_ptr[i] != other.m_ptr[i]) return false;
+				}
+
+				return true;
+			}
+
+			template<usize M>
+			constexpr bool operator==(cexpr_str<Char, M>) const noexcept{ return false; }
+
+			constexpr bool operator!=(cexpr_str<Char, N> other) const noexcept{
+				for(usize i = 0; i < size(); i++){
+					if(m_ptr[i] == other.m_ptr[i]) return false;
+				}
+
+				return true;
+			}
+
+			template<usize M>
+			constexpr bool operator!=(cexpr_str<Char, M>) const noexcept{ return true; }
+
 			const Char *const m_ptr;
 	};
 

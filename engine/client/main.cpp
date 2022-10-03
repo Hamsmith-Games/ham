@@ -343,7 +343,15 @@ class net_subsystem: public ham::engine::subsys_base<net_subsystem>{
 
 			m_net = ham_net_create(HAM_NET_STEAMWORKS_PLUGIN_NAME, HAM_NET_STEAMWORKS_OBJECT_NAME);
 			if(!m_net){
-				ham_loginfof("ham-client-net", "Error creating ham_net");
+				ham_logerrorf("ham-client-net", "Error creating ham_net");
+				return false;
+			}
+
+			m_serv_sock = ham_net_socket_create(m_net, HAM_NET_EMPTY_PEER, 1476);
+			if(!m_serv_sock){
+				ham_logerrorf("ham-client-net", "Error create listen ham_net_socket");
+				ham_net_destroy(m_net);
+				m_net = nullptr;
 				return false;
 			}
 
@@ -352,6 +360,7 @@ class net_subsystem: public ham::engine::subsys_base<net_subsystem>{
 		}
 
 		void fini(ham_engine *engine) noexcept{
+			ham_net_socket_destroy(m_serv_sock);
 			ham_net_destroy(m_net);
 		}
 
@@ -361,6 +370,7 @@ class net_subsystem: public ham::engine::subsys_base<net_subsystem>{
 
 	private:
 		ham_net *m_net;
+		ham_net_socket *m_serv_sock;
 
 		friend class ham::engine::subsys_base<net_subsystem>;
 };

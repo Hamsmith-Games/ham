@@ -16,17 +16,45 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef HAM_ENGINE_EDITOR_MAINWINDOW_HPP
-#define HAM_ENGINE_EDITOR_MAINWINDOW_HPP 1
+#ifndef HAM_ENGINE_EDITOR_WELCOME_WIZARD_HPP
+#define HAM_ENGINE_EDITOR_WELCOME_WIZARD_HPP 1
 
 #include <QMainWindow>
+#include <QWizard>
 
-namespace ham::engine{
-	class MainWindow: public QMainWindow{
+#include "window.hpp"
+
+namespace ham::engine::editor{
+	class welcome_splash: public QWizardPage{
+		Q_OBJECT
+
 		public:
-			MainWindow();
-			~MainWindow();
+			welcome_splash(QWidget *parent = nullptr);
+			~welcome_splash();
+	};
+
+	class welcome_wizard: public QWizard{
+		Q_OBJECT
+
+		public:
+			welcome_wizard(QWidget *parent = nullptr);
+			~welcome_wizard();
+	};
+
+	class welcome_window: public window{
+		Q_OBJECT
+
+		public:
+			welcome_window(QWidget *parent = nullptr);
+			~welcome_window();
+
+		protected:
+			void new_proj_pressed();
+			void open_proj_pressed();
+
+		private:
+			QWidget *m_inner;
 	};
 }
 
-#endif // !HAM_ENGINE_EDITOR_MAINWINDOW_HPP
+#endif // !HAM_ENGINE_EDITOR_WELCOME_WIZARD_HPP

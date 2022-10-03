@@ -1459,6 +1459,8 @@ namespace ham{
 		template<unit Value> using constant_unit = constant_value<unit, Value>;
 
 		template<bool Value> using constant_bool = constant_value<bool, Value>;
+		using constant_true = constant_bool<true>;
+		using constant_false = constant_bool<false>;
 
 		template<i8  Value> using constant_i8  = constant_value<i8,  Value>;
 		template<u8  Value> using constant_u8  = constant_value<u8,  Value>;

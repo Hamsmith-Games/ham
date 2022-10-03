@@ -2,17 +2,9 @@
 #include "ham/plugin.h"
 #include "ham/log.h"
 
-#include <steam/steamnetworkingsockets.h>
+#include "net-gns.h"
 
 HAM_C_API_BEGIN
-
-struct ham_net_gns{
-	ham_derive(ham_net)
-};
-
-struct ham_net_vtable_gns{
-	ham_derive(ham_net_vtable)
-};
 
 static ham_net_gns *ham_net_gns_ctor(ham_net_gns *net, ham_usize nargs, va_list va){
 	(void)nargs; (void)va;
@@ -23,12 +15,25 @@ static void ham_net_gns_dtor(ham_net_gns *net){
 	std::destroy_at(net);
 }
 
-static void ham_net_gns_loop(ham_net *net, ham_f64 dt){
+static bool ham_net_gns_init(ham_net_gns *net){
+	(void)net;
+	return true;
+}
+
+static void ham_net_gns_fini(ham_net_gns *net){
+	(void)net;
+}
+
+static void ham_net_gns_loop(ham_net_gns *net, ham_f64 dt){
 	(void)net; (void)dt;
 
 }
 
-ham_define_object_x(2, ham_net_gns, 1, ham_net_vtable, ham_net_gns_ctor, ham_net_gns_dtor, ( .loop = ham_net_gns_loop ))
+static bool ham_net_gns_find_peer(ham_net_gns *net, ham_net_peer *ret, ham_str8 query){
+	return false;
+}
+
+ham_define_net_object(ham_net_gns, ham_net_socket_gns)
 
 static void ham_impl_gns_debug(ESteamNetworkingSocketsDebugOutputType type, const char *msg){
 	switch(type){

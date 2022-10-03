@@ -110,21 +110,21 @@ ham_nothrow static inline ham_f64 ham_ticker_tick(ham_ticker *ticker, ham_f64 ta
 
 	target_dt = ham_max(target_dt - ticker->avg_clock_dt, 0.0);
 
-	ham_timepoint_now(&ticker->loop, clk_id);
-	ham_duration dur = ham_timepoint_diff(ticker->end, ticker->loop);
+	ham_timepoint_now(&ticker->end, clk_id);
+	ham_duration dur = ham_timepoint_diff(ticker->loop, ticker->end);
 	ham_f64 dt = ham_duration_to_seconds64(dur);
 
 	const ham_f64 sleep_dt = ham_max(target_dt - dt, 0.0);
-	ham_duration sleep_rem = ham_duration_from_seconds64(sleep_dt);
-	while((sleep_rem.tv_sec + sleep_rem.tv_sec) != 0){
-		sleep_rem = ham_sleep(sleep_rem);
+	ham_duration sleep_dur = ham_duration_from_seconds64(sleep_dt);
+	while((sleep_dur.tv_nsec + sleep_dur.tv_sec) != 0){
+		sleep_dur = ham_sleep(sleep_dur);
 	}
 
-	ham_timepoint_now(&ticker->loop, clk_id);
-	dur = ham_timepoint_diff(ticker->end, ticker->loop);
+	ham_timepoint_now(&ticker->end, clk_id);
+	dur = ham_timepoint_diff(ticker->loop, ticker->end);
 	dt = ham_duration_to_seconds64(dur);
 
-	ticker->end = ticker->loop;
+	ticker->loop = ticker->end;
 	return dt;
 }
 

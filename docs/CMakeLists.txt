@@ -31,6 +31,7 @@ set(
 	"HAM_C_API_BEGIN="
 	"HAM_C_API_END="
 	"ham_api="
+	"ham_engine_api="
 	#"ham_nothrow="
 	"ham_nonnull_args(...)="
 	"ham_derive(x)=x HAM_SUPER_NAME\;"

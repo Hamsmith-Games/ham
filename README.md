@@ -1,6 +1,6 @@
 <h1 align="center">
 <br/>
-<img src="logo.png" width="512" />
+<img src="engine/editor/images/logo.png" width="512" />
 <br/>
 <br/>
 The Hamsmith Development Environment

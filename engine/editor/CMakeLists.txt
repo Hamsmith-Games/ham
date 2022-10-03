@@ -22,10 +22,19 @@ qt_standard_project_setup()
 
 ham_add_executable(
 	ham-engine-editor
+	images.qrc
+	fonts.qrc
+
 	main.cpp
 
-	MainWindow.hpp
-	MainWindow.cpp
+	window.hpp
+	window.cpp
+
+	welcome_wizard.hpp
+	welcome_wizard.cpp
+
+	main_window.hpp
+	main_window.cpp
 )
 
 set_target_properties(
@@ -34,6 +43,8 @@ set_target_properties(
 	    WIN32_EXECUTABLE ON
 		MACOSX_BUNDLE    ON
 		ENABLE_EXPORTS   ON
+		AUTORCC          ON
+		AUTOMOC          ON
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")

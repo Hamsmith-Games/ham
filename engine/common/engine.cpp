@@ -32,7 +32,14 @@ HAM_C_API_BEGIN
 
 static ham_engine *ham_impl_gengine = nullptr;
 
-ham_extern_c ham_public ham_export ham_nothrow ham_u32 ham_net_steam_appid(){ return ham_impl_gengine->app_info.appid; }
+ham_extern_c ham_public ham_export ham_nothrow ham_u32 ham_net_steam_appid(){
+	if(!ham_impl_gengine){
+		ham_logapiwarnf("Steam networking initialized before engine");
+		return 480;
+	}
+
+	return ham_impl_gengine->app_info.appid;
+}
 
 struct ham_impl_engine_data{
 	ham::str8 vtable_id;

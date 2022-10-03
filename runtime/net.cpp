@@ -92,11 +92,77 @@ void ham_net_destroy(ham_net *net){
 }
 
 void ham_net_loop(ham_net *net, ham_f64 dt){
-	if(ham_unlikely(!net)) return;
+	if(!ham_check(net != NULL)) return;
 
 	const auto vtable = (const ham_net_vtable*)ham_super(net)->vtable;
 
 	vtable->loop(net, dt);
+}
+
+bool ham_net_find_peer(ham_net *net, ham_net_peer *ret, ham_str8 query){
+	if(
+	   !ham_check(net != NULL) ||
+	   !ham_check(ret != NULL) ||
+	   !ham_check((query.len && query.ptr) || (!query.len && !query.ptr))
+	){
+		return false;
+	}
+
+	const auto vtable = (const ham_net_vtable*)ham_super(net)->vtable;
+
+	return vtable->find_peer(net, ret, query);
+}
+
+static inline ham_net_socket *ham_impl_net_socket_construct(ham_net_socket *sock, ...){
+	const auto obj_vt = ham_super(sock)->vtable;
+	const auto obj_info = obj_vt->info();
+
+	va_list va;
+	va_start(va, sock);
+	const auto ret = (ham_net_socket*)obj_vt->ctor(ham_super(sock), 2, va);
+	va_end(va);
+
+	return ret;
+}
+
+ham_net_socket *ham_net_socket_create(ham_net *net, ham_net_peer peer, ham_u16 port){
+	if(!ham_check(net != NULL)) return nullptr;
+
+	const auto vtable = ((const ham_net_vtable*)ham_super(net)->vtable)->socket_vtable();
+	const auto obj_vt = ham_super(vtable);
+
+	const auto obj_info = obj_vt->info();
+
+	const auto obj = (ham_net_socket*)ham_allocator_alloc(net->allocator, obj_info->alignment, obj_info->size);
+	if(!obj){
+		ham_logapierrorf("Error allocating memory for socket object \"%s\"", obj_info->type_id);
+		return nullptr;
+	}
+
+	ham_super(obj)->vtable = obj_vt;
+	obj->net = net;
+	obj->peer = peer;
+	obj->port = port;
+	obj->is_listen = ham_net_peer_cmp(peer, HAM_NET_EMPTY_PEER) == 0;
+
+	const auto ret = ham_impl_net_socket_construct(obj, peer, port);
+	if(!ret){
+		ham_logapierrorf("Error constructing socket object \"%s\"", obj_info->type_id);
+		ham_allocator_free(net->allocator, obj);
+		return nullptr;
+	}
+
+	return ret;
+}
+
+void ham_net_socket_destroy(ham_net_socket *socket){
+	if(ham_unlikely(socket == NULL)) return;
+
+	const auto obj_vt = ham_super(socket)->vtable;
+	const auto allocator = socket->net->allocator;
+
+	obj_vt->dtor(ham_super(socket));
+	ham_allocator_free(allocator, socket);
 }
 
 HAM_C_API_END

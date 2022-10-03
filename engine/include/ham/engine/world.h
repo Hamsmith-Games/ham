@@ -27,11 +27,16 @@
 
 #include "ham/engine/config.h"
 
+#include "ham/net.h"
 #include "ham/object.h"
 
 HAM_C_API_BEGIN
 
 typedef struct ham_world ham_world;
+
+ham_engine_api ham_world *ham_world_create(ham_net_socket *sock);
+
+ham_engine_api void ham_world_destroy(ham_world *world);
 
 /**
  * @defgroup HAM_ENGINE_WORLD_ENTITY Entities

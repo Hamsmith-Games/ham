@@ -34,6 +34,11 @@ if(NOT gns_content_POPULATED)
 	add_subdirectory(${gns_content_SOURCE_DIR} ${gns_content_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
-ham_add_plugin(ham-net-gns net-gns.cpp)
+ham_add_plugin(
+	ham-net-gns
+	net-gns.h
+	net-gns.cpp
+	net-socket-gns.cpp
+)
 
 target_link_libraries(ham-net-gns PRIVATE GameNetworkingSockets_s)

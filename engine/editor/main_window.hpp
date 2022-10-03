@@ -1,5 +1,5 @@
 /*
- * Ham World Engine Server Manager
+ * Ham World Engine Editor
  * Copyright (C) 2022  Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -16,11 +16,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef HAM_ENGINE_SERVER_H
-#define HAM_ENGINE_SERVER_H 1
+#ifndef HAM_ENGINE_EDITOR_MAIN_WINDOW_HPP
+#define HAM_ENGINE_EDITOR_MAIN_WINDOW_HPP 1
 
-#include "ham/engine.h"
+#include <QMainWindow>
 
-int ham_exec_server_manager(int argc, char *argv[]);
+namespace ham::engine::editor{
+	class main_window: public QMainWindow{
+		Q_OBJECT
 
-#endif // !HAM_ENGINE_SERVER_H
+		public:
+			main_window();
+			~main_window();
+	};
+}
+
+#endif // !HAM_ENGINE_EDITOR_MAIN_WINDOW_HPP
