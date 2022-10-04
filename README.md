@@ -37,7 +37,7 @@ The Ham runtime is the backbone of all other components in the project.
 <br/>
 
 <h2 align="center">
-<a href="engine/README.md">Ham World Engine</a>
+<a href="engine">Ham World Engine</a>
 <br/>
 <br/>
 </h2>
@@ -75,7 +75,7 @@ The Ham Language is currently a P.O.C and should not be used.
 <br/>
 
 <h1 align="center">Building the environment</h1>
-<h4 align="center">As easy as 1, 2, 3... probably.</h4>
+<p align="center"><b>As easy as 1, 2, 3... probably.</b></p>
 
 <br/>
 <br/>
@@ -93,20 +93,23 @@ cmake --build . -j $(nproc)
 <br/>
 
 <h1 align="center">Special thanks</h1>
-<h4 align="center">These projects made Ham possible ❤️</h4>
+<p align="center"><b>These projects made Ham possible ❤️</b></p>
 
 <br/>
 <br/>
 
-<h3 align="center"><a href="https://www.gnu.org/software/software.html">GNU Software</a></h3>
-<h3 align="center"><a href="https://fmt.dev/">{fmt}</a></h3>
-<h3 align="center"><a href="https://www.qt.io/">Qt Project</a></h3>
-<h3 align="center"><a href="https://www.libsdl.org/">Simple DirectMedia Layer</a></h3>
-<h3 align="center"><a href="https://github.com/ValveSoftware/GameNetworkingSockets">GameNetworkingSockets</a></h3>
-<h3 align="center"><a href="https://github.com/ibireme/yyjson">yyjson</a></h3>
-<h3 align="center"><a href="https://gmplib.org/">GNU MP</a></h3>
-<h3 align="center"><a href="https://www.mpfr.org/">GNU MPFR</a></h3>
-<h3 align="center"><a href="https://invisible-island.net/ncurses/">Ncurses</a></h3>
-<h3 align="center"><a href="https://github.com/martinus/robin-hood-hashing">robin_hood unordered map & set</a></h3>
-<h3 align="center"><a href="https://www.vulkan.org/">Vulkan</a></h3>
-<h3 align="center"><a href="https://openal-soft.org/">OpenAL Soft</a></h3>
+<p align="center"><a href="https://www.gnu.org/software/software.html">GNU Software</a></p>
+<p align="center"><a href="https://fmt.dev/">{fmt}</a></p>
+<p align="center"><a href="https://www.qt.io/">Qt Project</a></p>
+<p align="center"><a href="https://www.libsdl.org/">Simple DirectMedia Layer</a></p>
+<p align="center"><a href="https://github.com/ValveSoftware/GameNetworkingSockets">GameNetworkingSockets</a></p>
+<p align="center"><a href="https://github.com/ibireme/yyjson">yyjson</a></p>
+<p align="center"><a href="https://gmplib.org/">GNU MP</a></p>
+<p align="center"><a href="https://www.mpfr.org/">GNU MPFR</a></p>
+<p align="center"><a href="https://invisible-island.net/ncurses/">Ncurses</a></p>
+<p align="center"><a href="https://github.com/martinus/robin-hood-hashing">robin_hood unordered map & set</a></p>
+<p align="center"><a href="https://www.vulkan.org/">Vulkan</a></p>
+<p align="center"><a href="https://openal-soft.org/">OpenAL Soft</a></p>
+
+<br/>
+<br/>

@@ -18,7 +18,7 @@ This is where the magic happens.
 <br/>
 
 <h2 align="center">
-Runtime - `libham-engine`
+Runtime - <code>libham-engine</code>
 <br/>
 <br/>
 </h2>
@@ -33,7 +33,7 @@ This is where all of the actual engine work happens and can be embedded in exist
 <br/>
 
 <h2 align="center">
-Client - `ham-engine-client`
+Client - <code>ham-engine-client</code>
 <br/>
 <br/>
 </h2>
@@ -46,6 +46,7 @@ A portal into the worlds created with the engine.
 <br/>
 
 <h3>Dependencies</h3>
+
 - `libham-engine`
 - SDL2
 - Vulkan
@@ -56,7 +57,7 @@ A portal into the worlds created with the engine.
 <br/>
 
 <h2 align="center">
-Server - `ham-engine-server`
+Server - <code>ham-engine-server</code>
 <br/>
 <br/>
 </h2>
@@ -71,7 +72,7 @@ Host your own world!
 <br/>
 
 <h2 align="center">
-Editor - `ham-engine-editor`
+Editor - <code>ham-engine-editor</code>
 <br/>
 <br/>
 </h2>
@@ -84,6 +85,7 @@ Create games and applications.
 <br/>
 
 <h3>Dependencies</h3>
+
 - `libham-engine`
 - Qt6
 
