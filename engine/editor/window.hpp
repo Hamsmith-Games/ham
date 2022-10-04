@@ -50,6 +50,7 @@ namespace ham::engine::editor{
 			~window();
 
 			void set_central_widget(QWidget *widget);
+			QWidget *central_widget();
 
 		signals:
 			void maximized();

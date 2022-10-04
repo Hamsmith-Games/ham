@@ -1390,6 +1390,34 @@ namespace ham{
 			ctype m_val;
 	};
 
+	class version{
+		public:
+			constexpr version(u16 major_, u16 minor_, u16 patch_) noexcept
+				: m_val{ major_, minor_, patch_ }{}
+
+			constexpr version(const ham_version &val_) noexcept
+				: m_val{val_}{}
+
+			constexpr operator ham_version&() noexcept{ return m_val; }
+			constexpr operator const ham_version&() const noexcept{ return m_val; }
+
+			constexpr bool operator==(const version &rhs) const noexcept{ return ham_version_cmp(m_val, rhs.m_val) == 0; }
+			constexpr bool operator!=(const version &rhs) const noexcept{ return ham_version_cmp(m_val, rhs.m_val) != 0; }
+			constexpr bool operator< (const version &rhs) const noexcept{ return ham_version_cmp(m_val, rhs.m_val) <  0; }
+			constexpr bool operator> (const version &rhs) const noexcept{ return ham_version_cmp(m_val, rhs.m_val) >  0; }
+			constexpr bool operator<=(const version &rhs) const noexcept{ return ham_version_cmp(m_val, rhs.m_val) <= 0; }
+			constexpr bool operator>=(const version &rhs) const noexcept{ return ham_version_cmp(m_val, rhs.m_val) >= 0; }
+
+			constexpr bool is_compatible(const version &rhs) const noexcept{ return ham_version_is_compatible(m_val, rhs.m_val); }
+
+			constexpr u16 major() const noexcept{ return m_val.major; }
+			constexpr u16 minor() const noexcept{ return m_val.minor; }
+			constexpr u16 patch() const noexcept{ return m_val.patch; }
+
+		//private:
+			ham_version m_val;
+	};
+
 	class uuid{
 		public:
 			constexpr uuid() noexcept = default;
@@ -1514,6 +1542,24 @@ namespace fmt{
 	template<typename Char>
 	struct formatter<ham::basic_str<Char>>
 		: public formatter<basic_string_view<Char>>{};
+
+	template<>
+	struct formatter<ham_version>{
+		constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()){
+			if(ctx.begin() != ctx.end()){
+				throw format_error("invalid format");
+			}
+
+			return ctx.begin();
+		}
+
+		template<typename FormatContext>
+		auto format(const ham_version &ver, FormatContext &ctx) const -> decltype(ctx.out()){
+			return fmt::format_to(ctx.out(), "{}.{}.{}", ver.major, ver.minor, ver.patch);
+		}
+	};
+
+	template<> struct formatter<ham::version>: formatter<ham_version>{};
 }
 
 #endif // __cplusplus

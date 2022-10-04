@@ -127,9 +127,9 @@ static bool ham_net_on_load_steam(){
 
 	SteamNetworkingUtils()->SetDebugOutputFunction(
 		#ifdef HAM_DEBUG
-		k_ESteamNetworkingSocketsDebugOutputType_Verbose,
-		#else
 		k_ESteamNetworkingSocketsDebugOutputType_Msg,
+		#else
+		k_ESteamNetworkingSocketsDebugOutputType_Warning,
 		#endif
 		ham_impl_steam_debug
 	);

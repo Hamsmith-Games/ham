@@ -41,6 +41,31 @@ namespace ham::engine::editor{
 			~welcome_wizard();
 	};
 
+	class project_wizard: public QWizard{
+		Q_OBJECT
+
+		private:
+			class initial_page: public QWizardPage{
+				public:
+					initial_page(QWidget *parent = nullptr);
+					~initial_page();
+
+					bool validatePage() override;
+			};
+
+			class info_page: public QWizardPage{
+				public:
+					info_page(QWidget *parent = nullptr);
+					~info_page();
+
+					bool validatePage() override;
+			};
+
+		public:
+			project_wizard(QWidget *parent = nullptr);
+			~project_wizard();
+	};
+
 	class welcome_window: public window{
 		Q_OBJECT
 
@@ -53,7 +78,10 @@ namespace ham::engine::editor{
 			void open_proj_pressed();
 
 		private:
+			QWidget *createWelcomeSplash();
+
 			QWidget *m_inner;
+			QWidget *m_splash;
 	};
 }
 

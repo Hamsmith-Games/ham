@@ -1,5 +1,7 @@
 <h1 align="center">
 <br/>
+<img src="editor/images/ham.png" width="384" />
+<br/>
 <br/>
 The Ham World Engine
 <br/>

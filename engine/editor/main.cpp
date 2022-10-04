@@ -50,7 +50,7 @@ int main(int argc, char *argv[]){
 	const auto font_fam = QFontDatabase::applicationFontFamilies(font_id).at(0);
 
 	QFont app_font(font_fam);
-	app_font.setPixelSize(12);
+	app_font.setPointSize(9);
 
 	QStyle *app_style = QStyleFactory::create("fusion");
 

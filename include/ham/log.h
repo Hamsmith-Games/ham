@@ -159,6 +159,81 @@ static inline void ham_logf(ham_log_level level, const char *api, const char *fm
 
 HAM_C_API_END
 
+#ifdef __cplusplus
+
+#include "meta.hpp"
+#include "str_buffer.h"
+
+#include <source_location>
+
+namespace ham{
+	enum class log_level{
+		info = HAM_LOG_INFO,
+		verbose = HAM_LOG_VERBOSE,
+		debug = HAM_LOG_DEBUG,
+		warning = HAM_LOG_WARNING,
+		error = HAM_LOG_ERROR,
+		fatal = HAM_LOG_FATAL,
+	};
+
+	template<typename ... Args>
+	static inline void log(log_level level, const char8 *api, const fmt::format_string<Args...> &fmt_str, Args &&... args) noexcept{
+		ham_timepoint log_tp = (ham_timepoint){ 0, 0 };
+
+		if(!ham_timepoint_now(&log_tp, CLOCK_REALTIME)){
+			// bad place for this to happen :/
+		}
+
+		if(level == log_level::verbose && !ham_log_is_verbose()){
+			return;
+		}
+
+		format_buffered(sizeof(ham_impl_message_buf), ham_impl_message_buf, fmt_str, std::forward<Args>(args)...);
+
+		const ham_logger *logger = ham_current_logger();
+
+		logger->log(log_tp, static_cast<ham_log_level>(level), api, ham_impl_message_buf, logger->user);
+
+	#ifdef HAM_DEBUG
+		if(static_cast<int>(level) > HAM_LOG_WARNING){
+			ham_breakpoint();
+		}
+	#endif
+	}
+
+	template<typename ... Args>
+	static inline void loginfo(const char *api, const fmt::format_string<Args...> &fmt_str, Args &&... args) noexcept{
+		log(log_level::info, api, fmt_str, std::forward<Args>(args)...);
+	}
+
+	template<typename ... Args>
+	static inline void logverbose(const char *api, const fmt::format_string<Args...> &fmt_str, Args &&... args) noexcept{
+		log(log_level::verbose, api, fmt_str, std::forward<Args>(args)...);
+	}
+
+	template<typename ... Args>
+	static inline void logdebug(const char *api, const fmt::format_string<Args...> &fmt_str, Args &&... args) noexcept{
+		log(log_level::debug, api, fmt_str, std::forward<Args>(args)...);
+	}
+
+	template<typename ... Args>
+	static inline void logwarn(const char *api, const fmt::format_string<Args...> &fmt_str, Args &&... args) noexcept{
+		log(log_level::warning, api, fmt_str, std::forward<Args>(args)...);
+	}
+
+	template<typename ... Args>
+	static inline void logerror(const char *api, const fmt::format_string<Args...> &fmt_str, Args &&... args) noexcept{
+		log(log_level::error, api, fmt_str, std::forward<Args>(args)...);
+	}
+
+	template<typename ... Args>
+	static inline void logfatal(const char *api, const fmt::format_string<Args...> &fmt_str, Args &&... args) noexcept{
+		log(log_level::fatal, api, fmt_str, std::forward<Args>(args)...);
+	}
+}
+
+#endif // __cplusplus
+
 /**
  * @}
  */

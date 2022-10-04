@@ -5,5 +5,6 @@
         <file>images/maximize-btn.png</file>
         <file>images/min-btn.png</file>
         <file>images/resize-handle.png</file>
+        <file>images/folder-open.png</file>
     </qresource>
 </RCC>

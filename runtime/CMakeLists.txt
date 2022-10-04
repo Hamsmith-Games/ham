@@ -43,7 +43,7 @@ set(
 )
 
 if(NOT CMAKE_USE_PTHREADS_INIT)
-	message(FATLA_ERROR "Async currently only available with pthread support")
+	message(FATAL_ERROR "Async currently only available with POSIX thread API support")
 endif()
 
 if(WIN32)
@@ -67,6 +67,9 @@ add_library(ham::runtime ALIAS ham)
 
 set_target_properties(
 	ham PROPERTIES
+
+	C_EXTENSIONS ON
+	CXX_EXTENSIONS ON
 
 	C_VISIBILITY_PRESET hidden
 	CXX_VISIBILITY_PRESET hidden

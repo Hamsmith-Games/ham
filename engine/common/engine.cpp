@@ -57,7 +57,7 @@ static inline ham_uptr ham_impl_engine_thread_main(void *user){
 
 	ham_loginfof(
 		"ham-engine",
-		"Creating engine for app: %s v%d.%d.%d",
+		"Creating engine for app: %s v%u.%u.%u",
 		engine->app_info.display_name,
 		engine->app_info.version.major,
 		engine->app_info.version.minor,
@@ -249,24 +249,23 @@ static struct option ham_impl_long_options[] = {
 	{ 0,            0,                  0, 0 },
 };
 
-static inline bool ham_app_info_init(ham_str8 json_path, ham_app_info *ret){
-	const auto json_doc = ham_json_document_open(json_path);
+static inline bool ham_app_info_init(ham::str8 json_path, ham_app_info *ret){
+	const auto json_doc = ham::json_document::open(json_path);
 	if(!json_doc){
-		ham_logapierrorf("Failed to open app JSON: %.*s", (int)json_path.len, json_path.ptr);
+		ham_logapierrorf("Failed to open app JSON: %.*s", (int)json_path.len(), json_path.ptr());
 		return false;
 	}
 
-	const auto json_root = ham_json_document_root(json_doc);
+	const auto json_root = json_doc.root();
 
-	const auto appinfo = ham_json_object_get(json_root, "app-info");
+	const auto appinfo = json_root.object_get("app-info");
 	if(!appinfo){
 		ham_logapierrorf("Failed to get \"app-info\" object from app JSON");
-		ham_json_document_destroy(json_doc);
 		return false;
 	}
 
-	const auto appinfo_get = [appinfo](const ham_json_value **ret, const char *elem) -> bool{
-		*ret = ham_json_object_get(appinfo, elem);
+	const auto appinfo_get = [appinfo](ham::json_value_view<false> *ret, const char *elem) -> bool{
+		*ret = appinfo.object_get(elem);
 		if(!*ret){
 			ham_logapierrorf("Failed to get \"app-info.%s\" from app JSON", elem);
 			return false;
@@ -275,14 +274,14 @@ static inline bool ham_app_info_init(ham_str8 json_path, ham_app_info *ret){
 		return true;
 	};
 
-	const ham_json_value
-		*appinfo_id,
-		*appinfo_name,
-		*appinfo_display_name,
-		*appinfo_author,
-		*appinfo_version,
-		*appinfo_license,
-		*appinfo_desc
+	ham::json_value_view<false>
+		appinfo_id,
+		appinfo_name,
+		appinfo_display_name,
+		appinfo_author,
+		appinfo_version,
+		appinfo_license,
+		appinfo_desc
 	;
 	if(
 		!appinfo_get(&appinfo_id,           "id") ||
@@ -293,36 +292,32 @@ static inline bool ham_app_info_init(ham_str8 json_path, ham_app_info *ret){
 		!appinfo_get(&appinfo_license,      "license") ||
 		!appinfo_get(&appinfo_desc,         "desc")
 	){
-		ham_json_document_destroy(json_doc);
 		return false;
 	}
 
 	// Value checking
 
-	if(!ham_json_is_nat(appinfo_id)){
+	if(!appinfo_id.is_nat()){
 		ham_logapierrorf("Invalid type for \"app-info.id\": expected uint");
-		ham_json_document_destroy(json_doc);
 		return false;
 	}
 
-	const auto version_len = ham_json_array_iterate(appinfo_version, nullptr, nullptr);
+	const auto version_len = appinfo_version.array_len();
 	if(version_len != 3){
 		ham_logapierrorf("Invalid version array: bad length (expected 3)");
-		ham_json_document_destroy(json_doc);
 		return false;
 	}
 
-	const auto appinfo_ver_major = ham_json_array_get(appinfo_version, 0);
-	const auto appinfo_ver_minor = ham_json_array_get(appinfo_version, 1);
-	const auto appinfo_ver_patch = ham_json_array_get(appinfo_version, 2);
+	const auto appinfo_ver_major = appinfo_version.array_get(0);
+	const auto appinfo_ver_minor = appinfo_version.array_get(1);
+	const auto appinfo_ver_patch = appinfo_version.array_get(2);
 
 	if(
-	   !ham_json_is_nat(appinfo_ver_major) ||
-	   !ham_json_is_nat(appinfo_ver_minor) ||
-	   !ham_json_is_nat(appinfo_ver_patch)
+	   !appinfo_ver_major.is_nat() ||
+	   !appinfo_ver_minor.is_nat() ||
+	   !appinfo_ver_patch.is_nat()
 	){
 		ham_logapierrorf("Invalid version array: bad element type (expected uint)");
-		ham_json_document_destroy(json_doc);
 		return false;
 	}
 
@@ -330,25 +325,23 @@ static inline bool ham_app_info_init(ham_str8 json_path, ham_app_info *ret){
 
 	// Write good values
 
-	ret->appid = ham_json_get_nat(appinfo_id);
+	ret->appid = appinfo_id.get_nat();
 
-	ret->version.major = ham_json_get_nat(appinfo_ver_major);
-	ret->version.minor = ham_json_get_nat(appinfo_ver_minor);
-	ret->version.patch = ham_json_get_nat(appinfo_ver_patch);
+	ret->version.major = appinfo_ver_major.get_nat();
+	ret->version.minor = appinfo_ver_minor.get_nat();
+	ret->version.patch = appinfo_ver_patch.get_nat();
 
-	const auto name = ham_json_get_str(appinfo_name);
-	memcpy(ret->name, name.ptr, name.len);
-	ret->name[name.len] = '\0';
+	const auto name = appinfo_name.get_str();
+	memcpy(ret->name, name.ptr(), name.len());
+	ret->name[name.len()] = '\0';
 
-	const auto display_name = ham_json_get_str(appinfo_display_name);
-	memcpy(ret->display_name, display_name.ptr, display_name.len);
-	ret->display_name[display_name.len] = '\0';
+	const auto display_name = appinfo_display_name.get_str();
+	memcpy(ret->display_name, display_name.ptr(), display_name.len());
+	ret->display_name[display_name.len()] = '\0';
 
-	const auto author = ham_json_get_str(appinfo_author);
-	memcpy(ret->author, author.ptr, author.len);
-	ret->author[author.len] = '\0';
-
-	ham_json_document_destroy(json_doc);
+	const auto author = appinfo_author.get_str();
+	memcpy(ret->author, author.ptr(), author.len());
+	ret->author[author.len()] = '\0';
 
 	return true;
 }

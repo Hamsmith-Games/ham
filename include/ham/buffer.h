@@ -66,7 +66,7 @@ static inline bool ham_buffer_init(ham_buffer *buf, ham_usize alignment, ham_usi
 	const ham_allocator *cur_allocator = ham_current_allocator();
 
 	void *const mem = ham_allocator_alloc(cur_allocator, alignment, initial_capacity);
-	if(!mem) return false;
+	if(ham_unlikely(!mem)) return false;
 
 	buf->allocator = cur_allocator;
 	buf->mem = mem;
@@ -77,7 +77,7 @@ static inline bool ham_buffer_init(ham_buffer *buf, ham_usize alignment, ham_usi
 }
 
 static inline void ham_buffer_finish(ham_buffer *buf){
-	if(!buf) return;
+	if(ham_unlikely(!buf)) return;
 
 	if(buf->mem) ham_allocator_free(buf->allocator, buf->mem);
 

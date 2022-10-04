@@ -177,10 +177,12 @@ editor::window::window(QWidget *parent)
 	const auto resize_handle_br = new resize_handle(Qt::BottomRightCorner, this);
 
 	const auto inner_lay = new QVBoxLayout;
+	//inner_lay->setContentsMargins(0, 0, 0, 0);
 	m_inner->setLayout(inner_lay);
 
 	const auto window_lay = new QVBoxLayout;
 
+	m_inner->setContentsMargins(0, 0, 0, 0);
 	m_inner->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 
 	window_lay->setContentsMargins(0, 0, 0, 0);
@@ -202,13 +204,19 @@ editor::window::~window(){}
 void editor::window::set_central_widget(QWidget *widget){
 	const auto layout = m_inner->layout();
 
-	const auto &inner_children = m_inner->children();
-	if(!inner_children.empty()){
-		const auto child = m_inner->childAt(0, 0);
-		layout->removeWidget(child);
+	if(!layout->isEmpty()){
+		const auto item = layout->takeAt(0);
+		layout->removeItem(item);
+		item->widget()->setParent(nullptr);
 	}
 
 	layout->addWidget(widget);
+}
+
+QWidget *editor::window::central_widget(){
+	const auto layout = m_inner->layout();
+	if(layout->isEmpty()) return nullptr;
+	else return layout->takeAt(0)->widget();
 }
 
 void editor::window::changeEvent(QEvent *event){

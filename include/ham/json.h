@@ -57,6 +57,7 @@ typedef enum ham_json_type{
 
 ham_api ham_json_type ham_json_get_type(const ham_json_value *json);
 
+ham_api bool ham_json_is_null(const ham_json_value *json);
 ham_api bool ham_json_is_object(const ham_json_value *json);
 ham_api bool ham_json_is_array(const ham_json_value *json);
 ham_api bool ham_json_is_bool(const ham_json_value *json);
@@ -95,6 +96,111 @@ ham_api ham_f64 ham_json_get_real(const ham_json_value *json);
 ham_api ham_str8 ham_json_get_str(const ham_json_value *json);
 
 HAM_C_API_END
+
+#ifdef __cplusplus
+
+namespace ham{
+	enum class json_type{
+		null = HAM_JSON_NULL,
+		object = HAM_JSON_OBJECT,
+		array = HAM_JSON_ARRAY,
+		bool_ = HAM_JSON_BOOL,
+		nat = HAM_JSON_NAT,
+		int_ = HAM_JSON_INT,
+		real = HAM_JSON_REAL,
+		string = HAM_JSON_STRING,
+		raw = HAM_JSON_RAW,
+	};
+
+	template<bool Mutable = false>
+	class json_value_view{
+		public:
+			using handle_type = std::conditional_t<Mutable, ham_json_value*, const ham_json_value*>;
+
+			json_value_view(handle_type val = nullptr) noexcept
+				: m_val(val){}
+
+			operator bool() const noexcept{ return m_val != nullptr; }
+
+			template<bool UMutable = Mutable>
+			operator handle_type() const noexcept{ return m_val; }
+
+			json_type type() const noexcept{
+				return static_cast<json_type>(ham_json_get_type(m_val));
+			}
+
+			usize object_len() const noexcept{ return ham_json_object_iterate(m_val, nullptr, nullptr); }
+			json_value_view<Mutable> object_get(const char *key) const noexcept{ return ham_json_object_get(m_val, key); }
+
+			template<typename Fn>
+			usize object_iterate(Fn &&f) const noexcept(noexcept(std::forward<Fn>(f)(std::declval<const ham_json_value*>()))){
+				constexpr auto wrapper = +[](const ham_json_value *val, void *user) -> bool{
+					const auto fptr = reinterpret_cast<std::remove_reference_t<Fn>*>(user);
+					return (*fptr)(val);
+				};
+
+				return ham_json_object_iterate(m_val, wrapper, &f);
+			}
+
+			usize array_len() const noexcept{ return ham_json_array_iterate(m_val, nullptr, nullptr); }
+			json_value_view<Mutable> array_get(usize idx) const noexcept{ return ham_json_array_get(m_val, idx); }
+
+			template<typename Fn>
+			usize array_iterate(Fn &&f) const noexcept(noexcept(std::forward<Fn>(f)(std::declval<const ham_json_value*>()))){
+				constexpr auto wrapper = +[](const ham_json_value *val, void *user) -> bool{
+					const auto fptr = reinterpret_cast<std::remove_reference_t<Fn>*>(user);
+					return (*fptr)(val);
+				};
+
+				return ham_json_array_iterate(m_val, wrapper, &f);
+			}
+
+			bool is_null()   const noexcept{ return ham_json_is_null(m_val); }
+			bool is_object() const noexcept{ return ham_json_is_object(m_val); }
+			bool is_array()  const noexcept{ return ham_json_is_array(m_val); }
+			bool is_bool()   const noexcept{ return ham_json_is_bool(m_val); }
+			bool is_nat()    const noexcept{ return ham_json_is_nat(m_val); }
+			bool is_int()    const noexcept{ return ham_json_is_int(m_val); }
+			bool is_real()   const noexcept{ return ham_json_is_real(m_val); }
+			bool is_str()    const noexcept{ return ham_json_is_str(m_val); }
+			bool is_raw()    const noexcept{ return ham_json_is_raw(m_val); }
+
+			uptr get_nat()  const noexcept{ return ham_json_get_nat(m_val); }
+			iptr get_int()  const noexcept{ return ham_json_get_int(m_val); }
+			f64  get_real() const noexcept{ return ham_json_get_real(m_val); }
+			str8 get_str()  const noexcept{ return ham_json_get_str(m_val); }
+
+		private:
+			handle_type m_val;
+	};
+
+	json_value_view(ham_json_value*) -> json_value_view<true>;
+	json_value_view(const ham_json_value*) -> json_value_view<false>;
+
+	class json_document{
+		public:
+			json_document(const str8 &json)
+				: m_handle(ham_json_document_create(json)){}
+
+			static json_document open(const str8 &path){
+				return json_document(path_tag{}, path);
+			}
+
+			operator bool() const& noexcept{ return m_handle.get() != nullptr; }
+
+			json_value_view<false> root() const noexcept{ return ham_json_document_root(m_handle.get()); }
+
+		private:
+			struct path_tag{};
+
+			json_document(path_tag, const str8 &path)
+				: m_handle(ham_json_document_open(path)){}
+
+			unique_handle<ham_json_document*, ham_json_document_destroy> m_handle;
+	};
+}
+
+#endif // __cplusplus
 
 /**
  * @}

@@ -316,7 +316,7 @@ namespace ham{
 	template<typename ... Args>
 	str8 format_buffered(
 		usize buf_size, char *buf,
-		fmt::format_string<Args...> fmt_str, Args &&... args
+		const fmt::format_string<Args...> &fmt_str, Args &&... args
 	){
 		if(buf_size < 2) return str8();
 
@@ -325,11 +325,13 @@ namespace ham{
 			fmt_str, std::forward<Args>(args)...
 		);
 
+		*fmt_res.out = '\0';
+
 		return str8(buf, fmt_res.size);
 	}
 
 	template<typename ... Args>
-	str_buffer_utf8 format(fmt::format_string<Args...> fmt_str, Args &&... args){
+	str_buffer_utf8 format(const fmt::format_string<Args...> &fmt_str, Args &&... args){
 		str_buffer_utf8 ret;
 		fmt::format_to(
 			std::back_inserter(ret),

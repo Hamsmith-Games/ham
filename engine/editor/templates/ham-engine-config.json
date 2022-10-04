@@ -1,0 +1,10 @@
+{
+	"engine-client": {
+		"width": 1280,
+		"height": 720
+	},
+	"renderer": {
+		"plugin": "ham-renderer-vulkan",
+		"object": "ham_renderer_vulkan"
+	}
+}

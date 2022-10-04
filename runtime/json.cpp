@@ -24,7 +24,7 @@ ham_json_document *ham_json_document_create(ham_str8 json){
 
 	ptr->allocator = allocator;
 
-	ptr->yydoc = yyjson_read(json.ptr, json.len, 0);
+	ptr->yydoc = yyjson_read(json.ptr, json.len, YYJSON_READ_ALLOW_COMMENTS | YYJSON_READ_ALLOW_TRAILING_COMMAS);
 	if(!ptr->yydoc){
 		ham_logapierrorf("Error in yyjson_read");
 		ham_allocator_delete(allocator, ptr);
@@ -119,6 +119,7 @@ ham_json_type ham_json_get_type(const ham_json_value *json){
 // Type introspection
 //
 
+bool ham_json_is_null(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_null((yyjson_val*)json) : false; }
 bool ham_json_is_object(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_obj((yyjson_val*)json) : false; }
 bool ham_json_is_array(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_arr((yyjson_val*)json) : false; }
 bool ham_json_is_bool(const ham_json_value *json){ return ham_check(json != NULL) ? unsafe_yyjson_is_bool((yyjson_val*)json) : false; }
