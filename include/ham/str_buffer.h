@@ -203,6 +203,9 @@ namespace ham{
 
 			basic_str_buffer(): m_handle(detail::str_buffer_ctype_create_allocator<Char>(ham_current_allocator(), str_type{})){}
 
+			basic_str_buffer(const basic_str_buffer &other)
+				: m_handle(detail::str_buffer_ctype_create_allocator<Char>(ham_current_allocator(), other.get())){}
+
 			explicit basic_str_buffer(const ham_allocator *allocator_)
 				: m_handle(detail::str_buffer_ctype_create_allocator<Char>(allocator_, str_type{})){}
 
@@ -220,15 +223,21 @@ namespace ham{
 
 			basic_str_buffer &operator=(basic_str_buffer&&) noexcept = default;
 
-			basic_str_buffer &operator=(const str_type &str_){
-				set(str_);
-				// TODO: signal an error; exception?
+			basic_str_buffer &operator=(const basic_str_buffer &other){
+				if(this != &other){
+					set(other.get());
+				}
+
 				return *this;
 			}
 
-			operator str_type() const& noexcept{ return get(); }
+			basic_str_buffer &operator=(const str_type &str_){
+				set(str_);
+				// TODO: signal on error; exception?
+				return *this;
+			}
 
-			operator str_type() const&& = delete;
+			operator str_type() const noexcept{ return get(); }
 
 			int compare(const str_type &other) const noexcept{ return get().compare(other); }
 
@@ -347,23 +356,32 @@ namespace ham{
 	template<> struct hash_functor<str_buffer_utf32>: hash_functor<str32>{};
 }
 
-template<>
-struct std::hash<ham::str_buffer_utf8>: ham::hash_functor<ham::str_buffer_utf8>{};
-
-template<>
-struct std::hash<ham::str_buffer_utf16>: ham::hash_functor<ham::str_buffer_utf16>{};
-
-template<>
-struct std::hash<ham::str_buffer_utf32>: ham::hash_functor<ham::str_buffer_utf32>{};
+namespace std{
+	template<typename Char>
+	struct hash<ham::basic_str_buffer<Char>>: ham::hash_functor<ham::basic_str_buffer<Char>>{};
+}
 
 template<typename Char>
 inline std::basic_ostream<Char> &operator<<(std::basic_ostream<Char> &stream, const ham::basic_str_buffer<Char> &str){
 	return stream << str.get();
 }
 
-template<typename Char>
-struct fmt::formatter<ham::basic_str_buffer<Char>>
-	: fmt::formatter<ham::basic_str<Char>>{};
+namespace fmt{
+	template<typename Char>
+	struct formatter<ham::basic_str_buffer<Char>>{
+		public:
+			formatter<ham::basic_str<Char>> str_formatter;
+
+			constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()){
+				return str_formatter.parse(ctx);
+			}
+
+			template<typename FormatContext>
+			auto format(const ham::basic_str<Char> &str, FormatContext &ctx) const -> decltype(ctx.out()){
+				return str_formatter.format(str, ctx);
+			}
+	};
+}
 
 #endif // __cplusplus
 

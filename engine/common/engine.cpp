@@ -249,6 +249,7 @@ static struct option ham_impl_long_options[] = {
 	{ 0,            0,                  0, 0 },
 };
 
+// TODO: not get app info from a JSON file
 static inline bool ham_app_info_init(ham::str8 json_path, ham_app_info *ret){
 	const auto json_doc = ham::json_document::open(json_path);
 	if(!json_doc){

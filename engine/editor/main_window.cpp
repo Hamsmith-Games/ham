@@ -18,10 +18,30 @@
 
 #include "main_window.hpp"
 
+#include <QVBoxLayout>
+
 namespace editor = ham::engine::editor;
 
-editor::main_window::main_window(){
+editor::main_window::main_window(class project *project_, QWidget *parent)
+	: window(parent)
+	, m_proj(project_)
+	, m_world_view(new editor::world_view(this))
+{
 	setMinimumSize(854, 480);
+	setWindowTitle(QString("%1 - %2").arg(tr("Ham"), project_->name()));
+
+	project_->setParent(this);
+
+	const auto inner = new QWidget;
+	inner->setContentsMargins(0, 0, 0, 0);
+
+	const auto layout = new QVBoxLayout;
+
+	layout->addWidget(m_world_view, 1);
+
+	inner->setLayout(layout);
+
+	set_central_widget(inner);
 }
 
 editor::main_window::~main_window(){}

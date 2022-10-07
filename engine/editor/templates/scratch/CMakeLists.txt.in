@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
+
+project(
+	{{ham_project_name}}
+	VERSION "{{ham_project_version}}"
+	DESCRIPTION "{{ham_project_description}}"
+	LANGUAGES C CXX
+)
+
+include(HamEngine)

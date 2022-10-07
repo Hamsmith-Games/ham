@@ -33,6 +33,7 @@ set(
 	fs.cpp
 	plugin.cpp
 	colony.cpp
+	octree.cpp
 	str_buffer.cpp
 	lex.cpp
 	parse.cpp
@@ -40,6 +41,7 @@ set(
 	shape.cpp
 	net.cpp
 	renderer.cpp
+	ham.cpp
 )
 
 if(NOT CMAKE_USE_PTHREADS_INIT)

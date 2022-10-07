@@ -1,5 +1,5 @@
 /*
- * Ham Programming Language Tests
+ * Ham Runtime Tests
  * Copyright (C) 2022  Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -27,8 +27,6 @@ using namespace ham::typedefs;
 #define HAM_TEST_UTF_STR "🍖abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789?\\\n\r"
 
 bool ham_test_utf(){
-	std::cout << "Running unicode tests... " << std::flush;
-
 	constexpr char8  u8str[]  = HAM_TEST_UTF_STR;
 	constexpr char32 u32str[] = HAM_CONCAT(U, HAM_TEST_UTF_STR);
 
@@ -39,9 +37,7 @@ bool ham_test_utf(){
 	while(off < (sizeof(u8str)-1)){
 		const auto nchars = ham_str_next_codepoint_utf8(&cp, u8str + off, sizeof(u8str) - (off+1));
 		if(nchars == (usize)-1 || u32str[u32idx] != cp){
-			std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
-
-			std::cerr << "    Test failed at character " << off << " '" << u8str[u32idx] << "'\n" << std::flush;
+			std::cerr << "Test failed at character " << off << " '" << u8str[u32idx] << "'\n" << std::flush;
 			return false;
 		}
 
@@ -49,6 +45,5 @@ bool ham_test_utf(){
 		++u32idx;
 	}
 
-	std::cout << HAM_TEST_PASSED_STR "\n";
 	return true;
 }

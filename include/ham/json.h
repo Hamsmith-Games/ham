@@ -99,6 +99,8 @@ HAM_C_API_END
 
 #ifdef __cplusplus
 
+#include "str_buffer.h"
+
 namespace ham{
 	enum class json_type{
 		null = HAM_JSON_NULL,
@@ -153,6 +155,28 @@ namespace ham{
 				};
 
 				return ham_json_array_iterate(m_val, wrapper, &f);
+			}
+
+			json_value_view<Mutable> operator[](usize idx) const noexcept{
+				const auto obj_type = type();
+				switch(obj_type){
+					case json_type::array: return array_get(idx);
+
+					case json_type::object:{
+						char num_buf[21] = { 0 }; // 2^64=18446744073709551616 is 20 sf
+						format_buffered(sizeof(num_buf), num_buf, "{}", idx);
+						return object_get(num_buf);
+					}
+
+					default: return nullptr;
+				}
+			}
+
+			json_value_view<Mutable> operator[](const char *key) const noexcept{
+				switch(type()){
+					case json_type::object: return object_get(key);
+					default: return nullptr;
+				}
 			}
 
 			bool is_null()   const noexcept{ return ham_json_is_null(m_val); }

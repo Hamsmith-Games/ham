@@ -1,5 +1,5 @@
 /*
- * Ham Programming Language Tests
+ * Ham Runtime Tests
  * Copyright (C) 2022  Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -28,9 +28,6 @@ constexpr auto test_lex_src = HAM_LIT_UTF8(
 );
 
 bool ham_test_lex(){
-	std::cout << "Running lexer tests... ";
-	std::cout << std::flush;
-
 	ham::source_location loc(
 		HAM_LIT("test-src"),
 		0, 0
@@ -52,14 +49,10 @@ bool ham_test_lex(){
 		const auto tok_str = tok.str();
 		const auto tok_loc = tok.source_location();
 
-		std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
-
-		std::cerr
-			<< "    Lexing error[" << tok_loc.line() + 1 << ":" << tok_loc.column()+1 << "]: " << tok_str << '\n';
+		std::cerr << "Lexing error[" << tok_loc.line() + 1 << ":" << tok_loc.column()+1 << "]: " << tok_str << '\n';
 
 		return false;
 	}
 
-	std::cout << HAM_TEST_PASSED_STR "\n";
 	return true;
 }

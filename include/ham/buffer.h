@@ -77,7 +77,7 @@ static inline bool ham_buffer_init(ham_buffer *buf, ham_usize alignment, ham_usi
 }
 
 static inline void ham_buffer_finish(ham_buffer *buf){
-	if(ham_unlikely(!buf)) return;
+	if(ham_unlikely(!buf) || ham_unlikely(!buf->allocator)) return;
 
 	if(buf->mem) ham_allocator_free(buf->allocator, buf->mem);
 
@@ -133,7 +133,258 @@ static inline ham_usize ham_buffer_size(const ham_buffer *buf){ return buf ? buf
 
 static inline void *ham_buffer_data(ham_buffer *buf){ return buf ? buf->mem : ham_null; }
 
+static inline bool ham_buffer_erase(ham_buffer *buf, ham_usize from, ham_usize len){
+	if(!buf || !buf->mem || from >= buf->allocated) return false;
+
+	const ham_usize actual_len = ham_min(len, buf->allocated - from);
+	const ham_usize after_len  = buf->allocated - (from + actual_len);
+
+	char *const it = (char*)buf->mem + from;
+
+	char *const after_beg = it + actual_len;
+	char *const after_end = after_beg + after_len;
+
+	if(after_beg != after_end){
+		memmove(it, after_beg, after_len);
+	}
+
+	buf->allocated -= actual_len;
+	return true;
+}
+
+static inline bool ham_buffer_insert(ham_buffer *buf, ham_usize offset, const void *data, ham_usize len){
+	if(!buf || !buf->mem) return false;
+
+	offset = ham_min(offset, buf->allocated);
+
+	if(!ham_buffer_resize(buf, buf->allocated + len)) return false;
+
+	const ham_usize rem = buf->allocated - (offset + len);
+
+	char *const it = (char*)buf->mem + offset;
+	char *const it_end = it + len;
+
+	if(rem > 0){
+		memcpy(it_end, it, rem);
+	}
+
+	memcpy(it, data, len);
+
+	return true;
+}
+
 HAM_C_API_END
+
+#include "str_buffer.h"
+
+namespace ham{
+	class basic_buffer_exception: public exception{};
+
+	class basic_buffer_ctor_error: public basic_buffer_exception{
+		public:
+			const char *api() const noexcept override{ return "ham::basic_buffer::basic_buffer"; }
+			const char *what() const noexcept override{ return "Error in ham_buffer_init"; }
+	};
+
+	class basic_buffer_emplace_error: public basic_buffer_exception{
+		public:
+			const char *api() const noexcept override{ return "ham::basic_buffer::emplace_back"; }
+			const char *what() const noexcept override{ return "Error in ham_buffer_resize"; }
+	};
+
+	class basic_buffer_at_error: public basic_buffer_exception{
+		public:
+			basic_buffer_at_error(usize idx)
+				: m_msg(format("No element at index {}", idx)){}
+
+			const char *api() const noexcept override{ return "ham::basic_buffer::at"; }
+			const char *what() const noexcept override{ return m_msg.c_str(); }
+
+		private:
+			str_buffer_utf8 m_msg;
+	};
+
+	class basic_buffer_copy_error: public basic_buffer_exception{
+		public:
+			const char *api() const noexcept override{ return "ham::basic_buffer"; }
+			const char *what() const noexcept override{ return "Error in ham_buffer_resize"; }
+	};
+
+	template<typename T>
+		requires std::is_same_v<T, void> || (std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>)
+	class basic_buffer{
+		public:
+			static_assert(std::is_same_v<T, std::remove_cvref_t<T>>);
+
+			using value_type = std::conditional_t<std::is_same_v<T, void>, char, T>;
+
+			using pointer       = value_type*;
+			using const_pointer = const value_type*;
+
+			using reference       = value_type&;
+			using const_reference = const value_type&;
+
+			static constexpr usize value_alignment = std::conditional_t<std::is_same_v<T, void>, meta::constant_usize<alignof(void*)>, meta::constant_usize<alignof(T)>>::value;
+			static constexpr usize value_size      = std::conditional_t<std::is_same_v<T, void>, meta::constant_usize<1>,              meta::constant_usize<sizeof(T)>>::value;
+
+			template<
+				bool HasDefaultCtor = !std::is_same_v<T, void>,
+				std::enable_if_t<HasDefaultCtor, int> = 0
+			>
+			explicit basic_buffer(usize initial_capacity = 0){
+				if(!ham_buffer_init(&m_buf, value_alignment, initial_capacity * value_size)){
+					throw basic_buffer_ctor_error();
+				}
+			}
+
+			template<
+				bool HasSizedCtor = std::is_same_v<T, void>,
+				std::enable_if_t<HasSizedCtor, int> = 0
+			>
+			explicit basic_buffer(usize alignment, usize initial_capacity = 0){
+				if(!ham_buffer_init(&m_buf, alignment, initial_capacity)){
+					throw basic_buffer_ctor_error();
+				}
+			}
+
+			basic_buffer(const std::initializer_list<value_type> &values){
+				if(!ham_buffer_init(&m_buf, value_alignment, values.size() * value_size)){
+					throw basic_buffer_ctor_error();
+				}
+
+				if(!ham_buffer_resize(&m_buf, values.size() * value_size)){
+					throw basic_buffer_copy_error();
+				}
+
+				std::uninitialized_copy_n(values.begin(), values.size(), (pointer)m_buf.mem);
+			}
+
+			basic_buffer(basic_buffer &&other) noexcept
+				: m_buf(other.m_buf)
+			{
+				memset(&other.m_buf, 0, sizeof(ham_buffer));
+			}
+
+			basic_buffer(const basic_buffer &other){
+				if(!ham_buffer_init(&m_buf, value_alignment, other.m_buf.allocated)){
+					throw basic_buffer_ctor_error();
+				}
+
+				if(!ham_buffer_resize(&m_buf, other.m_buf.allocated)){
+					throw basic_buffer_copy_error();
+				}
+
+				std::uninitialized_copy_n((const_pointer)other.m_buf.mem, other.size(), (pointer)m_buf.mem);
+			}
+
+			~basic_buffer(){
+				if(m_buf.mem){
+					const auto len = size();
+					const auto data_ = data();
+					std::destroy_n(data_, len);
+					ham_buffer_finish(&m_buf);
+				}
+			}
+
+			basic_buffer &operator=(basic_buffer &&other) noexcept{
+				if(this != &other){
+					const auto len = size();
+					const auto data_ = data();
+					std::destroy_n(data_, len);
+
+					ham_buffer_finish(&m_buf);
+
+					memcpy(&m_buf, &other.m_buf, sizeof(ham_buffer));
+					memset(&other.m_buf, 0, sizeof(ham_buffer));
+				}
+
+				return *this;
+			}
+
+			basic_buffer &operator=(const basic_buffer &other){
+				if(this != &other){
+					const auto len = size();
+					const auto data_ = data();
+					std::destroy_n(data_, len);
+
+					if(!ham_buffer_resize(&m_buf, other.m_buf.allocated)){
+						throw basic_buffer_copy_error();
+					}
+
+					std::uninitialized_copy_n((const_pointer)other.m_buf.mem, other.size(), (pointer)m_buf.mem);
+				}
+
+				return *this;
+			}
+
+			bool empty() const noexcept{ return m_buf.allocated == 0; }
+
+			pointer data() noexcept{ return (pointer)m_buf.mem; }
+			const_pointer data() const noexcept{ return (const_pointer)m_buf.mem; }
+
+			usize size() const noexcept{
+				return m_buf.allocated / value_size;
+			}
+
+			reference operator[](usize idx) noexcept{ return data()[idx]; }
+			const_reference operator[](usize idx) const noexcept{ return data()[idx]; }
+
+			reference at(usize idx){
+				if(size() <= idx) throw basic_buffer_at_error(idx);
+				return data()[idx];
+			}
+
+			const_reference at(usize idx) const{
+				if(size() <= idx) throw basic_buffer_at_error(idx);
+				return data()[idx];
+			}
+
+			reference front(){ return at(0); }
+			const_reference front() const{ return at(0); }
+
+			reference back(){ return at(size()-1); }
+			const_reference back() const{ return at(size()-1); }
+
+			template<
+				bool InsertEnabled = !std::is_same_v<T, void>,
+				std::enable_if_t<InsertEnabled, int> = 0
+			>
+			pointer insert(usize idx, const_reference value){
+				if(!ham_buffer_insert(&m_buf, idx * value_size, &value, value_size)){
+					return nullptr;
+				}
+				else{
+					return data() + idx;
+				}
+			}
+
+			bool erase(usize idx) noexcept{
+				if(idx >= size()) return false;
+				else return ham_buffer_erase(&m_buf, idx * value_size, value_size);
+			}
+
+			template<typename ... Args>
+			auto emplace_back(Args &&... args) -> std::enable_if_t<!std::is_same_v<T, void>, reference>{
+				const auto new_idx = size();
+
+				if(!ham_buffer_resize(&m_buf, m_buf.allocated + value_size)){
+					throw basic_buffer_emplace_error();
+				}
+
+				const auto mem = data() + new_idx;
+				return *(new(mem) T(std::forward<Args>(args)...));
+			}
+
+			pointer begin() noexcept{ return data(); }
+			pointer end()   noexcept{ return data() + size(); }
+
+			const_pointer begin() const noexcept{ return data(); }
+			const_pointer end()   const noexcept{ return data() + size(); }
+
+		private:
+			ham_buffer m_buf;
+	};
+}
 
 /**
  * @}

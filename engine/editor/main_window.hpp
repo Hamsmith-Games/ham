@@ -19,15 +19,24 @@
 #ifndef HAM_ENGINE_EDITOR_MAIN_WINDOW_HPP
 #define HAM_ENGINE_EDITOR_MAIN_WINDOW_HPP 1
 
-#include <QMainWindow>
+#include "window.hpp"
+#include "project.hpp"
+#include "world_view.hpp"
 
 namespace ham::engine::editor{
-	class main_window: public QMainWindow{
+	class main_window: public window{
 		Q_OBJECT
 
 		public:
-			main_window();
+			explicit main_window(class project *project_, QWidget *parent = nullptr);
 			~main_window();
+
+			class project *project() const noexcept{ return m_proj; }
+			class world_view *world_view() noexcept{ return m_world_view; }
+
+		private:
+			class project *m_proj;
+			class world_view *m_world_view;
 	};
 }
 

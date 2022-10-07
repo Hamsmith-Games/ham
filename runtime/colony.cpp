@@ -1,3 +1,21 @@
+/*
+ * Ham Runtime
+ * Copyright (C) 2022  Hamsmith Ltd.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "ham/colony.h"
 #include "ham/check.h"
 #include "ham/memory.h"
@@ -19,7 +37,7 @@ struct ham_colony{
 	ham_usize num_buckets;
 	void *buckets[HAM_COLONY_MAX_BUCKETS];
 
-	ham::mutex mut;
+	mutable ham::mutex mut;
 	ham::std_vector<std::pair<ham_usize, void*>> elements;
 };
 
@@ -251,6 +269,20 @@ ham_usize ham_colony_iterate(ham_colony *colony, ham_colony_iterate_fn fn, void 
 	}
 
 	return colony->elements.size();
+}
+
+ham_nothrow ham_usize ham_colony_num_elements(const ham_colony *colony){
+	if(!ham_check(colony != NULL)) return (ham_usize)-1;
+	ham::scoped_lock lock(colony->mut);
+	return colony->elements.size();
+}
+
+ham_nothrow void *ham_colony_element_at(ham_colony *colony, ham_usize idx){
+	if(!ham_check(colony != NULL) || !ham_check(idx < colony->elements.size())){
+		return nullptr;
+	}
+
+	return colony->elements[idx].second;
 }
 
 HAM_C_API_END

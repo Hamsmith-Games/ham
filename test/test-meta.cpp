@@ -1,5 +1,5 @@
 /*
- * Ham Programming Language Tests
+ * Ham Runtime Tests
  * Copyright (C) 2022  Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -26,8 +26,6 @@
 using namespace ham::typedefs;
 
 bool ham_test_meta(){
-	std::cout << "Running meta tests... " << std::flush;
-
 	static_assert(ham::meta::type_name_v<void> == "void");
 	static_assert(ham::meta::type_name_v<bool> == "bool");
 
@@ -75,6 +73,5 @@ bool ham_test_meta(){
 	static_assert(ham::meta::type_name_v<ham::basic_str_buffer<char16>> == "ham::basic_str_buffer<char16_t>");
 	static_assert(ham::meta::type_name_v<ham::basic_str_buffer<char32>> == "ham::basic_str_buffer<char32_t>");
 
-	std::cout << HAM_TEST_PASSED_STR "\n";
 	return true;
 }

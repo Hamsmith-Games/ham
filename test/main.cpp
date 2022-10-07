@@ -1,5 +1,5 @@
 /*
- * Ham Programming Language Tests
+ * Ham Runtime Tests
  * Copyright (C) 2022  Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -27,19 +27,25 @@ using namespace ham::typedefs;
 int main(int argc, char *argv[]){
 	(void)argc; (void)argv;
 
-	usize passed_tests = 0;
-	usize num_tests = 0;
+	constexpr auto check_true = +[](bool result){ return result; };
 
-	const auto run_test = [&](auto f){
-		++num_tests;
-		if(f()) ++passed_tests;
+	ham::test_bool<> tests[] = {
+		{"meta",   ham_test_meta,   check_true},
+		{"object", ham_test_object, check_true},
+		{"utf",    ham_test_utf,    check_true},
+		{"lex",    ham_test_lex,    check_true},
+		{"buffer", ham_test_buffer, check_true},
+		{"octree", ham_test_octree, check_true},
 	};
 
-	run_test(ham_test_meta);
-	run_test(ham_test_object);
-	run_test(ham_test_utf);
-	run_test(ham_test_lex);
-	//run_test(ham_test_parse);
+	constexpr usize num_tests = std::size(tests);
+
+	usize passed_tests = 0;
+
+	for(usize i = 0; i < std::size(tests); i++){
+		const auto &test = tests[i];
+		if(test.run()) ++passed_tests;
+	}
 
 	std::cout << passed_tests << "/" << num_tests << " tests passed\n";
 

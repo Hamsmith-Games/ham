@@ -30,7 +30,9 @@ FetchContent_GetProperties(gns_content)
 if(NOT gns_content_POPULATED)
 	FetchContent_Populate(gns_content)
 
-	set(USE_STEAMWEBRTC ON CACHE BOOL "" FORCE)
+	if(NOT ANDROID)
+		set(USE_STEAMWEBRTC ON CACHE BOOL "" FORCE)
+	endif()
 	add_subdirectory(${gns_content_SOURCE_DIR} ${gns_content_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
@@ -39,6 +41,7 @@ ham_add_plugin(
 	net-gns.h
 	net-gns.cpp
 	net-socket-gns.cpp
+	net-connection-gns.cpp
 )
 
 target_link_libraries(ham-net-gns PRIVATE GameNetworkingSockets_s)

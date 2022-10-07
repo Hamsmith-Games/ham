@@ -1,0 +1,16 @@
+{
+	"engine": {
+	    "version": [{{ ham_engine_version_major }}, {{ ham_engine_version_minor }}, {{ ham_engine_version_patch }}]
+	},
+
+    "project": {
+	    "id": {{ ham_project_id }},
+		"name": "{{ ham_project_name }}",
+		"display-name": "{{ ham_project_display_name }}",
+		"author": "{{ ham_project_author }}",
+		"version": [{{ ham_project_version_major }}, {{ ham_project_version_minor }}, {{ ham_project_version_patch }}],
+		"license": "{{ ham_project_license }}",
+		"desc": "{{ ham_project_description }}"
+	}
+}
+

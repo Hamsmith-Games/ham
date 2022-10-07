@@ -1,3 +1,21 @@
+/*
+ * Ham Runtime
+ * Copyright (C) 2022  Hamsmith Ltd.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "ham/object.h"
 #include "ham/check.h"
 #include "ham/colony.h"
@@ -106,7 +124,11 @@ bool ham_object_manager_contains(const ham_object_manager *manager, const ham_ob
 	return ham_colony_contains(manager->instances, obj);
 }
 
-ham_object *ham_object_vnew(ham_object_manager *manager, ham_usize nargs, va_list va){
+ham_api ham_object *ham_object_vnew_init(
+	ham_object_manager *manager,
+	ham_object_manager_iterate_fn init_fn, void *user,
+	ham_usize nargs, va_list va
+){
 	if(!ham_check(manager != NULL)) return nullptr;
 
 	const auto mem = (ham_object*)ham_colony_emplace(manager->instances);
@@ -117,6 +139,14 @@ ham_object *ham_object_vnew(ham_object_manager *manager, ham_usize nargs, va_lis
 
 	const auto vtable = manager->obj_vtable;
 
+	mem->vtable = vtable;
+
+	if(init_fn && !init_fn(mem, user)){
+		ham_logapierrorf("Failed to initialize object memory");
+		ham_colony_erase(manager->instances, mem);
+		return nullptr;
+	}
+
 	const auto ret = vtable->ctor(mem, nargs, va);
 	if(!ret){
 		ham_logapierrorf("Failed to construct object");
@@ -124,7 +154,7 @@ ham_object *ham_object_vnew(ham_object_manager *manager, ham_usize nargs, va_lis
 		return nullptr;
 	}
 
-	ret->vtable = vtable;
+	ret->vtable = vtable; // make sure no funny business happens
 
 	return ret;
 }

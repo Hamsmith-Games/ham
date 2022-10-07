@@ -1,5 +1,5 @@
 /*
- * Ham Programming Language Tests
+ * Ham Runtime Tests
  * Copyright (C) 2022  Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -37,23 +37,18 @@ constexpr ham::expr_kind test_parse_expected_kinds[] = {
 };
 
 bool ham_test_parse(){
-	std::cout << "Running parser tests... ";
-	std::cout << std::flush;
-
 	ham::source_location_utf8 source_loc("parser-test.ham", 0, 0);
 
 	const auto lexed = ham::lex_all(source_loc, ham::str8(test_parse_src));
 	if(lexed.empty()){
-		std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
-		std::cerr << "    Failed to lex test source.\n";
+		std::cerr << "Failed to lex test source.\n";
 		return false;
 	}
 
 	for(auto &&tok : lexed){
 		if(tok.is_error()){
 			const auto tok_loc = tok.source_location();
-			std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
-			std::cerr << "    Lexing error[" << tok_loc.line()+1 << ":" << tok_loc.column()+1 << "]: " << tok.str() << '\n';
+			std::cerr << "Lexing error[" << tok_loc.line()+1 << ":" << tok_loc.column()+1 << "]: " << tok.str() << '\n';
 			return false;
 		}
 	}
@@ -79,13 +74,11 @@ bool ham_test_parse(){
 				src_loc = expr_tokens.begin()->source_location();
 			}
 
-			std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
-			std::cerr << "    Parsing error[" << src_loc.line()+1 << ":" << src_loc.column()+1 << "]: " << err_expr->message << '\n';
+			std::cerr << "Parsing error[" << src_loc.line()+1 << ":" << src_loc.column()+1 << "]: " << err_expr->message << '\n';
 			return false;
 		}
 		else if(expr.kind() != test_parse_expected_kinds[i]){
-			std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
-			std::cerr << "    Parsing error: expected kind " << ham::expr_kind_str8(test_parse_expected_kinds[i]) << " got " << ham::expr_kind_str8(expr.kind()) << '\n';
+			std::cerr << "Parsing error: expected kind " << ham::expr_kind_str8(test_parse_expected_kinds[i]) << " got " << ham::expr_kind_str8(expr.kind()) << '\n';
 			return false;
 		}
 
@@ -98,11 +91,9 @@ bool ham_test_parse(){
 	}
 
 	if(i != expected_num_exprs){
-		std::cout << HAM_TEST_FAILED_STR "\n" << std::flush;
-		std::cerr << "    Parsing error: wrong number of expressions, expected " << expected_num_exprs << " got " << i << '\n';
+		std::cerr << "Parsing error: wrong number of expressions, expected " << expected_num_exprs << " got " << i << '\n';
 		return false;
 	}
 
-	std::cout << HAM_TEST_PASSED_STR "\n";
 	return true;
 }

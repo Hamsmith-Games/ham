@@ -66,6 +66,11 @@ typedef struct ham_net_client ham_net_client;
 typedef struct ham_net_socket ham_net_socket;
 
 /**
+ * @brief Opaque handle representing a connection from one socket to another socket.
+ */
+typedef struct ham_net_connection ham_net_connection;
+
+/**
  * @brief Create a new net object.
  * @param plugin_id plugin to use
  * @param obj_id object type within \p plugin
@@ -99,19 +104,94 @@ ham_api void ham_net_loop(ham_net *net, ham_f64 dt);
 ham_api bool ham_net_find_peer(ham_net *net, ham_net_peer *ret, ham_str8 query);
 
 /**
- * @brief Create a listen or connection socket.
+ * @defgroup HAM_NET_CONNECTION Connections
+ * @{
+ */
+
+typedef void(*ham_net_connection_accepted_fn)(ham_net_connection *conn, void *user);
+typedef void(*ham_net_connection_rejected_fn)(ham_net_connection *conn, void *user);
+typedef void(*ham_net_connection_disconnect_fn)(ham_net_connection *conn, void *user);
+
+ham_api ham_net_connection *ham_net_connection_create(
+	ham_net *net,
+	ham_net_peer remote_peer, ham_u16 remote_port,
+	ham_net_connection_accepted_fn accepted_fn,
+	ham_net_connection_rejected_fn rejected_fn,
+	ham_net_connection_disconnect_fn disconnect_fn,
+	void *user
+);
+
+ham_api void ham_net_connection_destroy(ham_net_connection *conn);
+
+typedef void(*ham_net_connection_recv_fn)(const void *data, ham_usize len, void *user);
+
+/**
+ * Receive messages on a connection.
+ * @param conn connection to poll
+ * @param recv_fn function to call on each messages data
+ * @param user data passed in each call to \p recv_fn
+ * @returns number of messages received or ``(ham_usize)-1`` on error
+ */
+ham_api ham_usize ham_net_connection_recv(ham_net_connection *conn, ham_net_connection_recv_fn recv_fn, void *user);
+
+/**
+ * Send messages through a connection.
+ * @param conn connection to use
+ * @param data data to send
+ * @param len size of \p data in bytes
+ * @returns whether the message was successfully sent
+ */
+ham_api bool ham_net_connection_send(ham_net_connection *conn, const void *data, ham_usize len);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup HAM_NET_SOCKET Sockets
+ * @{
+ */
+
+typedef bool(*ham_net_socket_connection_request_fn)(ham_net_socket *sock, const ham_net_connection *conn, void *user);
+typedef void(*ham_net_socket_connection_fn)(ham_net_socket *sock, const ham_net_connection *conn, void *user);
+typedef void(*ham_net_socket_disconnect_fn)(ham_net_socket *sock, const ham_net_connection *conn, void *user);
+
+typedef ham_usize(*ham_net_socket_message_fn)(ham_net_socket *sock, const ham_net_connection *conn, ham_usize len, const void *bytes, void *user);
+
+/**
+ * @brief Create a listen socket.
  * @param net net object to create socket with
- * @param peer ``HAM_NET_NULL_PEER`` for a listen socket, or the peer to connect to
- * @param port port to listen on or connect through
+ * @param port port to listen on
  * @returns newly created socket object or ``NULL`` on error
  */
-ham_api ham_net_socket *ham_net_socket_create(ham_net *net, ham_net_peer peer, ham_u16 port);
+ham_api ham_net_socket *ham_net_socket_create(
+	ham_net *net, ham_u16 port,
+	ham_net_socket_connection_request_fn connect_req_fn,
+	ham_net_socket_connection_fn connection_fn,
+	ham_net_socket_disconnect_fn disconnect_fn,
+	void *user
+);
 
 /**
  * @brief Destroy a socket.
  * @param socket socket object to destroy
  */
 ham_api void ham_net_socket_destroy(ham_net_socket *socket);
+
+/**
+ * @brief Check if a socket is a listen socket.
+ */
+ham_api bool ham_net_socket_is_listen(const ham_net_socket *socket);
+
+ham_api ham_usize ham_net_socket_send(ham_net_socket *socket, const ham_net_connection *conn, const void *data, ham_usize len);
+
+typedef void(*ham_net_socket_recv_fn)(const ham_net_connection *conn, const void *data, ham_usize len, void *user);
+
+ham_api ham_usize ham_net_socket_recv(ham_net_socket *socket, ham_net_socket_recv_fn recv_fn, void *user);
+
+/**
+ * @}
+ */
 
 HAM_C_API_END
 

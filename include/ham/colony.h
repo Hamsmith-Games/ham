@@ -48,6 +48,10 @@ typedef bool(*ham_colony_iterate_fn)(void *ptr, void *user);
 
 ham_api ham_usize ham_colony_iterate(ham_colony *colony, ham_colony_iterate_fn fn, void *user);
 
+ham_api ham_nothrow ham_usize ham_colony_num_elements(const ham_colony *colony);
+
+ham_api ham_nothrow void *ham_colony_element_at(ham_colony *colony, ham_usize idx);
+
 ham_api bool ham_colony_view_erase(ham_colony *colony, void *ptr, ham_colony_iterate_fn view_fn, void *user);
 
 HAM_C_API_END
@@ -55,33 +59,67 @@ HAM_C_API_END
 #ifdef __cplusplus
 
 namespace ham{
-	template<typename T>
+	class colony_create_error: public exception{
+		public:
+			const char *api() const noexcept{ return "ham::colony"; }
+			const char *what() const noexcept{ return "Error in ham_colony_create"; }
+	};
+
+	template<typename T = void>
 	class colony{
 		public:
+			template<
+				bool HasDefaultCtor = !std::is_same_v<T, void>,
+				std::enable_if_t<HasDefaultCtor, int> = 0
+			>
 			colony()
 				: m_handle(ham_colony_create(alignof(T), sizeof(T)))
-			{}
+			{
+				if(!m_handle) throw colony_create_error{};
+			}
+
+			template<
+				bool HasSizedCtor = std::is_same_v<T, void>,
+				std::enable_if_t<HasSizedCtor, int> = 0
+			>
+			colony(usize elem_alignment, usize elem_size)
+				: m_handle(ham_colony_create(elem_alignment, elem_size))
+			{
+				if(!m_handle) throw colony_create_error{};
+			}
 
 			colony(colony&&) noexcept = default;
 
 			~colony(){
-				if(m_handle){
-					ham_colony_iterate(
-						m_handle.get(),
-						[](void *ptr, void*){ std::destroy_at((T*)ptr); return true; },
-						nullptr
-					);
+				if constexpr(!std::is_same_v<T, void>){
+					if(m_handle){
+						ham_colony_iterate(
+							m_handle.get(),
+							[](void *ptr, void*){ std::destroy_at((T*)ptr); return true; },
+							nullptr
+						);
+					}
 				}
 			}
 
 			colony &operator=(colony&&) noexcept = default;
+
+			usize size() const noexcept{ return ham_colony_num_elements(m_handle.get()); }
+
+			T *at(usize idx) noexcept{ return reinterpret_cast<T*>(ham_colony_element_at(m_handle.get(), idx)); }
 
 			template<typename ... Args>
 			T *emplace(Args &&... args){
 				const auto mem = ham_colony_emplace(m_handle.get());
 				if(!mem) return nullptr;
 
-				return new(mem) T(std::forward<Args>(args)...);
+				if constexpr(std::is_same_v<T, void>){
+					static_assert(sizeof...(Args) == 0);
+					return mem;
+				}
+				else{
+					return new(mem) T(std::forward<Args>(args)...);
+				}
 			}
 
 			bool erase(T *ptr) noexcept{
@@ -89,6 +127,10 @@ namespace ham{
 			}
 
 			bool compact() noexcept{ return ham_colony_compact(m_handle.get()); }
+
+			usize iterate(ham_colony_iterate_fn fn, void *user){
+				return ham_colony_iterate(m_handle.get(), fn, user);
+			}
 
 		private:
 			unique_handle<ham_colony*, ham_colony_destroy> m_handle;

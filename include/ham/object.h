@@ -82,30 +82,60 @@ typedef bool(*ham_object_manager_iterate_fn)(ham_object *obj, void *user);
 ham_api ham_usize ham_object_manager_iterate(ham_object_manager *manager, ham_object_manager_iterate_fn fn, void *user);
 
 /**
+ * @brief Create a new object, initializing the allocated object memory before constructing it.
+ * @param manager manager to create the new object with
+ * @param init_fn initialization function, returns ``false`` to signal an error
+ * @param user data passed to \p init_fn
+ * @param nargs number of arguments passed
+ * @param va list for the arguments
+ * @returns newly created object or ``NULL`` on error
+ */
+ham_api ham_object *ham_object_vnew_init(
+	ham_object_manager *manager,
+	ham_object_manager_iterate_fn init_fn, void *user,
+	ham_usize nargs, va_list va
+);
+
+/**
  * @brief Create a new object, passing constructor arguments through a ``va_list``.
  * @param manager manager to create the new object with
  * @param nargs number of arguments passed
  * @param va list for the arguments
  * @returns newly created object or ``NULL`` on error
  */
-ham_api ham_object *ham_object_vnew(ham_object_manager *manager, ham_usize nargs, va_list va);
+static inline ham_object *ham_object_vnew(ham_object_manager *manager, ham_usize nargs, va_list va){
+	return ham_object_vnew_init(manager, nullptr, nullptr, nargs, va);
+}
 
 //! @cond ignore
-static inline ham_object *ham_impl_object_new(ham_object_manager *manager, ham_usize nargs, ...){
+static inline ham_object *ham_impl_object_new_init(
+	ham_object_manager *manager,
+	ham_object_manager_iterate_fn init_fn, void *user,
+	ham_usize nargs, ...
+){
 	va_list va;
 	va_start(va, nargs);
-	ham_object *const ret = ham_object_vnew(manager, nargs, va);
+	ham_object *const ret = ham_object_vnew_init(manager, init_fn, user, nargs, va);
 	va_end(va);
 	return ret;
 }
 //! @endcond
 
 /**
+ * @brief Create a new object, initializing memory before use.
+ * @param manager manager to create the new object with
+ * @param view_fn initialization function, returns ``false`` on error
+ * @param user data passed to \p init_fn
+ * @returns newly created object or ``NULL`` on error
+ */
+#define ham_object_new_init(manager, init_fn, user, ...) (ham_impl_object_new_init(manager, (view_fn), (user), HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__))
+
+/**
  * @brief Create a new object.
  * @param manager manager to create the new object with
  * @returns newly created object or ``NULL`` on error
  */
-#define ham_object_new(manager, ...) (ham_impl_object_new(manager, HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__))
+#define ham_object_new(manager, ...) (ham_impl_object_new_init(manager, nullptr, nullptr, HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__))
 
 /**
  * @brief Destroy a managed object.

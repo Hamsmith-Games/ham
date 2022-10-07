@@ -58,8 +58,6 @@ static inline ham_usize ham_ptr_iterate(
 
 #endif // __GNUC__
 
-
-
 #ifdef __cplusplus
 
 namespace ham{
@@ -81,7 +79,7 @@ namespace ham{
 			{}
 
 			indirect_function(Ret(*fptr)(Args...)) noexcept
-				: m_data((void*)fptr)
+				: m_data{ .fptr = fptr }
 				, m_dispatcher(fptr_dispatcher)
 				, m_deleter(null_deleter)
 			{}

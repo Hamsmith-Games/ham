@@ -34,7 +34,7 @@ HAM_C_API_BEGIN
 
 typedef struct ham_world ham_world;
 
-ham_engine_api ham_world *ham_world_create(ham_net_socket *sock);
+ham_engine_api ham_world *ham_world_create();
 
 ham_engine_api void ham_world_destroy(ham_world *world);
 
@@ -49,6 +49,8 @@ typedef struct ham_entity_vtable ham_entity_vtable;
 struct ham_entity{
 	ham_derive(ham_object)
 	ham_world *world;
+	ham_entity *parent;
+	ham_vec3 pos;
 };
 
 struct ham_entity_vtable{
@@ -58,7 +60,8 @@ struct ham_entity_vtable{
 };
 
 ham_engine_api ham_entity *ham_entity_vcreate(
-	ham_world *world, const ham_entity_vtable *entity_vt,
+	ham_world *world, ham_entity *parent,
+	const ham_entity_vtable *entity_vt,
 	ham_usize nargs, va_list va
 );
 
@@ -66,19 +69,20 @@ ham_engine_api void ham_entity_destroy(ham_entity *ent);
 
 //! @cond ignore
 static inline ham_entity *ham_impl_entity_create(
-	ham_world *world, const ham_entity_vtable *entity_vt,
+	ham_world *world, ham_entity *parent,
+	const ham_entity_vtable *entity_vt,
 	ham_usize nargs, ...
 ){
 	va_list va;
 	va_start(va, nargs);
-	ham_entity *const ret = ham_entity_vcreate(world, entity_vt, nargs, va);
+	ham_entity *const ret = ham_entity_vcreate(world, parent, entity_vt, nargs, va);
 	va_end(va);
 	return ret;
 }
 //! @endcond
 
-#define ham_entity_create(world, entity_vt, ...) \
-	(ham_impl_entity_create((world), (entity_vt), HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__))
+#define ham_entity_create(world, parent, entity_vt, ...) \
+	(ham_impl_entity_create((world), (parent), (entity_vt), HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__))
 
 /**
  * @}

@@ -6,5 +6,7 @@
         <file>images/min-btn.png</file>
         <file>images/resize-handle.png</file>
         <file>images/folder-open.png</file>
+        <file>images/ham.png</file>
+        <file>images/cog.png</file>
     </qresource>
 </RCC>

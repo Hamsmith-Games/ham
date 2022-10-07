@@ -68,6 +68,10 @@ Server - <code>ham-engine-server</code>
 
 Host your own world!
 
+<h3>Dependencies</h3>
+
+- `libham-engine`
+
 <br/>
 <br/>
 <br/>

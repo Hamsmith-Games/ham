@@ -1,5 +1,5 @@
 #
-# Ham Programming Language Tests
+# Ham Runtime Tests
 # Copyright (C) 2022  Hamsmith Ltd.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-add_executable(
+ham_add_executable(
 	ham-test
 	tests.hpp
 	test-meta.cpp
@@ -24,8 +24,7 @@ add_executable(
 	test-utf.cpp
 	test-lex.cpp
 	test-parse.cpp
+	test-buffer.cpp
+	test-octree.cpp
 	main.cpp
 )
-
-target_link_libraries(ham-test PRIVATE ${HAM_CPU_LIBS})
-target_link_libraries(ham-test PUBLIC ham::runtime)

@@ -31,6 +31,74 @@ project(
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+##
+# Platform pre-configuration
+##
+
+if(ANDROID)
+	message(STATUS "Ham Android builds are a WIP")
+
+	include(ProcessorCount)
+
+	ProcessorCount(NPROC)
+
+	file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/android-deps)
+	file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/android-prefix)
+
+	set(ENV{ANDROID_NDK_HOME} "${ANDROID_NDK}")
+	set(ENV{ANDROID_NDK_ROOT} "${ANDROID_NDK}")
+	set(ENV{PATH} "${ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin:$ENV{PATH}")
+
+	set(ANDROID_PREFIX_DIR "${PROJECT_BINARY_DIR}/android-prefix")
+
+	execute_process(
+		COMMAND
+			${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" "${CMAKE_CURRENT_LIST_DIR}/android-deps"
+				"-DCMAKE_INSTALL_PREFIX=${ANDROID_PREFIX_DIR}"
+				"-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
+				"-DANDROID_PLATFORM=${ANDROID_PLATFORM}"
+				"-DANDROID_ABI=${ANDROID_ABI}"
+				"-DANDROID_NDK=${ANDROID_NDK}"
+				"-DANDROID_ARCHITECTURE=${ANDROID_ARCHITECTURE}"
+
+		COMMAND_ERROR_IS_FATAL ANY
+
+		WORKING_DIRECTORY
+			"${PROJECT_BINARY_DIR}/android-deps"
+	)
+
+	execute_process(
+		COMMAND
+			${CMAKE_COMMAND} --build . -j ${NPROC}
+
+		COMMAND_ERROR_IS_FATAL ANY
+
+		WORKING_DIRECTORY
+			"${PROJECT_BINARY_DIR}/android-deps"
+	)
+
+	execute_process(
+		COMMAND
+			${CMAKE_COMMAND} --install . --prefix "${ANDROID_PREFIX_DIR}"
+
+		COMMAND_ERROR_IS_FATAL ANY
+
+		WORKING_DIRECTORY
+			"${PROJECT_BINARY_DIR}/android-deps"
+	)
+
+	set(CMAKE_PREFIX_PATH "${ANDROID_PREFIX_DIR};${CMAKE_PREFIX_PATH}")
+
+	set(OPENSSL_ROOT_DIR "${ANDROID_PREFIX_DIR}")
+	set(OPENSSL_CRYPTO_LIBRARY "${ANDROID_PREFIX_DIR}/lib/libcrypto.so")
+	set(OPENSSL_INCLUDE_DIR "${ANDROID_PREFIX_DIR}/include")
+
+	set(Protobuf_LIBRARIES "${ANDROID_PREFIX_DIR}/lib/libprotobuf.a")
+	set(Protobuf_INCLUDE_DIR "${ANDROID_PREFIX_DIR}/include")
+endif()
+
 ##
 # Configuration
 ##
@@ -158,6 +226,7 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/dso.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/plugin.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/colony.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/octree.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/str_buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/json.h

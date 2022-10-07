@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/">
+        <file>templates/ham-engine-config.json</file>
+        <file>templates/scratch/ham-engine-project.json.in</file>
+        <file>templates/scratch/ham-engine-template.json</file>
+    </qresource>
+</RCC>

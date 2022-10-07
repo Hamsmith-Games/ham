@@ -28,7 +28,7 @@
 
 HAM_C_API_BEGIN
 
-ham_api ham_version ham_linked_version();
+ham_api ham_nothrow ham_version ham_linked_version();
 
 HAM_C_API_END
 

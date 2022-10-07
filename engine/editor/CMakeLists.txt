@@ -16,6 +16,46 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+##
+# Tools to be included in distribution
+##
+
+# FetchContent_Declare(
+# 	cmake_content
+# 	GIT_REPOSITORY https://gitlab.kitware.com/cmake/cmake.git
+# 	GIT_TAG        31f835410efeea50acd43512eb9e5646a26ea177 # v3.24.2
+# )
+#
+# FetchContent_GetProperties(cmake_content)
+# if(NOT cmake_content_POPULATED)
+# 	FetchContent_Populate(cmake_content)
+#
+# 	add_subdirectory(${cmake_content_SOURCE_DIR} ${cmake_content_BINARY_DIR} EXCLUDE_FROM_ALL)
+# endif()
+
+##
+# Dependencies
+##
+
+FetchContent_Declare(
+	mustach_content
+	GIT_REPOSITORY https://gitlab.com/jobol/mustach.git
+	GIT_TAG        a65e3a24a40aa479879a03ff3d7fb4288af65ea6 # 1.2.2
+)
+
+FetchContent_GetProperties(mustach_content)
+if(NOT mustach_content_POPULATED)
+	FetchContent_Populate(mustach_content)
+
+	add_library(mustach OBJECT ${mustach_content_SOURCE_DIR}/mustach.c)
+	add_library(mustach::mustach ALIAS mustach)
+	target_include_directories(mustach PUBLIC ${mustach_content_SOURCE_DIR})
+endif()
+
+##
+# Dependencies
+##
+
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 qt_standard_project_setup()
@@ -24,17 +64,24 @@ ham_add_executable(
 	ham-engine-editor
 	images.qrc
 	fonts.qrc
+	templates.qrc
 
 	main.cpp
 
 	window.hpp
 	window.cpp
 
+	project.hpp
+	project.cpp
+
 	welcome_wizard.hpp
 	welcome_wizard.cpp
 
 	main_window.hpp
 	main_window.cpp
+
+	world_view.hpp
+	world_view.cpp
 )
 
 set_target_properties(
@@ -56,4 +103,5 @@ target_link_libraries(
 	PRIVATE
 	    ham::engine
 		Qt6::Widgets
+		mustach::mustach
 )

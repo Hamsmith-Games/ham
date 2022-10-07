@@ -21,6 +21,7 @@ ham_add_plugin(
 	net-steam.h
 	net-steam.cpp
 	net-socket-steam.cpp
+	net-connection-steam.cpp
 )
 
-target_link_libraries(ham-net-steam PRIVATE Steamworks::Steamworks)
+target_link_libraries(ham-net-steam PRIVATE robin_hood::robin_hood Steamworks::Steamworks)

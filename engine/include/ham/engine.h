@@ -1,5 +1,5 @@
 /*
- * The Ham World Engine
+ * Ham World Engine Runtime
  * Copyright (C) 2022  Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -49,7 +49,7 @@ typedef struct ham_screen{
 typedef struct ham_engine ham_engine;
 
 /**
- * Create a new engine.
+ * @brief Create a new engine.
  * @warning It is not advised to create multiple engines in the same process.
  * @param plugin_id id of the engine plugin
  * @param obj_id id of the engine object within \p plugin_id
@@ -67,7 +67,7 @@ ham_engine_api ham_engine *ham_engine_create(
 );
 
 /**
- * Destroy an unexecuted engine.
+ * @brief Destroy an unexecuted engine.
  * @note Do not use this function after \ref ham_engine_exec on the same \p engine .
  * @param engine engine to destroy
  * @see ham_engine_create
@@ -75,7 +75,7 @@ ham_engine_api ham_engine *ham_engine_create(
 ham_engine_api ham_nothrow void ham_engine_destroy(ham_engine *engine);
 
 /**
- * Request an engine to finish execution.
+ * @brief Request an engine to finish execution.
  * @param engine engine to make the request on
  * @returns whether the request was successful
  */
@@ -84,7 +84,7 @@ ham_engine_api ham_nothrow bool ham_engine_request_exit(ham_engine *engine);
 ham_engine_api ham_nothrow ham_world *ham_engine_world(ham_engine *engine);
 
 /**
- * Execute an engine, destroy it and return an exit code.
+ * @brief Execute an engine, destroy it and return an exit code.
  * @note This function calls \ref ham_engine_destroy on the \p engine .
  * @param engine engine to execute
  * @return exit status as if returned from ``main``
@@ -112,7 +112,7 @@ ham_engine_api ham_nothrow bool ham_impl_engine_subsys_request_exit(ham_engine_s
 //! @endcond
 
 /**
- * Create a new engine subsystem.
+ * @brief Create a new engine subsystem.
  * @param engine engine to create the subsystem in
  * @param name name of the new subsystem; a valid string is required
  * @param init_fn initializer function
@@ -136,14 +136,14 @@ ham_engine_api ham_nothrow ham_engine *ham_engine_subsys_owner(ham_engine_subsys
 ham_engine_api ham_nothrow bool ham_engine_subsys_running(const ham_engine_subsys *subsys);
 
 /**
- * Get a subsystems minimum time between loops.
+ * @brief Get a subsystems minimum time between loops.
  * @param subsys subsystem to query
  * @returns minimum dt of \p subsys , if \p subsys is ``NULL`` 0.0 is returned
  */
 ham_engine_api ham_nothrow ham_f64 ham_engine_subsys_min_dt(ham_engine_subsys *subsys);
 
 /**
- * Set a subsystems minimum time between loops.
+ * @brief Set a subsystems minimum time between loops.
  * @param subsys subsystem to query
  * @param min_dt new minimum dt
  * @returns whether the minimum dt was successfully set
@@ -151,7 +151,7 @@ ham_engine_api ham_nothrow ham_f64 ham_engine_subsys_min_dt(ham_engine_subsys *s
 ham_engine_api ham_nothrow bool ham_engine_subsys_set_min_dt(ham_engine_subsys *subsys, ham_f64 min_dt);
 
 /**
- * Launch a subsystem before its owning engine is executed.
+ * @brief Launch a subsystem before its owning engine is executed.
  * @param subsys
  * @returns whether the subsystem was successfully launched
  */
@@ -217,6 +217,15 @@ namespace ham::engine{
 			}
 
 			ham_engine_subsys *m_subsys;
+	};
+
+	template<typename ... Subsystems>
+	class basic_engine{
+		public:
+
+
+		private:
+			ham_engine *m_engine;
 	};
 }
 

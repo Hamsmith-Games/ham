@@ -1,3 +1,21 @@
+/*
+ * Ham World Engine Editor
+ * Copyright (C) 2022  Hamsmith Ltd.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "window.hpp"
 
 #include <QGuiApplication>
@@ -90,12 +108,22 @@ void editor::window::resize_handle::mousePressEvent(QMouseEvent *event){
 
 editor::window::header::header(editor::window *parent)
 	: QWidget(parent)
+	, m_title_icn(new QLabel)
 	, m_title_lbl(new QLabel)
 {
 	setContentsMargins(0, 0, 0, 0);
 	setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Preferred);
 
+	const QImage ham_img(":/images/ham.png");
+
+	m_title_icn->setPixmap(QPixmap::fromImage(ham_img).scaledToWidth(16));
+
 	connect(parent, &editor::window::windowTitleChanged, m_title_lbl, &QLabel::setText);
+
+	const auto title_lay = new QHBoxLayout;
+	title_lay->addWidget(m_title_icn);
+	title_lay->addSpacing(10);
+	title_lay->addWidget(m_title_lbl);
 
 	const auto resize_handle_tl = new editor::window::resize_handle(Qt::TopLeftCorner, parent, this);
 
@@ -143,7 +171,7 @@ editor::window::header::header(editor::window *parent)
 	layout->setColumnStretch(1, 0);
 	layout->setColumnStretch(2, 1);
 	layout->addWidget(resize_handle_tl, 0, 0, Qt::AlignLeft);
-	layout->addWidget(m_title_lbl, 0, 1, Qt::AlignHCenter);
+	layout->addLayout(title_lay, 0, 1, Qt::AlignHCenter);
 	layout->addLayout(win_btns_lay, 0, 2, Qt::AlignRight);
 
 	setLayout(layout);
@@ -162,19 +190,59 @@ void editor::window::header::mousePressEvent(QMouseEvent *event){
 void editor::window::header::mouseReleaseEvent(QMouseEvent *event){}
 
 //
+// Footer
+//
+
+editor::window::footer::footer(editor::window *parent)
+	: QWidget(parent)
+	, m_status_line(new QWidget)
+{
+	const auto status_lay = new QHBoxLayout;
+
+	m_status_line->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+	m_status_line->setLayout(status_lay);
+
+	const auto resize_handle_br = new resize_handle(Qt::BottomRightCorner, parent, this);
+
+	connect(parent, &editor::window::maximized, resize_handle_br, &QWidget::hide);
+	connect(parent, &editor::window::normalized, resize_handle_br, &QWidget::show);
+
+	const auto layout = new QHBoxLayout;
+	layout->setContentsMargins(0, 0, 0, 0);
+
+	layout->addWidget(m_status_line, 1);
+	layout->addWidget(resize_handle_br, 0, Qt::AlignBottom | Qt::AlignRight);
+
+	setLayout(layout);
+}
+
+editor::window::footer::~footer(){
+}
+
+void editor::window::footer::set_status_widget(QWidget *widget){
+	const auto layout = m_status_line->layout();
+
+	if(!layout->isEmpty()){
+		const auto cur_item = layout->itemAt(0);
+		layout->removeItem(cur_item);
+	}
+
+	layout->addWidget(widget);
+}
+
+//
 // Windows
 //
 
 editor::window::window(QWidget *parent)
 	: QWidget(parent)
 	, m_lay(nullptr)
-	, m_header(new header(this))
+	, m_header(new class header(this))
 	, m_inner(new QWidget)
+	, m_footer(new class footer(this))
 {
 	setContentsMargins(0, 0, 0, 0);
 	setWindowFlags(Qt::FramelessWindowHint);
-
-	const auto resize_handle_br = new resize_handle(Qt::BottomRightCorner, this);
 
 	const auto inner_lay = new QVBoxLayout;
 	//inner_lay->setContentsMargins(0, 0, 0, 0);
@@ -189,10 +257,7 @@ editor::window::window(QWidget *parent)
 
 	window_lay->addWidget(m_header, 0, Qt::AlignTop);
 	window_lay->addWidget(m_inner, 1);
-	window_lay->addWidget(resize_handle_br, 0, Qt::AlignBottom | Qt::AlignRight);
-
-	connect(this, &editor::window::maximized, resize_handle_br, &QWidget::hide);
-	connect(this, &editor::window::normalized, resize_handle_br, &QWidget::show);
+	window_lay->addWidget(m_footer, 0, Qt::AlignBottom | Qt::AlignRight);
 
 	setLayout(window_lay);
 
@@ -210,6 +275,7 @@ void editor::window::set_central_widget(QWidget *widget){
 		item->widget()->setParent(nullptr);
 	}
 
+	widget->setFocus();
 	layout->addWidget(widget);
 }
 
@@ -224,17 +290,17 @@ void editor::window::changeEvent(QEvent *event){
 
 	switch(windowState()){
 		case Qt::WindowState::WindowMaximized:{
-			emit maximized();
+			Q_EMIT maximized();
 			break;
 		}
 
 		case Qt::WindowState::WindowMinimized:{
-			emit minimized();
+			Q_EMIT minimized();
 			break;
 		}
 
 		case Qt::WindowState::WindowNoState:{
-			emit normalized();
+			Q_EMIT normalized();
 			break;
 		}
 

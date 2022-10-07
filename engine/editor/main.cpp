@@ -27,6 +27,8 @@
 #include <QStyle>
 #include <QStyleFactory>
 #include <QVulkanInstance>
+#include <QStandardPaths>
+#include <QMessageBox>
 
 namespace editor = ham::engine::editor;
 
@@ -45,6 +47,19 @@ int main(int argc, char *argv[]){
 	cmd_parser.addPositionalArgument("app-dir", QApplication::translate("main", "Game directory"));
 
 	cmd_parser.process(app);
+
+	// setup default project directory (especially important for android)
+	const auto documents_dir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+	if(documents_dir.isEmpty()){
+		QMessageBox::critical(nullptr, "Fatal Error", "Could not get default document directory");
+		return 1;
+	}
+
+	const auto default_proj_dir = QString("%1/Ham Projects").arg(documents_dir);
+	if(!QDir(default_proj_dir).exists() && !QDir().mkdir(default_proj_dir)){
+		QMessageBox::critical(nullptr, "Fatal Error", "Could not create default project directory");
+		return 1;
+	}
 
 	int font_id = QFontDatabase::addApplicationFont(":/fonts/PressStart2P-Regular.ttf");
 	const auto font_fam = QFontDatabase::applicationFontFamilies(font_id).at(0);
@@ -124,7 +139,9 @@ int main(int argc, char *argv[]){
 		return app.exec();
 	}
 	else{
-		editor::main_window window;
+		const auto proj = new editor::project(QDir(args.at(0)));
+
+		editor::main_window window(proj);
 		window.show();
 
 		return app.exec();

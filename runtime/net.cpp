@@ -1,3 +1,21 @@
+/*
+ * Ham Runtime
+ * Copyright (C) 2022  Hamsmith Ltd.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "ham/net-object.h"
 
 #include "ham/plugin.h"
@@ -115,7 +133,7 @@ bool ham_net_find_peer(ham_net *net, ham_net_peer *ret, ham_str8 query){
 
 static inline ham_net_socket *ham_impl_net_socket_construct(ham_net_socket *sock, ...){
 	const auto obj_vt = ham_super(sock)->vtable;
-	const auto obj_info = obj_vt->info();
+	//const auto obj_info = obj_vt->info();
 
 	va_list va;
 	va_start(va, sock);
@@ -125,8 +143,27 @@ static inline ham_net_socket *ham_impl_net_socket_construct(ham_net_socket *sock
 	return ret;
 }
 
-ham_net_socket *ham_net_socket_create(ham_net *net, ham_net_peer peer, ham_u16 port){
-	if(!ham_check(net != NULL)) return nullptr;
+//
+// Sockets
+//
+
+// Listen socket
+
+ham_net_socket *ham_net_socket_create(
+	ham_net *net, ham_u16 port,
+	ham_net_socket_connection_request_fn connect_req_fn,
+	ham_net_socket_connection_fn connection_fn,
+	ham_net_socket_disconnect_fn disconnect_fn,
+	void *user
+){
+	if(
+		!ham_check(net != NULL) ||
+		!ham_check(connect_req_fn != NULL) ||
+		!ham_check(connection_fn != NULL) ||
+		!ham_check(disconnect_fn != NULL)
+	){
+		return nullptr;
+	}
 
 	const auto vtable = ((const ham_net_vtable*)ham_super(net)->vtable)->socket_vtable();
 	const auto obj_vt = ham_super(vtable);
@@ -141,11 +178,14 @@ ham_net_socket *ham_net_socket_create(ham_net *net, ham_net_peer peer, ham_u16 p
 
 	ham_super(obj)->vtable = obj_vt;
 	obj->net = net;
-	obj->peer = peer;
+	obj->peer = HAM_NET_EMPTY_PEER;
 	obj->port = port;
-	obj->is_listen = ham_net_peer_cmp(peer, HAM_NET_EMPTY_PEER) == 0;
+	obj->is_listen = true;
+	obj->connect_req_fn = connect_req_fn;
+	obj->connection_fn = connection_fn;
+	obj->disconnect_fn = disconnect_fn;
 
-	const auto ret = ham_impl_net_socket_construct(obj, peer, port);
+	const auto ret = ham_impl_net_socket_construct(obj, HAM_NET_EMPTY_PEER, port);
 	if(!ret){
 		ham_logapierrorf("Error constructing socket object \"%s\"", obj_info->type_id);
 		ham_allocator_free(net->allocator, obj);
@@ -163,6 +203,125 @@ void ham_net_socket_destroy(ham_net_socket *socket){
 
 	obj_vt->dtor(ham_super(socket));
 	ham_allocator_free(allocator, socket);
+}
+
+bool ham_net_socket_is_listen(const ham_net_socket *socket){
+	if(!ham_check(socket != NULL)) return false;
+	else return socket->is_listen;
+}
+
+ham_usize ham_net_socket_recv(ham_net_socket *socket, ham_net_socket_recv_fn recv_fn, void *user){
+	if(!ham_check(socket != NULL) || !ham_check(recv_fn != NULL)){
+		return false;
+	}
+
+	const auto vtable = (const ham_net_socket_vtable*)ham_super(socket)->vtable;
+
+	return vtable->recv(socket, recv_fn, user);
+}
+
+ham_usize ham_net_socket_send(ham_net_socket *socket, const ham_net_connection *conn, const void *buf, ham_usize buf_len){
+	if(!ham_check(socket != NULL) || !ham_check(buf && buf_len)){
+		return (ham_usize)-1;
+	}
+
+	const auto vtable = (const ham_net_socket_vtable*)ham_super(socket)->vtable;
+
+	return vtable->send(socket, conn, buf, buf_len);
+}
+
+//
+// Connections
+//
+
+static inline ham_net_connection *ham_impl_net_connection_construct(ham_net_connection *conn, ham_u32 nargs, ...){
+	const auto vtable = ham_super(conn)->vtable;
+
+	va_list va;
+	va_start(va, nargs);
+
+	const auto ret = (ham_net_connection*)vtable->ctor(ham_super(conn), nargs, va);
+
+	va_end(va);
+
+	return ret;
+}
+
+ham_net_connection *ham_net_connection_create(
+	ham_net *net,
+	ham_net_peer remote_peer, ham_u16 remote_port,
+	ham_net_connection_accepted_fn accepted_fn,
+	ham_net_connection_rejected_fn rejected_fn,
+	ham_net_connection_disconnect_fn disconnect_fn,
+	void *user
+){
+	if(
+		!ham_check(net != NULL) ||
+		!ham_check(accepted_fn != NULL) ||
+		!ham_check(rejected_fn != NULL) ||
+		!ham_check(disconnect_fn != NULL)
+	){
+		return nullptr;
+	}
+
+	const auto vtable = ((const ham_net_vtable*)ham_super(net)->vtable)->connection_vtable();
+	const auto obj_vt = ham_super(vtable);
+
+	const auto obj_info = obj_vt->info();
+
+	const auto obj = (ham_net_connection*)ham_allocator_alloc(net->allocator, obj_info->alignment, obj_info->size);
+	if(!obj){
+		ham_logapierrorf("Error allocating memory for connection object \"%s\"", obj_info->type_id);
+		return nullptr;
+	}
+
+	ham_super(obj)->vtable = obj_vt;
+	obj->net = net;
+	obj->peer = remote_peer;
+	obj->connected = false;
+	obj->accepted_fn = accepted_fn;
+	obj->rejected_fn = rejected_fn;
+	obj->disconnect_fn = disconnect_fn;
+	obj->user = user;
+
+	const auto ret = ham_impl_net_connection_construct(obj, 2, remote_peer, remote_port);
+	if(!ret){
+		ham_logapierrorf("Error constructing connection object \"%s\"", obj_info->type_id);
+		ham_allocator_free(net->allocator, obj);
+		return nullptr;
+	}
+
+	return ret;
+}
+
+void ham_net_connection_destroy(ham_net_connection *conn){
+	if(ham_unlikely(!conn)) return;
+
+	const auto allocator = conn->net->allocator;
+	const auto obj_vt = ham_super(conn)->vtable;
+
+	obj_vt->dtor(ham_super(conn));
+	ham_allocator_free(allocator, conn);
+}
+
+ham_usize ham_net_connection_recv(ham_net_connection *conn, ham_net_connection_recv_fn recv_fn, void *user){
+	if(!ham_check(conn != NULL) || !ham_check(recv_fn != NULL)){
+		return false;
+	}
+
+	const auto vtable = (const ham_net_connection_vtable*)ham_super(conn)->vtable;
+
+	return vtable->recv(conn, recv_fn, user);
+}
+
+bool ham_net_connection_send(ham_net_connection *conn, const void *data, ham_usize len){
+	if(!ham_check(conn != NULL) || !ham_check(data && len)){
+		return false;
+	}
+
+	const auto vtable = (const ham_net_connection_vtable*)ham_super(conn)->vtable;
+
+	return vtable->send(conn, data, len);
 }
 
 HAM_C_API_END

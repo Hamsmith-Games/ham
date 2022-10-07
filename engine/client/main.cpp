@@ -347,7 +347,7 @@ class net_subsystem: public ham::engine::subsys_base<net_subsystem>{
 				return false;
 			}
 
-			m_serv_sock = ham_net_socket_create(m_net, HAM_NET_EMPTY_PEER, 1476);
+			m_serv_sock = ham_net_socket_create(m_net, 1476, nullptr, nullptr, nullptr, nullptr);
 			if(!m_serv_sock){
 				ham_logerrorf("ham-client-net", "Error create listen ham_net_socket");
 				ham_net_destroy(m_net);
