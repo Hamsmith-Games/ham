@@ -4,13 +4,14 @@ List of stuff that needs to be done. Should probably be GitHub issues ¯\\\_(ツ
 
 ## Runtime
 
+- [ ] Add `pkg-config` file
 - [ ] Consolidate `ham_net_socket` and `ham_net_connection` or make `ham_net_socket` listen only
 - [ ] Create shape functions `ham_shape_calculate_bounding_box`, `ham_shape_calculate_area` and `ham_shape_calculate_volume`
 - [ ] Create ray type (`ham_ray`) and ray-shape intersection functions
 
 ## Plugins
 
-- [ ] Create `ham-renderer-gl` and/or `ham-renderer-gles`
+- [x] Create `ham-renderer-gl` and/or `ham-renderer-gles` (Created `ham-renderer-gl`)
 
 ### `ham-net-gns`
 
@@ -31,9 +32,10 @@ List of stuff that needs to be done. Should probably be GitHub issues ¯\\\_(ツ
 
 ### Runtime
 
+- [ ] Add `pkg-config` file
 - [ ] Create physics plugin interface (`ham_physics`)
 
-- [ ] Make `ham_engine` fully self-contained and remove "engine plugins"
+- [ ] Make `ham_engine` fully self-contained and remove "engine plugin" concept
   - [ ] Use `ham_engine_options` or similarly named struct in `ham_engine_create` instead of `argc` and `argv`
   - [ ] Make `ham_engine_subsystem` the primary way to construct the engine
 
