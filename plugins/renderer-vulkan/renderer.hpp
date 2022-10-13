@@ -51,10 +51,10 @@ struct ham_renderer_vulkan{
 
 	VkInstance vk_inst;
 	VkSurfaceKHR vk_surface;
-
-	ham_u32 vk_graphics_family, vk_present_family;
 	VkPhysicalDevice vk_phys_dev;
 	VkDevice vk_dev;
+
+	ham_u32 vk_graphics_family, vk_present_family;
 
 	VkQueue vk_graphics_queue, vk_present_queue;
 

@@ -22,8 +22,17 @@ List of stuff that needs to be done. Should probably be GitHub issues ¯\\\_(ツ
 - [ ] Make source compatible with GameNetworkingSockets where applicable
 - [ ] Add more Steamworks interfaces and rename to `ham-steam`
 
+### `ham-renderer-gl`
+
+- [ ] Add framebuffer initialization
+- [ ] Add shader pipeline initialization
+- [ ] Add depth-stencil render pass
+- [ ] Add lighting render pass
+- [ ] Add post-process render pass
+
 ### `ham-renderer-vulkan`
 
+- [ ] Fix up basic construction API (where should we construct the swapchain? behave like QVulkanRenderer?)
 - [ ] Wire up uniform buffers
 - [ ] Add render passes for GBO, lighting and post-processing
 - [ ] Render something more exciting than a quad displaying UVs
@@ -43,6 +52,11 @@ List of stuff that needs to be done. Should probably be GitHub issues ¯\\\_(ツ
 
 - [ ] Have `ham_world` do octree space-partitioning (see `ham/octree.h`)
   - [ ] Have `ham_world` track the positions of objects as they move and shift their position in the tree
+
+### Client
+
+- [ ] Fix vulkan code (`ham::client_window_vulkan`)
+- [ ] Fix vulkan side of video subsystem (requires fixing `ham-renderer-vulkan`)
 
 ### Editor
 

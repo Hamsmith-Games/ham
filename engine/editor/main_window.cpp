@@ -36,7 +36,7 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 	inner->setContentsMargins(0, 0, 0, 0);
 
 	const auto layout = new QVBoxLayout;
-
+	layout->setContentsMargins(0, 0, 0, 0);
 	layout->addWidget(m_world_view, 1);
 
 	inner->setLayout(layout);

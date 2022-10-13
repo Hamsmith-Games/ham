@@ -19,9 +19,7 @@
 #ifndef HAM_RENDERER_GL_RENDERER_GL_HPP
 #define HAM_RENDERER_GL_RENDERER_GL_HPP 1
 
-#include "ham/renderer-object.h"
-
-#include "KHR/khrplatform.h"
+#include "ham/renderer-object.h" // IWYU pragma: keep
 
 #ifdef HAM_RENDERER_GL_IMPLEMENTATION
 #	define ham_renderer_gl_api ham_private ham_export
@@ -40,20 +38,42 @@ typedef enum ham_renderer_gl_fbo_attachment{
 	HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT
 } ham_renderer_gl_fbo_attachment;
 
-typedef struct ham_renderer_gl{
+typedef enum ham_draw_buffer_gl_data{
+	HAM_DRAW_BUFFER_GL_POINTS,
+	HAM_DRAW_BUFFER_GL_INDICES,
+	HAM_DRAW_BUFFER_GL_COMMANDS,
+
+	HAM_DRAW_BUFFER_GL_DATA_COUNT
+} ham_draw_buffer_gl_data;
+
+typedef struct ham_draw_group_gl ham_draw_group_gl;
+
+typedef struct ham_renderer_gl_api ham_renderer_gl{
 	ham_derive(ham_renderer)
 
-	khronos_uint32_t
+	ham_u32
 		fbo,
 		fbo_attachments[HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT]
 	;
+
+	ham_u32 render_w, render_h;
+
+	ham_u32 scene_info_vert, scene_info_frag, scene_info_pipeline;
+	ham_u32 screen_post_vert, screen_post_frag, screen_post_pipeline;
+
+	ham_draw_group_gl *screen_group;
 } ham_renderer_gl;
 
-typedef struct ham_draw_group_gl{
+ham_renderer_gl_api ham_u32 ham_renderer_gl_load_shader(ham_renderer_gl *r, ham_u32 shader_type, ham_str8 name);
+ham_renderer_gl_api ham_u32 ham_renderer_gl_create_pipeline(ham_renderer_gl *r, ham_u32 vert_prog, ham_u32 frag_prog);
+
+struct ham_renderer_gl_api ham_draw_group_gl{
 	ham_derive(ham_draw_group)
 
-	khronos_uint32_t vao, vbo, ibo, cbo;
-} ham_draw_group_gl;
+	ham_u32 num_instances;
+	ham_u32 vao;
+	ham_u32 bufs[HAM_DRAW_BUFFER_GL_DATA_COUNT];
+};
 
 HAM_C_API_END
 

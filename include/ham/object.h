@@ -25,7 +25,8 @@
  * @{
  */
 
-#include "typedefs.h"
+#include "dso.h"
+#include "typesys.h"
 
 #include <stdarg.h>
 
@@ -124,7 +125,7 @@ static inline ham_object *ham_impl_object_new_init(
 /**
  * @brief Create a new object, initializing memory before use.
  * @param manager manager to create the new object with
- * @param view_fn initialization function, returns ``false`` on error
+ * @param init_fn initialization function, returns ``false`` on error
  * @param user data passed to \p init_fn
  * @returns newly created object or ``NULL`` on error
  */
@@ -145,13 +146,23 @@ static inline ham_object *ham_impl_object_new_init(
  */
 ham_api bool ham_object_delete(ham_object_manager *manager, ham_object *obj);
 
+ham_api const ham_object_vtable *ham_object_dso_vptr(ham_dso_handle dso, const char *obj_type_id);
+
+typedef bool(*ham_dso_iterate_object_vptrs_fn)(const ham_object_vtable *vptr, void *user);
+
+static inline ham_usize ham_dso_iterate_object_vptrs(
+	ham_dso_handle handle,
+	ham_dso_iterate_object_vptrs_fn fn,
+	void *user
+);
+
 typedef struct ham_object_info{
 	const char *type_id;
 	ham_usize alignment, size;
 } ham_object_info;
 
 struct ham_object_vtable{
-	const ham_object_info*(*info)();
+	const ham_object_info *info;
 
 	ham_object*(*ctor)(ham_object *ptr, ham_u32 nargs, va_list va);
 	void       (*dtor)(ham_object*);
@@ -178,38 +189,40 @@ struct ham_object{
 
 #define ham_super(derived_ptr) ham_super_n(1, derived_ptr)
 
-//! @cond ignore
-#define ham_impl_object_vtable_prefix ham_impl_obj_vtable_
-#define ham_impl_object_vtable_name(obj_name) HAM_CONCAT(ham_impl_obj_vtable_, obj_name)
-#define ham_impl_object_info_name(obj_name) HAM_CONCAT(ham_impl_obj_info_, obj_name)
-#define ham_impl_object_ctor_name(obj_name) HAM_CONCAT(ham_impl_obj_ctor_, obj_name)
-#define ham_impl_object_dtor_name(obj_name) HAM_CONCAT(ham_impl_obj_dtor_, obj_name)
+#define ham_object_method_prefix(method_name) ham_impl_obj_##method_name##_
+#define ham_object_method_name(obj_name, method_name) HAM_CONCAT(ham_object_method_prefix(method_name), obj_name)
 
+#define ham_object_vptr_prefix ham_impl_vptr_
+#define ham_object_ctor_prefix ham_impl_ctor_
+#define ham_object_dtor_prefix ham_impl_dtor_
+
+#define ham_object_vptr_name(obj_name) HAM_CONCAT(ham_object_vptr_prefix, obj_name)
+#define ham_object_ctor_name(obj_name) HAM_CONCAT(ham_object_ctor_prefix, obj_name)
+#define ham_object_dtor_name(obj_name) HAM_CONCAT(ham_object_dtor_prefix, obj_name)
+
+//! @cond ignore
 #define ham_impl_define_object(obj_depth_, obj_, vtable_depth_, vtable_, ctor_, dtor_, vtable_body_) \
-	ham_extern_c ham_public ham_export const ham_object_vtable *ham_impl_object_vtable_name(obj_)(); \
-	static const ham_object_info *ham_impl_object_info_name(obj_)(){ \
-		static const ham_object_info ret = (ham_object_info){ \
+	ham_extern_c ham_public ham_export ham_nothrow const ham_object_vtable *ham_object_vptr_name(obj_)(); \
+	static ham_object *ham_object_ctor_name(obj_)(ham_object *ptr, ham_u32 nargs, va_list va){ \
+		ptr->vtable = ham_object_vptr_name(obj_)(); \
+		obj_ *const ret = (ctor_)((obj_*)ptr, nargs, va); \
+		return ret ? ham_super_n(obj_depth_, ret) : nullptr; \
+	} \
+	ham_nothrow static void ham_object_dtor_name(obj_)(ham_object *obj){ \
+		obj_ *const derived_ptr = (obj_*)obj; \
+		(dtor_)(derived_ptr); \
+	} \
+	ham_nothrow const ham_object_vtable *ham_object_vptr_name(obj_)(){\
+		static const ham_object_info info = (ham_object_info){ \
 			.type_id = #obj_, \
 			.alignment = alignof(obj_), \
 			.size = sizeof(obj_), \
 		}; \
-		return &ret; \
-	} \
-	static ham_object *ham_impl_object_ctor_name(obj_)(ham_object *ptr, ham_u32 nargs, va_list va){ \
-		ptr->vtable = ham_impl_object_vtable_name(obj_)(); \
-		obj_ *const ret = (ctor_)((obj_*)ptr, nargs, va); \
-		return ret ? ham_super_n(obj_depth_, ret) : nullptr; \
-	} \
-	static void ham_impl_object_dtor_name(obj_)(ham_object *obj){ \
-		obj_ *const derived_ptr = (obj_*)obj; \
-		(dtor_)(derived_ptr); \
-	} \
-	const ham_object_vtable *ham_impl_object_vtable_name(obj_)(){\
 		static const vtable_ ret = (vtable_){ \
 			HAM_REPEAT(vtable_depth_, .HAM_SUPER_NAME) = (ham_object_vtable){ \
-				.info = ham_impl_object_info_name(obj_), \
-				.ctor = ham_impl_object_ctor_name(obj_), \
-				.dtor = ham_impl_object_dtor_name(obj_), \
+				.info = &info, \
+				.ctor = ham_object_ctor_name(obj_), \
+				.dtor = ham_object_dtor_name(obj_), \
 			}, \
 			HAM_EAT vtable_body_ \
 		}; \
@@ -217,9 +230,11 @@ struct ham_object{
 	}
 //! @endcond
 
-#define ham_define_object_x(obj_depth, obj, vtable_depth, vtable, ctor, dtor, vtable_body) ham_impl_define_object(obj_depth, obj, vtable_depth, vtable, ctor, dtor, vtable_body)
+#define ham_define_object_x(obj_depth, obj, vtable_depth, vtable, ctor, dtor, vtable_body) \
+	ham_impl_define_object(obj_depth, obj, vtable_depth, vtable, ctor, dtor, vtable_body)
 
-#define ham_define_object(obj, vtable, ctor, dtor, vtable_body) ham_define_object_x(1, obj, 1, vtable, ctor, dtor, vtable_body)
+#define ham_define_object(obj, vtable, ctor, dtor, vtable_body) \
+	ham_define_object_x(1, obj, 1, vtable, ctor, dtor, vtable_body)
 
 HAM_C_API_END
 
@@ -436,6 +451,50 @@ namespace ham{
 				}
 		};
 
+		/**
+		 * @brief Object registration interface class.
+		 *
+		 * Given the following object definition:
+		 *
+		 * ```c++
+		 * struct my_c_obj{
+		 * 	ham_derive(ham_object)
+		 * 	// ...
+		 * };
+		 *
+		 * struct my_c_obj_vtable{
+		 * 	ham_derive(ham_object_vtable)
+		 * 	// ...
+		 * };
+		 *
+		 * ham_define_object(my_c_obj, my_c_obj_vtable)
+		 *
+		 * using my_c_obj_registration = ham::object_registration<my_c_obj, my_c_obj_vtable>;
+		 * ```
+		 *
+		 * The following usages are intended...
+		 *
+		 *
+		 * At the top of a single source file place a line like the following:
+		 *
+		 * ```c++
+		 * const auto my_c_obj_type = my_c_obj_registration::register();
+		 * ```
+		 *
+		 * Or, from a set of library initialization/finalization routines:
+		 *
+		 * ```c++
+		 *
+		 *
+		 * bool my_lib_init(){
+		 * 	my_c_obj_registration::register();
+		 * }
+		 *
+		 * void my_lib_fini(){
+		 * 	my_c_obj_registration::deregister();
+		 * }
+		 * ```
+		 */
 		template<
 			HamObject Object,
 			HamObjectVTable VTable,
@@ -451,9 +510,7 @@ namespace ham{
 				using object_const_ptr = const object_type*;
 				using vtable_ptr       = const vtable_type*;
 
-				ham_object_registration(){
-
-				}
+				static bool register_(){ return false; }
 		};
 	}
 

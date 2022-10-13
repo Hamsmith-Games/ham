@@ -209,8 +209,7 @@ editor::project_wizard::template_page::template_page(QWidget *parent)
 	: QWizardPage(parent)
 {
 	setTitle(tr("Template"));
-	setSubTitle(tr("Pre-cooked meals."));
-	setContentsMargins(0, 0, 0, 0);
+	setSubTitle(tr("Pre-packaged meals."));
 
 	const auto template_list = new QListView;
 
@@ -271,7 +270,7 @@ editor::project_wizard::template_page::template_page(QWidget *parent)
 
 	connect(template_list, &QListView::activated, this, [this, tmpls, template_model, preview_title, preview_desc](const QModelIndex &index){
 		const auto tmpl_name   = template_model->data(index, template_model::NameRole).toString();
-		const auto tmpl_dir    = template_model->data(index, template_model::DirRole).toString();
+		//const auto tmpl_dir    = template_model->data(index, template_model::DirRole).toString();
 		//const auto tmpl_author = template_model->data(index, template_model::AuthorRole);
 		const auto tmpl_desc   = template_model->data(index, template_model::DescriptionRole).toString();
 
@@ -306,8 +305,8 @@ editor::project_wizard::project_wizard(QWidget *parent)
 	: QWizard(parent)
 {
 	setWindowTitle(tr("New Project"));
-
 	setWizardStyle(QWizard::ModernStyle);
+	setContentsMargins(20, 0, 20, 0);
 
 	//QImage logo_img(":/images/logo.png");
 	//setPixmap(QWizard::LogoPixmap, QPixmap::fromImage(logo_img).scaledToWidth(128));
@@ -359,23 +358,13 @@ editor::project_wizard::~project_wizard(){}
 editor::welcome_window::welcome_window(QWidget *parent)
 	: window(parent)
 	, m_splash(createWelcomeSplash())
+	, m_wizard(new editor::project_wizard)
 {
 	setWindowTitle(tr("Welcome!"));
 	setMinimumSize(854, 480);
 
-	set_central_widget(m_splash);
-}
-
-editor::welcome_window::~welcome_window(){}
-
-void editor::welcome_window::new_proj_pressed(){
-	setWindowTitle(tr("New Project"));
-
-	const auto proj_wizard = new editor::project_wizard;
-	set_central_widget(proj_wizard);
-
-	connect(proj_wizard, &QWizard::accepted, this, [this, proj_wizard]{
-		const auto proj_dir = proj_wizard->field("dir").toString();
+	connect(m_wizard, &QWizard::accepted, this, [this]{
+		const auto proj_dir = m_wizard->field("dir").toString();
 		const auto proj = new editor::project(QDir(proj_dir));
 		const auto main_win = new editor::main_window(proj);
 		main_win->show();
@@ -389,10 +378,23 @@ void editor::welcome_window::new_proj_pressed(){
 		*/
 	});
 
-	connect(proj_wizard, &QWizard::rejected, this, [this]{
+	connect(m_wizard, &QWizard::rejected, this, [this]{
 		setWindowTitle(tr("Welcome!"));
 		set_central_widget(m_splash);
+		m_wizard->hide();
+		m_splash->show();
 	});
+
+	set_central_widget(m_splash);
+}
+
+editor::welcome_window::~welcome_window(){}
+
+void editor::welcome_window::new_proj_pressed(){
+	setWindowTitle(tr("New Project"));
+	set_central_widget(m_wizard);
+	m_splash->hide();
+	m_wizard->show();
 }
 
 void editor::welcome_window::open_proj_pressed(){
@@ -432,6 +434,7 @@ QWidget *editor::welcome_window::createWelcomeSplash(){
 	layout->addWidget(projs_box);
 
 	const auto ret = new QWidget;
+	ret->setContentsMargins(20, 0, 20, 0);
 	ret->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 	ret->setLayout(layout);
 

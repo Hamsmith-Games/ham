@@ -1,6 +1,6 @@
 #
 # Ham World Engine Editor
-# Copyright (C) 2022  Hamsmith Ltd.
+# Copyright (C) 2022 Hamsmith Ltd.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -50,13 +50,14 @@ if(NOT mustach_content_POPULATED)
 	add_library(mustach OBJECT ${mustach_content_SOURCE_DIR}/mustach.c)
 	add_library(mustach::mustach ALIAS mustach)
 	target_include_directories(mustach PUBLIC ${mustach_content_SOURCE_DIR})
+	target_link_libraries(mustach PRIVATE ${HAM_CPU_LIBS})
 endif()
 
 ##
 # Dependencies
 ##
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets OpenGLWidgets)
 
 qt_standard_project_setup()
 
@@ -81,6 +82,7 @@ ham_add_executable(
 	main_window.cpp
 
 	world_view.hpp
+	vulkan.cpp
 	world_view.cpp
 )
 
@@ -102,6 +104,6 @@ target_link_libraries(
 	ham-engine-editor
 	PRIVATE
 	    ham::engine
-		Qt6::Widgets
+		Qt6::Widgets Qt6::OpenGLWidgets
 		mustach::mustach
 )

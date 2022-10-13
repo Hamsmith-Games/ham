@@ -30,9 +30,7 @@ FetchContent_GetProperties(gns_content)
 if(NOT gns_content_POPULATED)
 	FetchContent_Populate(gns_content)
 
-	if(NOT ANDROID)
-		set(USE_STEAMWEBRTC ON CACHE BOOL "" FORCE)
-	endif()
+	set(USE_STEAMWEBRTC ON CACHE BOOL "" FORCE)
 	add_subdirectory(${gns_content_SOURCE_DIR} ${gns_content_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 

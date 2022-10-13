@@ -1,6 +1,6 @@
 #
 # The Hamsmith Development Environment
-# Copyright (C) 2022  Hamsmith Ltd.
+# Copyright (C) 2022 Hamsmith Ltd.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -184,6 +184,7 @@ set(HAM_NET_DEFAULT_PLUGIN_UUID ${HAM_NET_GNS_PLUGIN_UUID})
 # Render plugin info
 
 set(HAM_RENDERER_VULKAN_PLUGIN ham-renderer-vulkan)
+set(HAM_RENDERER_GL_PLUGIN ham-renderer-gl)
 
 string(
 	UUID HAM_RENDERER_UUID_NAMESPACE
@@ -199,8 +200,15 @@ string(
 	TYPE SHA1
 )
 
-set(HAM_RENDERER_DEFAULT_PLUGIN ${HAM_RENDERER_VULKAN_PLUGIN})
-set(HAM_RENDERER_DEFAULT_PLUGIN_UUID ${HAM_RENDERER_VULKAN_PLUGIN_UUID})
+string(
+	UUID HAM_RENDERER_GL_PLUGIN_UUID
+	NAMESPACE ${HAM_RENDERER_UUID_NAMESPACE}
+	NAME ${HAM_RENDERER_GL_PLUGIN}
+	TYPE SHA1
+)
+
+set(HAM_RENDERER_DEFAULT_PLUGIN ${HAM_RENDERER_GL_PLUGIN})
+set(HAM_RENDERER_DEFAULT_PLUGIN_UUID ${HAM_RENDERER_GL_PLUGIN_UUID})
 
 # Keep a list of all headers
 
@@ -236,7 +244,8 @@ set(
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/shape.h
 
-	${HAM_SOURCE_INCLUDE_DIR}/ham/vk.h # just a dispatch lib, not a loader
+	${HAM_SOURCE_INCLUDE_DIR}/ham/gl.h # just a dispatch/helper header, not a loader
+	${HAM_SOURCE_INCLUDE_DIR}/ham/vk.h # same applies here
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/net.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/net-object.h
@@ -258,6 +267,8 @@ set(
 set(HAM_ALL_HEADERS ${HAM_HEADERS})
 set(HAM_ALL_INCLUDE_DIRS "${HAM_BINARY_INCLUDE_DIR};${HAM_SOURCE_INCLUDE_DIR}")
 
+set(HAM_ENGINE_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/engine")
+
 # User options
 
 option(HAM_BUILD_DOCS    "Whether to build documentation"       ${PROJECT_IS_TOP_LEVEL})
@@ -271,6 +282,11 @@ option(HAM_INSTALL_PLUGINS "Whether to install the default plugins"     ON)
 option(HAM_INSTALL_TOOLS   "Whether to install compiled tools"          ${PROJECT_IS_TOP_LEVEL})
 option(HAM_INSTALL_TESTS   "Whether to install the tests"               OFF)
 option(HAM_INSTALL_ENGINE  "Whether to install the world engine"        OFF)
+
+# Plugin options
+
+option(HAM_PLUGINS_ENABLE_GL     "Whether to enable OpenGL-related plugins" ON)
+option(HAM_PLUGINS_ENABLE_VULKAN "Whether to enable Vulkan-related plugins" OFF)
 
 # Platform specific options
 
@@ -403,8 +419,8 @@ if(HAM_BUILD_PLUGINS)
 endif()
 
 if(HAM_BUILD_TOOLS)
-	add_subdirectory(interpreter)
-	add_subdirectory(comp)
+	add_subdirectory(lang-interpreter)
+	add_subdirectory(lang-compiler)
 endif()
 
 if(HAM_BUILD_ENGINE)
@@ -459,6 +475,11 @@ install(
 install(
 	FILES runtime/LICENSE.md
 	DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/libham
+)
+
+install(
+	FILES runtime/HamConfig.cmake
+	DESTINATION ${CMAKE_INSTALL_DATADIR}/ham/cmake
 )
 
 install(

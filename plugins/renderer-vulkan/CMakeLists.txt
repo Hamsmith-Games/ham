@@ -18,8 +18,6 @@
 
 find_package(Vulkan REQUIRED COMPONENTS glslc)
 
-include(EmbedFile)
-
 set(VMA_STATIC_VULKAN_FUNCTIONS OFF CACHE BOOL "" FORCE)
 set(VMA_DYNAMIC_VULKAN_FUNCTIONS ON CACHE BOOL "" FORCE)
 
@@ -34,16 +32,6 @@ FetchContent_MakeAvailable(VulkanMemoryAllocator_content)
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	target_compile_options(VulkanMemoryAllocator PRIVATE "-fPIC")
 endif()
-
-#embed_file(screen.vert screen.vert.h)
-
-function(ham_compile_shader INPUT OUTPUT)
-	add_custom_command(
-		OUTPUT ${OUTPUT}
-		COMMAND Vulkan::glslc "${INPUT}" -O -o "${OUTPUT}"
-		MAIN_DEPENDENCY "${INPUT}"
-	)
-endfunction()
 
 ham_compile_shader(${CMAKE_CURRENT_LIST_DIR}/screen.vert ${HAM_PLUGIN_BINARY_DIR}/shaders/screen.vert.spv)
 ham_compile_shader(${CMAKE_CURRENT_LIST_DIR}/screen.frag ${HAM_PLUGIN_BINARY_DIR}/shaders/screen.frag.spv)

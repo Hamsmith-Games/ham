@@ -158,6 +158,7 @@ namespace ham::engine::editor{
 
 			QWidget *m_inner;
 			QWidget *m_splash;
+			QWizard *m_wizard;
 	};
 }
 

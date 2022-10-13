@@ -109,10 +109,10 @@ struct ham_net_connection_vtable{
 	loop_name_, loop_fn_, \
 	find_peer_name_, find_peer_fn_ \
 ) \
-	const ham_object_vtable *ham_impl_object_vtable_name(derived_socket_)(); \
-	const ham_object_vtable *ham_impl_object_vtable_name(derived_connection_)(); \
-	static const ham_net_socket_vtable *ham_impl_socket_vtable_##derived_(){ return (const ham_net_socket_vtable*)ham_impl_object_vtable_name(derived_socket_)(); } \
-	static const ham_net_connection_vtable *ham_impl_connection_vtable_##derived_(){ return (const ham_net_connection_vtable*)ham_impl_object_vtable_name(derived_connection_)(); } \
+	const ham_object_vtable *ham_object_vptr_name(derived_socket_)(); \
+	const ham_object_vtable *ham_object_vptr_name(derived_connection_)(); \
+	static const ham_net_socket_vtable *ham_impl_socket_vtable_##derived_(){ return (const ham_net_socket_vtable*)ham_object_vptr_name(derived_socket_)(); } \
+	static const ham_net_connection_vtable *ham_impl_connection_vtable_##derived_(){ return (const ham_net_connection_vtable*)ham_object_vptr_name(derived_connection_)(); } \
 	static bool init_name_(ham_net *net){ return (init_fn_)((derived_*)net); } \
 	static void fini_name_(ham_net *net){ (fini_fn_)((derived_*)net); } \
 	static void loop_name_(ham_net *net, ham_f64 dt){ (loop_fn_)((derived_*)net, dt); } \

@@ -162,6 +162,10 @@ typedef ham_usize(*ham_net_socket_message_fn)(ham_net_socket *sock, const ham_ne
  * @brief Create a listen socket.
  * @param net net object to create socket with
  * @param port port to listen on
+ * @param connect_req_fn connection request callback
+ * @param connection_fn connection successful callback
+ * @param disconnect_fn disconnection callback
+ * @param user data passed to all callbacks
  * @returns newly created socket object or ``NULL`` on error
  */
 ham_api ham_net_socket *ham_net_socket_create(

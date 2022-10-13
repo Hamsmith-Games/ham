@@ -18,12 +18,133 @@
 
 #include "renderer-gl.hpp"
 
-#include "ham/log.h"
+#include "ham/check.h"
+#include "ham/fs.h"
+#include "ham/gl.h"
 
-#include "glbinding/glbinding.h"
-#include "glbinding/gl46core/gl.h"
+#include "glad/glad.h"
+
+#include "robin_hood.h"
+
+using namespace ham::typedefs;
 
 HAM_C_API_BEGIN
+
+HAM_PLUGIN(
+	ham_renderer_gl,
+	HAM_RENDERER_GL_PLUGIN_UUID,
+	HAM_RENDERER_GL_PLUGIN_NAME,
+	HAM_VERSION,
+	"OpenGL Rendering",
+	"Hamsmith Ltd.",
+	"LGPLv3+",
+	HAM_RENDERER_PLUGIN_CATEGORY,
+	"Rendering using OpenGL 4.3+",
+
+	ham_plugin_init_pass,
+	ham_plugin_fini_pass
+)
+
+constexpr static inline GLenum ham_renderer_gl_fbo_attachment_format(ham_renderer_gl_fbo_attachment attachment) noexcept{
+	switch(attachment){
+		case HAM_RENDERER_GL_FBO_DEPTH_STENCIL: return GL_DEPTH24_STENCIL8;
+		case HAM_RENDERER_GL_FBO_DIFFUSE:       return GL_RGBA8;
+		case HAM_RENDERER_GL_FBO_NORMAL:        return GL_RGB16F;
+		case HAM_RENDERER_GL_FBO_SCENE:         return GL_R11F_G11F_B10F;
+		default: return GL_RGBA8; // squelch warnings
+	}
+}
+
+constexpr static inline const char *ham_gl_enum_str(GLenum val){
+	switch(val){
+	#define HAM_CASE(val_) case (val_): return #val_;
+
+		HAM_CASE(GL_DEBUG_TYPE_ERROR)
+		HAM_CASE(GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR)
+		HAM_CASE(GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR)
+		HAM_CASE(GL_DEBUG_TYPE_PORTABILITY)
+		HAM_CASE(GL_DEBUG_TYPE_PERFORMANCE)
+		HAM_CASE(GL_DEBUG_TYPE_OTHER)
+		HAM_CASE(GL_DEBUG_TYPE_MARKER)
+		HAM_CASE(GL_DEBUG_TYPE_PUSH_GROUP)
+		HAM_CASE(GL_DEBUG_TYPE_POP_GROUP)
+
+		HAM_CASE(GL_DEBUG_SEVERITY_HIGH)
+		HAM_CASE(GL_DEBUG_SEVERITY_MEDIUM)
+		HAM_CASE(GL_DEBUG_SEVERITY_LOW)
+		HAM_CASE(GL_DEBUG_SEVERITY_NOTIFICATION)
+
+		HAM_CASE(GL_DEBUG_SOURCE_API)
+		HAM_CASE(GL_DEBUG_SOURCE_WINDOW_SYSTEM)
+		HAM_CASE(GL_DEBUG_SOURCE_SHADER_COMPILER)
+		HAM_CASE(GL_DEBUG_SOURCE_THIRD_PARTY)
+		HAM_CASE(GL_DEBUG_SOURCE_APPLICATION)
+		HAM_CASE(GL_DEBUG_SOURCE_OTHER)
+
+		HAM_CASE(GL_FRAMEBUFFER_COMPLETE)
+		HAM_CASE(GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT)
+		HAM_CASE(GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT)
+		HAM_CASE(GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER)
+		HAM_CASE(GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER)
+		HAM_CASE(GL_FRAMEBUFFER_UNSUPPORTED)
+
+		HAM_CASE(GL_VERTEX_SHADER)
+		HAM_CASE(GL_FRAGMENT_SHADER)
+		HAM_CASE(GL_GEOMETRY_SHADER)
+		HAM_CASE(GL_COMPUTE_SHADER)
+
+	#undef HAM_CASE
+
+		default: return "UNKNOWN";
+	}
+}
+
+static inline void ham_renderer_gl_debug_callback(
+	GLenum source,
+	GLenum type,
+	GLuint id,
+	GLenum severity,
+	GLsizei length,
+	const GLchar *message,
+	const void *userParam
+){
+
+	ham::log_level level;
+
+	switch(type){
+		case GL_DEBUG_TYPE_ERROR:{
+			switch(severity){
+				case GL_DEBUG_SEVERITY_HIGH:{
+					level = ham::log_level::error;
+					break;
+				}
+
+				default:{
+					level = ham::log_level::warning;
+					break;
+				}
+			}
+
+			break;
+		}
+
+		default:{
+			level = ham::log_level::verbose;
+			break;
+		}
+	}
+
+	ham::log(
+		level,
+		"OpenGL",
+		"[{}] [{}] [{}] {}: {}",
+		ham_gl_enum_str(source),
+		ham_gl_enum_str(type),
+		ham_gl_enum_str(severity),
+		id,
+		ham::str8(message, length)
+	);
+}
 
 static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 nargs, va_list va){
 	if(nargs != 1){
@@ -35,31 +156,422 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 
 	const auto getProcAddr = create_args->gl.glGetProcAddr;
 
-	glbinding::initialize((glbinding::ContextHandle)create_args->gl.context_handle, [getProcAddr](const char *name){ return (void(*)())getProcAddr(name); });
+	if(!gladLoadGLLoader(getProcAddr)){
+		ham::logapierror("Error in gladLoadGLLoader");
+		return nullptr;
+	}
+
+	GLint num_exts;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &num_exts);
+
+	robin_hood::unordered_flat_set<std::string_view> required_exts = {
+		"GL_ARB_direct_state_access",
+		"GL_ARB_separate_shader_objects",
+		"GL_ARB_gl_spirv",
+		"GL_ARB_spirv_extensions",
+		"GL_KHR_debug",
+	};
+
+	for(GLint i = 0; i < num_exts; i++){
+		const auto ext_str = (const char*)glGetStringi(GL_EXTENSIONS, (GLuint)i);
+		const auto ext_res = required_exts.find(ext_str);
+		if(ext_res != required_exts.end()){
+			required_exts.erase(ext_res);
+			if(required_exts.empty()){
+				break;
+			}
+		}
+	}
+
+	if(!required_exts.empty()){
+		ham::str_buffer_utf8 ext_lines;
+
+		for(const auto &ext : required_exts){
+			ext_lines += ham::format("\n    {}", ext);
+		}
+
+		ham::logapierror("The following extensions are not supported on this platform:{}", ext_lines);
+		return nullptr;
+	}
+
+#ifdef HAM_DEBUG
+	glDebugMessageCallback(ham_renderer_gl_debug_callback, r);
+	glEnable(GL_DEBUG_OUTPUT);
+#endif
+
+	const auto scene_info_vert = ham_renderer_gl_load_shader(r, GL_VERTEX_SHADER, HAM_LIT("shaders-gl/scene_info.vert"));
+	if(scene_info_vert == (u32)-1){
+		ham::logapierror("Error loading scene info vertex shader");
+		return nullptr;
+	}
+
+	const auto scene_info_frag = ham_renderer_gl_load_shader(r, GL_FRAGMENT_SHADER, HAM_LIT("shaders-gl/scene_info.frag"));
+	if(scene_info_frag == (u32)-1){
+		ham::logapierror("Error loading scene info fragment shader");
+		glDeleteProgram(scene_info_vert);
+		return nullptr;
+	}
+
+	const auto scene_info_pipeline = ham_renderer_gl_create_pipeline(r, scene_info_vert, scene_info_frag);
+	if(scene_info_pipeline == (u32)-1){
+		ham::logapierror("Error creating scene info shader pipeline");
+		glDeleteProgram(scene_info_vert);
+		glDeleteProgram(scene_info_frag);
+		return nullptr;
+	}
+
+	const auto screen_vert = ham_renderer_gl_load_shader(r, GL_VERTEX_SHADER, HAM_LIT("shaders-gl/screen.vert"));
+	if(screen_vert == (u32)-1){
+		ham::logapierror("Error loading screen vertex shader");
+		glDeleteProgramPipelines(1, &scene_info_pipeline);
+		glDeleteProgram(scene_info_vert);
+		glDeleteProgram(scene_info_frag);
+		return nullptr;
+	}
+
+	const auto screen_frag = ham_renderer_gl_load_shader(r, GL_FRAGMENT_SHADER, HAM_LIT("shaders-gl/screen.frag"));
+	if(screen_frag == (u32)-1){
+		ham::logapierror("Error loading screen fragment shader");
+		glDeleteProgramPipelines(1, &scene_info_pipeline);
+		glDeleteProgram(scene_info_vert);
+		glDeleteProgram(scene_info_frag);
+		glDeleteProgram(screen_vert);
+		return nullptr;
+	}
+
+	const auto screen_pipeline = ham_renderer_gl_create_pipeline(r, screen_vert, screen_frag);
+	if(screen_pipeline == (u32)-1){
+		ham::logapierror("Error creating screen shader pipeline");
+		glDeleteProgramPipelines(1, &scene_info_pipeline);
+		glDeleteProgram(scene_info_vert);
+		glDeleteProgram(scene_info_frag);
+		glDeleteProgram(screen_vert);
+		glDeleteProgram(screen_frag);
+		return nullptr;
+	}
 
 	const auto ret = new(r) ham_renderer_gl;
 
-	using namespace gl;
+	ret->fbo = 0;
+	memset(ret->fbo_attachments, 0, sizeof(ret->fbo_attachments));
 
-	glCreateFramebuffers(1, &ret->fbo);
-	glCreateTextures(GL_TEXTURE_2D, (GLsizei)std::size(ret->fbo_attachments), ret->fbo_attachments);
+	ret->render_w = 0;
+	ret->render_h = 0;
+
+	ret->screen_post_vert = screen_vert;
+	ret->screen_post_frag = screen_frag;
+	ret->screen_post_pipeline = screen_pipeline;
+
+	ret->scene_info_vert = scene_info_vert;
+	ret->scene_info_frag = scene_info_frag;
+	ret->scene_info_pipeline = scene_info_pipeline;
+
+	const auto unit_sq = ham_shape_unit_square();
+	ret->screen_group = (ham_draw_group_gl*)ham_draw_group_create(ham_super(ret), 1, &unit_sq);
 
 	return ret;
 }
 
 static inline void ham_renderer_gl_dtor(ham_renderer_gl *r){
-	using namespace gl;
+	glDeleteProgramPipelines(1, &r->scene_info_pipeline);
+	glDeleteProgram(r->scene_info_vert);
+	glDeleteProgram(r->scene_info_frag);
+
+	glDeleteProgramPipelines(1, &r->screen_post_pipeline);
+	glDeleteProgram(r->screen_post_vert);
+	glDeleteProgram(r->screen_post_frag);
 
 	glDeleteFramebuffers(1, &r->fbo);
-	glDeleteTextures((GLsizei)std::size(r->fbo_attachments), r->fbo_attachments);
+	glDeleteTextures(HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT, r->fbo_attachments);
 
 	std::destroy_at(r);
 }
 
-static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const ham_renderer_frame_data *data){
+static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32 h){
+	if(r->fbo){
+		GLint old_w, old_h;
+		glGetTextureLevelParameteriv(r->fbo_attachments[1], 0, GL_TEXTURE_WIDTH, &old_w);
+		glGetTextureLevelParameteriv(r->fbo_attachments[1], 0, GL_TEXTURE_HEIGHT, &old_h);
 
+		if(old_w >= w && old_h >= h){
+			r->render_w = w;
+			r->render_h = h;
+			return true;
+		}
+	}
+
+	GLuint new_fbo;
+	GLuint new_attachments[HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT];
+
+	glCreateFramebuffers(1, &new_fbo);
+	glCreateTextures(GL_TEXTURE_2D, HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT, new_attachments);
+
+	GLenum attachment_points[] = {
+		GL_DEPTH_STENCIL_ATTACHMENT,
+		GL_COLOR_ATTACHMENT0,
+		GL_COLOR_ATTACHMENT1,
+		GL_COLOR_ATTACHMENT2,
+		GL_COLOR_ATTACHMENT3,
+		GL_COLOR_ATTACHMENT4,
+		GL_COLOR_ATTACHMENT5,
+	};
+
+	for(u32 i = 0; i < HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT; i++){
+		const auto attachment = static_cast<ham_renderer_gl_fbo_attachment>(i);
+		glTextureStorage2D(new_attachments[i], 1, ham_renderer_gl_fbo_attachment_format(attachment), w, h);
+		glNamedFramebufferTexture(new_fbo, attachment_points[i], new_attachments[i], 0);
+	}
+
+	glNamedFramebufferDrawBuffers(new_fbo, HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT - 1, attachment_points + 1);
+	glNamedFramebufferReadBuffer(new_fbo, attachment_points[HAM_RENDERER_GL_FBO_SCENE]);
+
+	GLenum status = glCheckNamedFramebufferStatus(new_fbo, GL_DRAW_FRAMEBUFFER);
+	if(status != GL_FRAMEBUFFER_COMPLETE){
+		ham::logapierror("Error in glCheckNamedFramebufferStatus: {}", ham_gl_enum_str(status));
+		return false;
+	}
+
+	if(r->fbo){
+		glDeleteFramebuffers(1, &r->fbo);
+		glDeleteTextures(HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT, r->fbo_attachments);
+	}
+
+	r->fbo = new_fbo;
+	memcpy(r->fbo_attachments, new_attachments, sizeof(r->fbo_attachments));
+
+	r->render_w = w;
+	r->render_h = h;
+
+	return true;
+}
+
+static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const ham_renderer_frame_data *data){
+	GLint screen_fbo, screen_viewport[4];
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &screen_fbo);
+	glGetIntegerv(GL_VIEWPORT, screen_viewport);
+
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, r->fbo);
+	glViewport(0, 0, r->render_w, r->render_h);
+
+	glClearColor(0.f, 0.f, 0.f, 0.f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+//	glBindProgramPipeline(r->scene_info_pipeline);
+
+//	ham_object_manager_iterate(
+//		ham_super(r)->draw_groups, [](ham_object *obj, void *user) -> bool{
+//			const auto group = (const ham_draw_group_gl*)obj;
+//			if(!group->num_instances) return true;
+
+//			glBindVertexArray(group->vao);
+//			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, group->bufs[HAM_DRAW_BUFFER_GL_COMMANDS]);
+//			glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr, ham_super(group)->num_shapes, sizeof(ham_gl_draw_elements_indirect_command));
+//			return true;
+//		},
+//		nullptr
+//	);
+
+	// TODO: do lighting pass
+
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)screen_fbo);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, r->fbo);
+
+	glClearColor(0.f, 0.f, 0.f, 0.f);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glBindProgramPipeline(r->screen_post_pipeline);
+
+	static const GLuint indices[] = { 0, 1, 2, 3 };
+
+	glBindVertexArray(r->screen_group->vao);
+
+	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_INT, nullptr);
+
+	// TODO: post-process scene and draw to screen
+
+	glViewport(screen_viewport[0], screen_viewport[1], screen_viewport[2], screen_viewport[3]);
 }
 
 ham_define_renderer(ham_renderer_gl, ham_draw_group_gl)
+
+//
+// Shaders
+//
+
+ham_renderer_gl_api ham_u32 ham_renderer_gl_load_shader(ham_renderer_gl *r, ham_u32 shader_type, ham_str8 filename){
+	const auto plugin_dir = ham_plugin_dir(ham_super(r)->plugin);
+
+	ham_path_buffer_utf8 shader_path = { 0 };
+
+	memcpy(shader_path, plugin_dir.ptr, plugin_dir.len);
+	shader_path[plugin_dir.len] = '/';
+
+	const auto path_len = plugin_dir.len + filename.len + 1;
+
+	if(path_len >= HAM_PATH_BUFFER_SIZE){
+		shader_path[plugin_dir.len] = '\0';
+		ham::logapierror(
+			"Path to {} shader too long ({}, max {}): {}/{}",
+			ham_gl_enum_str(shader_type),
+			path_len, HAM_PATH_BUFFER_SIZE,
+			plugin_dir.ptr, filename.ptr
+		);
+		return (u32)-1;
+	}
+
+	memcpy(shader_path + plugin_dir.len + 1, filename.ptr, filename.len);
+	shader_path[path_len] = '\0';
+
+	const auto file = ham_file_open_utf8(ham::str8(shader_path, path_len), HAM_OPEN_READ);
+	if(!file){
+		ham::logapierror(
+			"Failed to open {} shader: {}",
+			ham_gl_enum_str(shader_type),
+			shader_path
+		);
+		return (u32)-1;
+	}
+
+	ham_file_info file_info;
+	if(!ham_file_get_info(file, &file_info)){
+		ham::logapierror(
+			"Failed to get file info for {} shader: {}",
+			ham_gl_enum_str(shader_type),
+			shader_path
+		);
+		ham_file_close(file);
+		return (u32)-1;
+	}
+
+	const auto src_buf = (char*)ham_allocator_alloc(ham_super(r)->allocator, alignof(void*), file_info.size);
+	if(!src_buf){
+		ham::logapierror(
+			"Failed to allocate memory for {} shader: {}",
+			ham_gl_enum_str(shader_type),
+			shader_path
+		);
+		ham_file_close(file);
+		return (u32)-1;
+	}
+
+	ham_file_read(file, src_buf, file_info.size);
+	ham_file_close(file);
+
+	GLuint shad = glCreateShader((GLenum)shader_type);
+	if(shad == 0){
+		ham::logapierror("Error in glCreateShader({})", ham_gl_enum_str(shader_type));
+		ham_allocator_free(ham_super(r)->allocator, src_buf);
+		return (u32)-1;
+	}
+
+	if(strcmp(file_info.mime.ptr, HAM_MIME_BINARY) == 0){
+		// Only support spir-v binaries currently
+		glShaderBinary(1, &shad, GL_SHADER_BINARY_FORMAT_SPIR_V_ARB, src_buf, file_info.size);
+		glSpecializeShaderARB(shad, "main", 0, nullptr, nullptr);
+	}
+	else{
+		GLint length = file_info.size;
+		glShaderSource(shad, 1, &src_buf, &length);
+		glCompileShader(shad);
+	}
+
+	ham_allocator_free(ham_super(r)->allocator, src_buf);
+
+	GLint status;
+
+	glGetShaderiv(shad, GL_COMPILE_STATUS, &status);
+	if(status != GL_TRUE){
+		glGetShaderiv(shad, GL_INFO_LOG_LENGTH, &status);
+
+		ham::str_buffer_utf8 buf;
+		buf.resize((usize)status + 1, '\0');
+
+		glGetShaderInfoLog(shad, status, &status, buf.ptr());
+
+		ham::logapierror("Failed to compile shader {}:\n{}", shader_path, buf.c_str());
+
+		glDeleteShader(shad);
+
+		return (u32)-1;
+	}
+
+	GLuint prog = glCreateProgram();
+
+	glAttachShader(prog, shad);
+	glProgramParameteri(prog, GL_PROGRAM_SEPARABLE, (GLint)GL_TRUE);
+	glLinkProgram(prog);
+	glDetachShader(prog, shad);
+	glDeleteShader(shad);
+
+	glGetProgramiv(prog, GL_LINK_STATUS, &status);
+	if(status != GL_TRUE){
+		glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &status);
+
+		ham::str_buffer_utf8 buf;
+		buf.resize((usize)status + 1, '\0');
+
+		glGetProgramInfoLog(prog, status, &status, buf.ptr());
+
+		ham::logapierror("Failed to link shader {}:\n{}", shader_path, buf.c_str());
+
+		glDeleteProgram(prog);
+
+		return (u32)-1;
+	}
+
+	glValidateProgram(prog);
+
+	glGetProgramiv(prog, GL_VALIDATE_STATUS, &status);
+	if(status != GL_TRUE){
+		glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &status);
+
+		ham::str_buffer_utf8 buf;
+		buf.resize((usize)status + 1, '\0');
+
+		glGetProgramInfoLog(prog, status, &status, buf.ptr());
+
+		ham::logapierror("Failed to validate shader {}:\n{}", shader_path, buf.c_str());
+
+		glDeleteProgram(prog);
+
+		return (u32)-1;
+	}
+
+	return prog;
+}
+
+ham_u32 ham_renderer_gl_create_pipeline(ham_renderer_gl *r, ham_u32 vert_prog, ham_u32 frag_prog){
+	if(!ham_check(vert_prog != (u32)-1) || !ham_check(frag_prog != (u32)-1)){
+		return (u32)-1;
+	}
+
+	GLuint ret;
+	glCreateProgramPipelines(1, &ret);
+
+	glUseProgramStages(ret, GL_VERTEX_SHADER_BIT, vert_prog);
+	glUseProgramStages(ret, GL_FRAGMENT_SHADER_BIT, frag_prog);
+
+	glValidateProgramPipeline(ret);
+
+	GLint status;
+
+	glGetProgramPipelineiv(ret, GL_VALIDATE_STATUS, &status);
+	if(status != GL_TRUE){
+		glGetProgramPipelineiv(ret, GL_INFO_LOG_LENGTH, &status);
+
+		ham::str_buffer_utf8 buf;
+		buf.resize((usize)status + 1, '\0');
+
+		glGetProgramPipelineInfoLog(ret, status, &status, buf.ptr());
+
+		ham::logapierror("Failed to validate shader pipeline:\n{}", buf.c_str());
+
+		glDeleteProgramPipelines(1, &ret);
+
+		return (u32)-1;
+	}
+
+	return ret;
+}
 
 HAM_C_API_END

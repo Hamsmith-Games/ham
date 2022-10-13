@@ -196,6 +196,7 @@ namespace ham{
 	class basic_str_buffer{
 		public:
 			using ctype = detail::str_buffer_ctype_t<Char>;
+			using cstr_type = detail::str_ctype_t<Char>;
 
 			using value_type = Char;
 			using char_type = Char;
@@ -210,6 +211,9 @@ namespace ham{
 				: m_handle(detail::str_buffer_ctype_create_allocator<Char>(allocator_, str_type{})){}
 
 			basic_str_buffer(const str_type &str_ , const ham_allocator *allocator_ = ham_current_allocator())
+				: m_handle(detail::str_buffer_ctype_create_allocator<Char>(allocator_, str_)){}
+
+			basic_str_buffer(const cstr_type &str_, const ham_allocator *allocator_ = ham_current_allocator())
 				: m_handle(detail::str_buffer_ctype_create_allocator<Char>(allocator_, str_)){}
 
 			template<usize N>
@@ -237,7 +241,17 @@ namespace ham{
 				return *this;
 			}
 
+			basic_str_buffer &operator=(const cstr_type &str_){
+				set(str_);
+				// TODO: signal on error; exception?
+				return *this;
+			}
+
+			operator cstr_type() const noexcept{ return get(); }
 			operator str_type() const noexcept{ return get(); }
+
+			Char &operator[](usize idx) noexcept{ return ptr()[idx]; }
+			const Char &operator[](usize idx) const noexcept{ return ptr()[idx]; }
 
 			int compare(const str_type &other) const noexcept{ return get().compare(other); }
 

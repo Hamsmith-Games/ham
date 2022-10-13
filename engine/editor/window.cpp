@@ -48,6 +48,7 @@ editor::window::resize_handle::resize_handle(Qt::Corner corner, editor::window *
 
 	const auto img_lbl = new QLabel(this);
 	const QImage img("://images/resize-handle.png");
+	img_lbl->setContentsMargins(0, 0, 0, 0);
 	img_lbl->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
 	const auto img_pix = QPixmap::fromImage(img).scaledToWidth(32);
@@ -116,20 +117,35 @@ editor::window::header::header(editor::window *parent)
 
 	const QImage ham_img(":/images/ham.png");
 
+	m_title_icn->setContentsMargins(0, 2, 0, 0);
 	m_title_icn->setPixmap(QPixmap::fromImage(ham_img).scaledToWidth(16));
 
 	connect(parent, &editor::window::windowTitleChanged, m_title_lbl, &QLabel::setText);
 
+	QFont title_fnt = m_title_lbl->font();
+	title_fnt.setPointSize(10);
+
+	m_title_lbl->setFont(title_fnt);
+	m_title_lbl->setAlignment(Qt::AlignCenter);
+	m_title_lbl->setContentsMargins(0, 4, 0, 0);
+	m_title_lbl->setTextFormat(Qt::TextFormat::MarkdownText);
+
 	const auto title_lay = new QHBoxLayout;
-	title_lay->addWidget(m_title_icn);
-	title_lay->addSpacing(10);
-	title_lay->addWidget(m_title_lbl);
+	title_lay->setContentsMargins(0, 0, 0, 0);
+	title_lay->addWidget(m_title_icn, 0, Qt::AlignVCenter);
+	title_lay->addSpacing(15);
+	title_lay->addWidget(m_title_lbl, 0, Qt::AlignVCenter);
 
 	const auto resize_handle_tl = new editor::window::resize_handle(Qt::TopLeftCorner, parent, this);
 
 	const auto min_btn = new QPushButton;
+	min_btn->setContentsMargins(0, 0, 0, 0);
+
 	const auto max_btn = new QPushButton;
+	max_btn->setContentsMargins(0, 0, 0, 0);
+
 	const auto close_btn = new QPushButton;
+	close_btn->setContentsMargins(0, 0, 0, 0);
 
 	connect(min_btn, &QPushButton::pressed, parent, &editor::window::showMinimized);
 
@@ -150,15 +166,16 @@ editor::window::header::header(editor::window *parent)
 	const QImage max_btn_img("://images/maximize-btn.png");
 	const QImage close_btn_img("://images/close-btn.png");
 
-	const QIcon min_btn_icon(QPixmap::fromImage(min_btn_img));
-	const QIcon max_btn_icon(QPixmap::fromImage(max_btn_img));
-	const QIcon close_btn_icon(QPixmap::fromImage(close_btn_img));
+	const QIcon min_btn_icon(QPixmap::fromImage(min_btn_img).scaledToWidth(16, Qt::TransformationMode::FastTransformation));
+	const QIcon max_btn_icon(QPixmap::fromImage(max_btn_img).scaledToWidth(16, Qt::TransformationMode::FastTransformation));
+	const QIcon close_btn_icon(QPixmap::fromImage(close_btn_img).scaledToWidth(16, Qt::TransformationMode::FastTransformation));
 
 	min_btn->setIcon(min_btn_icon);
 	max_btn->setIcon(max_btn_icon);
 	close_btn->setIcon(close_btn_icon);
 
 	const auto win_btns_lay = new QHBoxLayout;
+	win_btns_lay->setContentsMargins(0, 0, 4, 0);
 	win_btns_lay->setAlignment(Qt::AlignRight);
 	win_btns_lay->addWidget(min_btn, 0, Qt::AlignRight);
 	win_btns_lay->addWidget(max_btn, 0, Qt::AlignRight);
@@ -198,7 +215,9 @@ editor::window::footer::footer(editor::window *parent)
 	, m_status_line(new QWidget)
 {
 	const auto status_lay = new QHBoxLayout;
+	status_lay->setContentsMargins(0, 0, 0, 0);
 
+	m_status_line->setContentsMargins(0, 0, 0, 0);
 	m_status_line->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
 	m_status_line->setLayout(status_lay);
 
@@ -245,16 +264,13 @@ editor::window::window(QWidget *parent)
 	setWindowFlags(Qt::FramelessWindowHint);
 
 	const auto inner_lay = new QVBoxLayout;
-	//inner_lay->setContentsMargins(0, 0, 0, 0);
+	inner_lay->setContentsMargins(0, 0, 0, 0);
 	m_inner->setLayout(inner_lay);
+	m_inner->setContentsMargins(0, 0, 0, 0);
+	//m_inner->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 
 	const auto window_lay = new QVBoxLayout;
-
-	m_inner->setContentsMargins(0, 0, 0, 0);
-	m_inner->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
-
 	window_lay->setContentsMargins(0, 0, 0, 0);
-
 	window_lay->addWidget(m_header, 0, Qt::AlignTop);
 	window_lay->addWidget(m_inner, 1);
 	window_lay->addWidget(m_footer, 0, Qt::AlignBottom | Qt::AlignRight);
@@ -273,10 +289,12 @@ void editor::window::set_central_widget(QWidget *widget){
 		const auto item = layout->takeAt(0);
 		layout->removeItem(item);
 		item->widget()->setParent(nullptr);
+		item->widget()->hide();
 	}
 
-	widget->setFocus();
 	layout->addWidget(widget);
+	widget->show();
+	widget->setFocus();
 }
 
 QWidget *editor::window::central_widget(){

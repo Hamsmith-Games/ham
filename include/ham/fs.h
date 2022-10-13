@@ -81,6 +81,8 @@ HAM_C_API_END
 
 #ifdef __cplusplus
 
+#include "str_buffer.h"
+
 namespace ham{
 	namespace detail{
 		template<typename Char>
@@ -102,6 +104,9 @@ namespace ham{
 
 	template<typename Char>
 	static inline bool path_exists(const basic_str<Char> &path){ return detail::cpath_exists<Char>(path); }
+
+	template<typename Char>
+	static inline bool path_exists(const basic_str_buffer<Char> &path){ return detail::cpath_exists<Char>(path); }
 
 	enum class file_open_flags: std::underlying_type_t<ham_file_open_flags>{
 		read = HAM_OPEN_READ,

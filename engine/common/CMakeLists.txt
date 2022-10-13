@@ -1,6 +1,6 @@
 #
 # Ham World Engine Runtime
-# Copyright (C) 2022  Hamsmith Ltd.
+# Copyright (C) 2022 Hamsmith Ltd.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,8 +19,8 @@
 ham_add_library(
 	ham-engine SHARED
 	${HAM_ENGINE_HEADERS}
-	engine.cpp
-	subsys.cpp
+	engine2.cpp
+	argparse.cpp
 	sys.cpp
 	world.cpp
 )

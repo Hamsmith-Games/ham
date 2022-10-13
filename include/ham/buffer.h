@@ -43,8 +43,8 @@ ham_constexpr static inline ham_u32 ham_bit_ceil32(ham_u32 x){ return x == 1 ? 1
 ham_constexpr static inline ham_u64 ham_bit_ceil64(ham_u64 x){ return x == 1 ? 1 : 1 << (64UL - ham_lzcnt64(x - 1UL)); }
 //! @endcond
 
-static inline bool ham_buffer_init(ham_buffer *buf, ham_usize alignment, ham_usize initial_capacity){
-	if(!buf || alignment == (ham_usize)-1 || initial_capacity == (ham_usize)-1){
+static inline bool ham_buffer_init_allocator(ham_buffer *buf, const ham_allocator *allocator, ham_usize alignment, ham_usize initial_capacity){
+	if(!buf || !allocator || alignment == (ham_usize)-1 || initial_capacity == (ham_usize)-1){
 		return false;
 	}
 
@@ -63,17 +63,19 @@ static inline bool ham_buffer_init(ham_buffer *buf, ham_usize alignment, ham_usi
 		alignment = ham_popcnt64(alignment) == 1 ? alignment : ham_bit_ceil64(alignment);
 	}
 
-	const ham_allocator *cur_allocator = ham_current_allocator();
-
-	void *const mem = ham_allocator_alloc(cur_allocator, alignment, initial_capacity);
+	void *const mem = ham_allocator_alloc(allocator, alignment, initial_capacity);
 	if(ham_unlikely(!mem)) return false;
 
-	buf->allocator = cur_allocator;
+	buf->allocator = allocator;
 	buf->mem = mem;
 	buf->alignment = alignment;
 	buf->allocated = 0;
 	buf->capacity  = initial_capacity;
 	return true;
+}
+
+static inline bool ham_buffer_init(ham_buffer *buf, ham_usize alignment, ham_usize initial_capacity){
+	return ham_buffer_init_allocator(buf, ham_current_allocator(), alignment, initial_capacity);
 }
 
 static inline void ham_buffer_finish(ham_buffer *buf){
@@ -231,20 +233,27 @@ namespace ham{
 				bool HasDefaultCtor = !std::is_same_v<T, void>,
 				std::enable_if_t<HasDefaultCtor, int> = 0
 			>
-			explicit basic_buffer(usize initial_capacity = 0){
-				if(!ham_buffer_init(&m_buf, value_alignment, initial_capacity * value_size)){
+			explicit basic_buffer(usize initial_size = 0){
+				const auto initial_byte_size = initial_size * value_size;
+
+				if(!ham_buffer_init(&m_buf, value_alignment, initial_byte_size)){
 					throw basic_buffer_ctor_error();
 				}
+
+				ham_buffer_resize(&m_buf, initial_byte_size);
+				std::uninitialized_default_construct_n((pointer)m_buf.mem, size());
 			}
 
 			template<
 				bool HasSizedCtor = std::is_same_v<T, void>,
 				std::enable_if_t<HasSizedCtor, int> = 0
 			>
-			explicit basic_buffer(usize alignment, usize initial_capacity = 0){
-				if(!ham_buffer_init(&m_buf, alignment, initial_capacity)){
+			explicit basic_buffer(usize alignment, usize initial_size){
+				if(!ham_buffer_init(&m_buf, alignment, initial_size)){
 					throw basic_buffer_ctor_error();
 				}
+
+				ham_buffer_resize(&m_buf, initial_size);
 			}
 
 			basic_buffer(const std::initializer_list<value_type> &values){
@@ -328,6 +337,25 @@ namespace ham{
 
 			reference operator[](usize idx) noexcept{ return data()[idx]; }
 			const_reference operator[](usize idx) const noexcept{ return data()[idx]; }
+
+			bool resize(usize new_size) noexcept(noexcept(value_type())){
+				if(new_size == size()){
+					return true;
+				}
+				else if(new_size < size()){
+					std::destroy_n(data() + new_size, size() - new_size);
+					return ham_buffer_resize(&m_buf, new_size * value_size);
+				}
+				else{
+					const auto old_size = size();
+					if(!ham_buffer_resize(&m_buf, new_size * value_size)){
+						return false;
+					}
+
+					std::uninitialized_default_construct_n(data() + old_size, size() - old_size);
+					return true;
+				}
+			}
 
 			reference at(usize idx){
 				if(size() <= idx) throw basic_buffer_at_error(idx);

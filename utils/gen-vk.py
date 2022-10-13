@@ -1,15 +1,16 @@
+#!/usr/bin/env python3
+
 import requests
 import xml.etree.ElementTree as etree
 
 vk_xml_url = "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Docs/v1.3.229/xml/vk.xml"
 
 vk_xml_res = requests.get(vk_xml_url)
-
 if not vk_xml_res:
+	print(file=sys.stderr, f"Failed to retieve text from url: {vk_xml_url}")
 	exit(1)
 
-vk_xml      = vk_xml_res.text
-vk_xml_root = etree.fromstring(vk_xml)
+vk_xml_root = etree.fromstring(vk_xml_res.text)
 
 vk_features = vk_xml_root.findall('./feature')
 vk_exts     = vk_xml_root.findall('./extensions/extension[@author="KHR"]')

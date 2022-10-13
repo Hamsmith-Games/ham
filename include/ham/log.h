@@ -161,10 +161,17 @@ HAM_C_API_END
 
 #ifdef __cplusplus
 
-#include "meta.hpp"
 #include "str_buffer.h"
 
-#include <source_location>
+#if defined(__clang__) && !(__has_builtin(__builtin_source_location))
+#	include <experimental/source_location>
+	namespace ham::detail{ using source_location = std::experimental::source_location; };
+#elif defined(__GNUC__) || defined(_MSVC_VER)
+#	include <source_location>
+	namespace ham::detail{ using source_location = std::source_location; };
+#else
+#	error "Unsupported compiler"
+#endif
 
 namespace ham{
 	enum class log_level{
@@ -229,6 +236,99 @@ namespace ham{
 	template<typename ... Args>
 	static inline void logfatal(const char *api, const fmt::format_string<Args...> &fmt_str, Args &&... args) noexcept{
 		log(log_level::fatal, api, fmt_str, std::forward<Args>(args)...);
+	}
+
+	//
+	// API logging (api == function name)
+	//
+
+	struct logapi_format_string{
+		public:
+			template<
+				typename S,
+				std::enable_if_t<
+					std::is_convertible_v<const S&, fmt::string_view>,
+					int
+				> = 0
+			>
+			consteval logapi_format_string(
+				const S& s,
+				const detail::source_location loc_ = detail::source_location::current()
+			)
+				: m_fmt_str(s)
+				, m_loc(loc_){}
+
+			constexpr const fmt::string_view &fmt_str() const noexcept{ return m_fmt_str; }
+			constexpr const detail::source_location &loc() const noexcept{ return m_loc; }
+
+			constexpr operator fmt::string_view() const noexcept{ return m_fmt_str; }
+
+		private:
+			fmt::string_view m_fmt_str;
+			detail::source_location m_loc;
+	};
+
+	template<typename ... Args>
+	static inline void logapi(log_level level, const logapi_format_string &fmt_str, Args &&... args) noexcept{
+		ham_timepoint log_tp = (ham_timepoint){ 0, 0 };
+
+		if(!ham_timepoint_now(&log_tp, CLOCK_REALTIME)){
+			// bad place for this to happen :/
+		}
+
+		fmt::detail::check_format_string<Args...>(fmt_str.fmt_str());
+
+		if(level == log_level::verbose && !ham_log_is_verbose()){
+			return;
+		}
+
+		// TODO: make this work without vformat
+		const auto fmt_res = fmt::vformat_to_n(
+			ham_impl_message_buf, sizeof(ham_impl_message_buf)-1,
+			fmt_str, fmt::make_format_args(std::forward<Args>(args)...)
+		);
+
+		*fmt_res.out = '\0';
+
+		const ham_logger *logger = ham_current_logger();
+
+		logger->log(log_tp, static_cast<ham_log_level>(level), fmt_str.loc().function_name(), ham_impl_message_buf, logger->user);
+
+	#ifdef HAM_DEBUG
+		if(static_cast<int>(level) > HAM_LOG_WARNING){
+			ham_breakpoint();
+		}
+	#endif
+	}
+
+	template<typename ... Args>
+	static inline void logapiinfo(const logapi_format_string &fmt_str, Args &&... args) noexcept{
+		logapi(log_level::info, fmt_str, std::forward<Args>(args)...);
+	}
+
+	template<typename ... Args>
+	static inline void logapiverbose(const logapi_format_string &fmt_str, Args &&... args) noexcept{
+		logapi(log_level::verbose, fmt_str, std::forward<Args>(args)...);
+	}
+
+	template<typename ... Args>
+	static inline void logapidebug(const logapi_format_string &fmt_str, Args &&... args) noexcept{
+		logapi(log_level::debug, fmt_str, std::forward<Args>(args)...);
+	}
+
+	template<typename ... Args>
+	static inline void logapiwarn(const logapi_format_string &fmt_str, Args &&... args) noexcept{
+		logapi(log_level::warning, fmt_str, std::forward<Args>(args)...);
+	}
+
+	template<typename ... Args>
+	static inline void logapierror(const logapi_format_string &fmt_str, Args &&... args) noexcept{
+		logapi(log_level::error, fmt_str, std::forward<Args>(args)...);
+	}
+
+	template<typename ... Args>
+	static inline void logapifatal(const logapi_format_string &fmt_str, Args &&... args) noexcept{
+		logapi(log_level::fatal, fmt_str, std::forward<Args>(args)...);
 	}
 }
 

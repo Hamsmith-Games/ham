@@ -1483,6 +1483,30 @@ namespace ham{
 	using namespace literals;
 
 	namespace meta{
+		template<ham_usize BitWidth, typename = void> struct nearest_nat;
+		template<ham_usize BitWidth, typename = void> struct nearest_int;
+
+		template<ham_usize BitWidth>
+		using nearest_nat_t = typename nearest_nat<BitWidth>::type;
+
+		template<ham_usize BitWidth>
+		using nearest_int_t = typename nearest_int<BitWidth>::type;
+
+		template<ham_usize BitWidth> struct nearest_nat<BitWidth, std::enable_if_t<BitWidth <= 8>>: id<u8>{};
+		template<ham_usize BitWidth> struct nearest_nat<BitWidth, std::enable_if_t<(BitWidth > 8) && (BitWidth <= 16)>>: id<u16>{};
+		template<ham_usize BitWidth> struct nearest_nat<BitWidth, std::enable_if_t<(BitWidth > 16) && (BitWidth <= 32)>>: id<u32>{};
+		template<ham_usize BitWidth> struct nearest_nat<BitWidth, std::enable_if_t<(BitWidth > 32) && (BitWidth <= 64)>>: id<u64>{};
+
+		template<ham_usize BitWidth> struct nearest_int<BitWidth, std::enable_if_t<BitWidth <= 8>>: id<i8>{};
+		template<ham_usize BitWidth> struct nearest_int<BitWidth, std::enable_if_t<(BitWidth > 8) && (BitWidth <= 16)>>: id<i16>{};
+		template<ham_usize BitWidth> struct nearest_int<BitWidth, std::enable_if_t<(BitWidth > 16) && (BitWidth <= 32)>>: id<i32>{};
+		template<ham_usize BitWidth> struct nearest_int<BitWidth, std::enable_if_t<(BitWidth > 32) && (BitWidth <= 64)>>: id<i64>{};
+
+	#ifdef HAM_INT128
+		template<ham_usize BitWidth> struct nearest_nat<BitWidth, std::enable_if_t<(BitWidth > 64) && (BitWidth <= 128)>>: id<u128>{};
+		template<ham_usize BitWidth> struct nearest_int<BitWidth, std::enable_if_t<(BitWidth > 64) && (BitWidth <= 128)>>: id<i128>{};
+	#endif
+
 		// pretty much useless
 		template<unit Value> using constant_unit = constant_value<unit, Value>;
 
@@ -1541,7 +1565,23 @@ inline std::basic_ostream<Char> &operator<<(std::basic_ostream<Char> &stream, co
 namespace fmt{
 	template<typename Char>
 	struct formatter<ham::basic_str<Char>>
-		: public formatter<basic_string_view<Char>>{};
+		: public formatter<basic_string_view<Char>>
+	{
+		formatter<basic_string_view<Char>> m_formatter;
+
+		constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()){
+			return m_formatter.parse(ctx);
+		}
+
+		template<typename FormatContext>
+		auto format(const ham::basic_str<Char> &str, FormatContext &ctx) const -> decltype(ctx.out()){
+			return m_formatter.format(str, ctx);
+		}
+	};
+
+	template<> struct formatter<ham_str8>:  public formatter<ham::basic_str<ham::char8>>{};
+	template<> struct formatter<ham_str16>: public formatter<ham::basic_str<ham::char16>>{};
+	template<> struct formatter<ham_str32>: public formatter<ham::basic_str<ham::char32>>{};
 
 	template<>
 	struct formatter<ham_version>{

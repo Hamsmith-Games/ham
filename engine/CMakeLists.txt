@@ -1,6 +1,6 @@
 #
 # The Ham World Engine
-# Copyright (C) 2022  Hamsmith Ltd.
+# Copyright (C) 2022 Hamsmith Ltd.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -104,6 +104,11 @@ set_target_properties(
 ##
 
 if(HAM_INSTALL_ENGINE)
+	install(
+		FILES common/HamEngineConfig.cmake
+		DESTINATION ${CMAKE_INSTALL_DATADIR}/ham/cmake
+	)
+
 	install(
 		FILES LICENSE.md
 		DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/libham-engine

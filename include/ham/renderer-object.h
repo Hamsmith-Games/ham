@@ -29,6 +29,8 @@
 #include "object.h"
 #include "memory.h"
 #include "plugin.h"
+#include "async.h"
+#include "buffer.h"
 
 HAM_C_API_BEGIN
 
@@ -47,6 +49,9 @@ struct ham_renderer{
 	ham_plugin *plugin;
 
 	ham_object_manager *draw_groups;
+
+	ham_mutex *draw_mut;
+	ham_buffer draw_list, tmp_list;
 };
 
 struct ham_renderer_vtable{
@@ -54,9 +59,8 @@ struct ham_renderer_vtable{
 
 	const ham_draw_group_vtable*(*draw_group_vtable)();
 
-	bool(*init)(ham_renderer *r);
-	void(*fini)(ham_renderer *r);
-	void(*loop)(ham_renderer *r, ham_f64 dt);
+	bool(*resize)(ham_renderer *r, ham_u32 w, ham_u32 h);
+	void(*frame)(ham_renderer *r, ham_f64 dt, const ham_renderer_frame_data *data);
 };
 
 // Draw groups
@@ -72,62 +76,54 @@ struct ham_draw_group{
 
 struct ham_draw_group_vtable{
 	ham_derive(ham_object_vtable)
-
-	bool(*init)(
-		ham_draw_group *group,
-		ham_renderer *r,
-		ham_usize num_shapes, const ham_shape *const *shapes
-	);
-
-	void(*fini)(ham_draw_group *group);
 };
 
 //! @cond ignore
+
 #define ham_impl_define_renderer( \
 	derived_renderer, \
 	derived_draw_group, \
 	ctor_fn, dtor_fn, \
-	init_name, init_fn, \
-	fini_name, fini_fn, \
-	loop_name, loop_fn \
+	resize_name, resize_fn, \
+	frame_name, frame_fn \
 ) \
-static inline bool ham_impl_init_##derived_draw_group( \
-	ham_draw_group *group, \
-	ham_renderer *r, \
-	ham_usize num_shapes, const ham_shape *const *shapes \
-){ \
-	return (derived_draw_group##_init)((derived_draw_group*)group, (derived_renderer*)r, num_shapes, shapes); \
-}\
-static inline void ham_impl_fini_##derived_draw_group(ham_draw_group *group){ (derived_draw_group##_fini)((derived_draw_group*)group); } \
-ham_define_object_x( \
-	2, derived_draw_group, 1, ham_draw_group_vtable, \
-	derived_draw_group##_ctor, derived_draw_group##_dtor, \
-	( .init = ham_impl_init_##derived_draw_group, .fini = ham_impl_fini_##derived_draw_group ) \
-) \
-static inline const ham_draw_group_vtable *ham_impl_draw_group_vtable_##derived_renderer(){ return (const ham_draw_group_vtable*)(ham_impl_object_vtable_name(derived_draw_group)()); } \
-static inline bool ham_impl_init_##derived_renderer(ham_renderer *r){ return (init_fn)((derived_renderer*)r); } \
-static inline void ham_impl_fini_##derived_renderer(ham_renderer *r){ (fini_fn)((derived_renderer*)r); } \
-static inline void ham_impl_loop_##derived_renderer(ham_renderer *r, ham_f64 dt){ (loop_fn)((derived_renderer*)r, dt); } \
+ham_extern_c ham_public ham_nothrow const ham_object_vtable *ham_object_vptr_name(derived_draw_group)(); \
+ham_nothrow static inline const ham_draw_group_vtable *ham_impl_draw_group_vtable_##derived_renderer(){ return (const ham_draw_group_vtable*)(ham_object_vptr_name(derived_draw_group)()); } \
+static inline bool resize_name(ham_renderer *r, ham_u32 w, ham_u32 h){ return (resize_fn)((derived_renderer*)r, w, h); } \
+static inline void frame_name(ham_renderer *r, ham_f64 dt, const ham_renderer_frame_data *data){ (frame_fn)((derived_renderer*)r, dt, data); } \
 ham_define_object_x( \
 	2, derived_renderer, 1, ham_renderer_vtable, \
 	ctor_fn, dtor_fn, \
 	(	.draw_group_vtable = ham_impl_draw_group_vtable_##derived_renderer, \
-		.init = ham_impl_init_##derived_renderer, \
-		.fini = ham_impl_fini_##derived_renderer, \
-		.loop = ham_impl_loop_##derived_renderer ) \
+		.resize = resize_name, \
+		.frame = frame_name, \
+	) \
 )
+
+#define ham_impl_define_draw_group( \
+	derived, \
+	ctor_fn, dtor_fn \
+) \
+ham_define_object_x( \
+	2, derived, 1, ham_draw_group_vtable, \
+	ctor_fn, dtor_fn, \
+	() \
+)
+
 //! @endcond
 
-#define ham_define_renderer(derived_renderer, derived_draw_group)\
+#define ham_define_renderer(derived_renderer, derived_draw_group) \
 	ham_impl_define_renderer(\
 		derived_renderer, \
 		derived_draw_group, \
 		derived_renderer##_ctor, \
 		derived_renderer##_dtor, \
-		ham_impl_init_##derived_renderer, derived_renderer##_init, \
-		ham_impl_fini_##derived_renderer, derived_renderer##_fini, \
-		ham_impl_loop_##derived_renderer, derived_renderer##_loop \
+		ham_impl_resize_##derived_renderer, derived_renderer##_resize, \
+		ham_impl_frame_##derived_renderer, derived_renderer##_frame \
 	)
+
+#define ham_define_draw_group(derived) \
+	ham_impl_define_draw_group(derived, derived##_ctor, derived##_dtor)
 
 HAM_C_API_END
 

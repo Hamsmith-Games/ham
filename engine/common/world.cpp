@@ -1,6 +1,6 @@
 /*
  * Ham World Engine Runtime
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,7 +42,7 @@ ham_world *ham_world_create(){
 
 	const auto ret = ham_allocator_new(allocator, ham_world);
 	if(!ret){
-		ham_logapierrorf("Error allocating ham_world");
+		ham::logapierror("Error allocating ham_world");
 		return nullptr;
 	}
 
@@ -84,13 +84,13 @@ ham_entity *ham_entity_vcreate(
 			// TODO: create object manager
 			man = ham_object_manager_create(ham_super(entity_vt));
 			if(!man){
-				ham_logapierrorf("Failed to create object manager for \"%s\"", ham_super(entity_vt)->info()->type_id);
+				ham::logapierror("Failed to create object manager for \"{}\"", ham_super(entity_vt)->info->type_id);
 				return nullptr;
 			}
 
 			const auto emplace_res = world->obj_mans.try_emplace(entity_vt, man);
 			if(!emplace_res.second){
-				ham_logapierrorf("Failed to emplace object manager into ham_world");
+				ham::logapierror("Failed to emplace object manager into ham_world");
 				ham_object_manager_destroy(man);
 				return nullptr;
 			}
@@ -119,7 +119,7 @@ ham_entity *ham_entity_vcreate(
 
 	const auto obj = ham_object_vnew_init(man, init_fn, &data, nargs, va);
 	if(!obj){
-		ham_logapierrorf("Failed to create new entity of type \"%s\"", ham_super(entity_vt)->info()->type_id);
+		ham::logapierror("Failed to create new entity of type \"{}\"", ham_super(entity_vt)->info->type_id);
 		return nullptr;
 	}
 

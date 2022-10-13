@@ -31,37 +31,62 @@ namespace ham::meta{
 	template<typename Char, usize N>
 	struct cexpr_str{
 		public:
-			constexpr cexpr_str(const Char (&lit)[N]) noexcept
-				: m_ptr(lit){}
+			consteval cexpr_str(const Char (&lit)[N+1]) noexcept
+				: cexpr_str(lit, make_index_seq<N>()){}
 
-			constexpr static usize size() noexcept{ return N-1; }
-			constexpr const Char *data() const noexcept{ return m_ptr; }
+			consteval cexpr_str(const cexpr_str &other) noexcept
+				: cexpr_str(other.m_chars, make_index_seq<N>()){}
 
-			constexpr operator basic_str<Char>() const noexcept{ return basic_str(m_ptr, N-1); }
+			constexpr static usize size() noexcept{ return N; }
+			constexpr const Char *data() const noexcept{ return m_chars; }
 
-			constexpr bool operator==(cexpr_str<Char, N> other) const noexcept{
+			constexpr operator basic_str<Char>() const noexcept{ return basic_str(m_chars, N); }
+
+			constexpr bool operator==(const cexpr_str<Char, N> &other) const noexcept{
 				for(usize i = 0; i < size(); i++){
-					if(m_ptr[i] != other.m_ptr[i]) return false;
+					if(m_chars[i] != other.m_chars[i]) return false;
 				}
 
 				return true;
 			}
 
 			template<usize M>
-			constexpr bool operator==(cexpr_str<Char, M>) const noexcept{ return false; }
+			constexpr bool operator==(const cexpr_str<Char, M>&) const noexcept{ return false; }
 
-			constexpr bool operator!=(cexpr_str<Char, N> other) const noexcept{
+			constexpr bool operator!=(const cexpr_str<Char, N> &other) const noexcept{
 				for(usize i = 0; i < size(); i++){
-					if(m_ptr[i] == other.m_ptr[i]) return false;
+					if(m_chars[i] == other.m_chars[i]) return false;
 				}
 
 				return true;
 			}
 
 			template<usize M>
-			constexpr bool operator!=(cexpr_str<Char, M>) const noexcept{ return true; }
+			constexpr bool operator!=(const cexpr_str<Char, M>&) const noexcept{ return true; }
 
-			const Char *const m_ptr;
+			template<usize M>
+			constexpr auto operator+(const cexpr_str<Char, M> &other) const noexcept{
+				return concat_impl(other, make_index_seq<N>(), make_index_seq<M>());
+			}
+
+		private:
+			template<usize ... Is>
+			consteval cexpr_str(const Char *lit, index_seq<Is...>)
+				: m_chars{ lit[Is]..., '\0' }{}
+
+			template<typename ... Chars>
+			consteval cexpr_str(Chars ... chars) noexcept
+				: m_chars{ chars..., '\0' }
+			{
+				static_assert(sizeof...(Chars) == N);
+			}
+
+			template<usize M, usize ... Is, usize ... Js>
+			constexpr auto concat_impl(const cexpr_str<Char, M> &other, index_seq<Is...>, index_seq<Js...>){
+				return cexpr_str<Char, N+M>(m_chars[Is]..., other.m_chars[Js]...);
+			}
+
+			Char m_chars[N+1];
 	};
 
 	template<typename Char, usize N>

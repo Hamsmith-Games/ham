@@ -7,4 +7,6 @@ project(
 	LANGUAGES C CXX
 )
 
-include(HamEngine)
+find_package(HamEngine REQUIRED)
+
+

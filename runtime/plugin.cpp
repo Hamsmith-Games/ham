@@ -1,6 +1,6 @@
 /*
  * Ham Runtime
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -173,7 +173,7 @@ ham_plugin *ham_plugin_load(ham_dso_handle dso, const char *plugin_id){
 		[](ham_dso_handle dso, ham_str8 sym_name, void *user){
 			const auto data = reinterpret_cast<iter_data*>(user);
 
-			constexpr ham::str8 obj_vtable_prefix = HAM_STRINGIFY(ham_impl_object_vtable_prefix);
+			constexpr ham::str8 obj_vtable_prefix = HAM_STRINGIFY(ham_object_vptr_prefix);
 			constexpr ham::str8 vtable_prefix = HAM_STRINGIFY(HAM_IMPL_PLUGIN_VTABLE_NAME_PREFIX);
 
 			const auto sym_str = ham::str8(sym_name);
@@ -315,7 +315,7 @@ const ham_object_vtable *ham_plugin_object(const ham_plugin *plugin, ham_str8 na
 	}
 
 	for(auto obj_vt : plugin->object_vtables){
-		const ham::str8 obj_type_id = ham::str8(obj_vt->info()->type_id);
+		const ham::str8 obj_type_id = ham::str8(obj_vt->info->type_id);
 		if(obj_type_id == name) return obj_vt;
 	}
 

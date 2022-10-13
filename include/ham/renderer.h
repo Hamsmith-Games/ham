@@ -26,30 +26,67 @@
  */
 
 #include "shape.h"
+#include "vk.h" // IWYU pragma: keep
 
 #include <stdarg.h>
 
 HAM_C_API_BEGIN
 
+typedef void*(*ham_gl_get_proc_addr)(const char *name);
+
+typedef struct ham_renderer_create_args_vulkan{
+	VkInstance instance;
+	VkPhysicalDevice physical_device;
+	VkDevice device;
+	PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
+	PFN_vkGetDeviceProcAddr vkGetDeviceProcAddr;
+
+	ham_u32 num_swapchain_images;
+	VkImage *swapchain_images;
+	VkImageView *swapchain_image_views;
+	VkImage depth_stencil_image;
+	VkImageView depth_stencil_image_view;
+} ham_renderer_create_args_vulkan;
+
+typedef struct ham_renderer_create_args_gl{
+	ham_uptr context_handle;
+	ham_gl_get_proc_addr glGetProcAddr;
+} ham_renderer_create_args_gl;
+
+typedef union ham_renderer_create_args{
+	ham_renderer_create_args_vulkan vulkan;
+	ham_renderer_create_args_gl gl;
+} ham_renderer_create_args;
+
+typedef struct ham_renderer_frame_data_vulkan{
+	ham_u64 current_frame;
+	VkCommandBuffer command_buffer;
+	VkFramebuffer framebuffer;
+	VkRenderPass default_render_pass;
+} ham_renderer_frame_data_vulkan;
+
+typedef struct ham_renderer_frame_data_gl{
+	ham_u64 current_frame;
+} ham_renderer_frame_data_gl;
+
+typedef union ham_renderer_frame_data{
+	ham_u64 current_frame;
+	ham_renderer_frame_data_vulkan vulkan;
+	ham_renderer_frame_data_gl gl;
+} ham_renderer_frame_data;
+
 typedef struct ham_renderer ham_renderer;
+typedef struct ham_renderer_vtable ham_renderer_vtable;
 
-ham_api ham_renderer *ham_renderer_vcreate(const char *plugin_id, const char *obj_id, ham_usize nargs, va_list va);
+ham_api ham_renderer *ham_renderer_vptr_create(const ham_renderer_vtable *vptr, const ham_renderer_create_args *args);
 
-//! @cond ignore
-static inline ham_renderer *ham_impl_renderer_create(const char *plugin_id, const char *obj_id, ham_usize nargs, ...){
-	va_list va;
-	va_start(va, nargs);
-	const ham_auto ret = ham_renderer_vcreate(plugin_id, obj_id, nargs, va);
-	va_end(va);
-	return ret;
-}
-//! @endcond
-
-#define ham_renderer_create(plugin_id, obj_id, ...) (ham_impl_renderer_create((plugin_id), (obj_id), HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__))
+ham_api ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, const ham_renderer_create_args *args);
 
 ham_api void ham_renderer_destroy(ham_renderer *renderer);
 
-ham_api void ham_renderer_loop(ham_renderer *renderer, ham_f64 dt);
+ham_api bool ham_renderer_resize(ham_renderer *renderer, ham_u32 w, ham_u32 h);
+
+ham_api void ham_renderer_frame(ham_renderer *renderer, ham_f64 dt, const ham_renderer_frame_data *data);
 
 /**
  * @defgroup HAM_RENDERER_TEXTURE Textures
@@ -95,6 +132,16 @@ static inline ham_usize ham_draw_group_num_instances(ham_draw_group *group){
  */
 
 HAM_C_API_END
+
+namespace ham{
+	class renderer{
+		public:
+			renderer(){}
+
+		private:
+			unique_handle<ham_renderer*, ham_renderer_destroy> m_handle;
+	};
+}
 
 /**
  * @}

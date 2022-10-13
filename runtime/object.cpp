@@ -1,6 +1,6 @@
 /*
  * Ham Runtime
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -55,7 +55,7 @@ ham_object_manager *ham_object_manager_create(const ham_object_vtable *vtable){
 
 	ptr->allocator = allocator;
 	ptr->obj_vtable = vtable;
-	ptr->obj_info = vtable->info();
+	ptr->obj_info = vtable->info;
 
 	ptr->instances = ham_colony_create(ptr->obj_info->alignment, ptr->obj_info->size);
 	if(!ptr->instances){

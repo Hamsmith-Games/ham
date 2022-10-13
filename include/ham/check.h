@@ -36,11 +36,7 @@ HAM_C_API_BEGIN
 
 #define ham_check_msg(cond_, fmt_str_, ...) ham_impl_check_msg(cond_, fmt_str_ __VA_OPT__(,) __VA_ARGS__)
 
-//! @cond ignore
-#define ham_impl_check(cond_) ham_check_msg(cond_, "Condition not met: %s", #cond_)
-//! @endcond
-
-#define ham_check(cond_) ham_impl_check(cond_)
+#define ham_check(cond_) ham_check_msg(cond_, "Condition not met: %s", #cond_)
 
 HAM_C_API_END
 

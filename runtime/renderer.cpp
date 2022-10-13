@@ -1,6 +1,6 @@
 /*
  * Ham Runtime
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -21,53 +21,58 @@
 
 HAM_C_API_BEGIN
 
-ham_renderer *ham_renderer_vcreate(const char *plugin_id, const char *object_id, ham_usize nargs, va_list va){
-	if(!ham_check(object_id != NULL)) return nullptr;
+static inline ham_renderer *ham_impl_renderer_construct(const ham_object_vtable *vtable, ham_object *obj, ...){
+	va_list va;
+	va_start(va, obj);
+	const auto ret = vtable->ctor(obj, 1, va);
+	va_end(va);
+	return (ham_renderer*)ret;
+}
+
+ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, const ham_renderer_create_args *args){
+	if(!ham_check(obj_id != NULL)) return nullptr;
 
 	ham_plugin *plugin = nullptr;
 	ham_dso_handle dso = nullptr;
 
 	if(!ham_plugin_find(plugin_id, HAM_EMPTY_STR8, &plugin, &dso)){
-		ham_logapierrorf("Could not find plugin by id '%s'", plugin_id);
+		ham::logapierror("Could not find plugin by id '{}'", plugin_id);
 		return nullptr;
 	}
 
-	const auto obj_vtable = ham_plugin_object(plugin, ham::str8(object_id));
+	const auto obj_vtable = ham_plugin_object(plugin, ham::str8(obj_id));
 	if(!obj_vtable){
-		ham_logapierrorf("Could not find object by id '%s'", object_id);
+		ham::logapierror("Could not find object by id '{}'", obj_id);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
 		return nullptr;
 	}
 
-	const auto obj_info = obj_vtable->info();
+	const auto obj_info = obj_vtable->info;
 
 	const auto allocator = ham_current_allocator();
 
 	const auto obj = (ham_object*)ham_allocator_alloc(allocator, obj_info->alignment, obj_info->size);
 	if(!obj){
-		ham_logapierrorf("Error allocating memory for renderer object '%s'", object_id);
+		ham::logapierror("Error allocating memory for renderer object '{}'", obj_id);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
 		return nullptr;
 	}
 
 	if(!ham_plugin_init(plugin)){
-		ham_logapierrorf("Error initializing plugin '%s'", ham_plugin_name(plugin).ptr);
+		ham::logapierror("Error initializing plugin '{}'", ham_plugin_name(plugin).ptr);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
 		return nullptr;
 	}
 
-	obj->vtable = obj_vtable;
-	((ham_renderer*)obj)->allocator = allocator;
-	((ham_renderer*)obj)->dso       = dso;
-	((ham_renderer*)obj)->plugin    = plugin;
+	const auto r = (ham_renderer*)obj;
 
-	const auto ret = (ham_renderer*)obj_vtable->ctor(obj, nargs, va);
-	if(!ret){
-		ham_logapierrorf("Failed to construct renderer object '%s'", object_id);
+	const auto draw_mut = ham_mutex_create(HAM_MUTEX_NORMAL);
+	if(!draw_mut){
+		ham::logapierror("Error in ham_mutex_create");
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
@@ -76,25 +81,78 @@ ham_renderer *ham_renderer_vcreate(const char *plugin_id, const char *object_id,
 
 	const auto draw_group_vtable = (const ham_object_vtable*)((const ham_renderer_vtable*)obj_vtable)->draw_group_vtable();
 
-	ret->draw_groups = ham_object_manager_create(draw_group_vtable);
-	if(!ret->draw_groups){
-		ham_logapierrorf("Failed to create object manager for draw groups");
-		obj_vtable->dtor(obj);
+	const auto draw_group_manager = ham_object_manager_create(draw_group_vtable);
+	if(!draw_group_manager){
+		ham::logapierror("Failed to create object manager for draw groups");
+		ham_mutex_destroy(draw_mut);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
 		return nullptr;
 	}
 
-	const auto renderer_vt = (const ham_renderer_vtable*)obj_vtable;
-	if(!renderer_vt->init(ret)){
-		ham_logapierrorf("Failed to initialize renderer object '%s'", object_id);
-		ham_object_manager_destroy(ret->draw_groups);
-		obj_vtable->dtor(obj);
+	ham_buffer draw_list, tmp_list;
+	if(!ham_buffer_init_allocator(&draw_list, allocator, alignof(ham_draw_group*), 0)){
+		ham::logapierror("Failed to initialize draw list: error in ham_buffer_init");
+		ham_object_manager_destroy(draw_group_manager);
+		ham_mutex_destroy(draw_mut);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
 		return nullptr;
+	}
+
+	if(!ham_buffer_init_allocator(&tmp_list, allocator, alignof(ham_draw_group*), 0)){
+		ham::logapierror("Failed to initialize draw temp list: error in ham_buffer_init");
+		ham_buffer_finish(&draw_list);
+		ham_object_manager_destroy(draw_group_manager);
+		ham_mutex_destroy(draw_mut);
+		ham_allocator_free(allocator, obj);
+		ham_plugin_unload(plugin);
+		ham_dso_close(dso);
+		return nullptr;
+	}
+
+	obj->vtable    = obj_vtable;
+	r->allocator   = allocator;
+	r->dso         = dso;
+	r->plugin      = plugin;
+	r->draw_mut    = draw_mut;
+	r->draw_groups = draw_group_manager;
+	r->draw_list   = draw_list;
+	r->tmp_list    = tmp_list;
+
+	const auto ret = ham_impl_renderer_construct(obj->vtable, obj, args);
+	if(!ret){
+		ham::logapierror("Failed to construct renderer object '{}'", obj_id);
+		ham_buffer_finish(&draw_list);
+		ham_buffer_finish(&tmp_list);
+		ham_object_manager_destroy(draw_group_manager);
+		ham_mutex_destroy(draw_mut);
+		ham_allocator_free(allocator, obj);
+		ham_plugin_unload(plugin);
+		ham_dso_close(dso);
+		return nullptr;
+	}
+
+	// in case somebody did something weird in a constructor, we have to set these again
+	// TODO: only do this in debug builds?
+	obj->vtable      = obj_vtable;
+	ret->allocator   = allocator;
+	ret->dso         = dso;
+	ret->plugin      = plugin;
+	ret->draw_mut    = draw_mut;
+	ret->draw_groups = draw_group_manager;
+
+	// check we don't muck up the draw lists tho
+	if(
+	   ret->draw_list.allocator != allocator || ret->draw_list.alignment != alignof(ham_draw_group*) ||
+	   ret->tmp_list.allocator  != allocator || ret->tmp_list.alignment  != alignof(ham_draw_group*)
+	){
+		// ... could still be bad tho ,':^)
+		ham::logapiwarn("Draw lists changed in object constructor, resetting to initial");
+		ret->draw_list = draw_list;
+		ret->tmp_list  = tmp_list;
 	}
 
 	return ret;
@@ -105,17 +163,19 @@ void ham_renderer_destroy(ham_renderer *r){
 
 	const auto allocator = r->allocator;
 	const auto obj_vt = ham_super(r)->vtable;
-	const auto renderer_vt = (const ham_renderer_vtable*)obj_vt;
+	//const auto renderer_vt = (const ham_renderer_vtable*)obj_vt;
 
 	const auto plugin = r->plugin;
 	const auto dso = r->dso;
+
+	ham_buffer_finish(&r->draw_list);
+	ham_buffer_finish(&r->tmp_list);
 
 	ham_object_manager_iterate(
 		r->draw_groups,
 		[](ham_object *obj, void*){
 			const auto vtable = (const ham_draw_group_vtable*)obj->vtable;
 			const auto group = (ham_draw_group*)obj;
-			vtable->fini(group);
 			return true;
 		},
 		nullptr
@@ -123,7 +183,7 @@ void ham_renderer_destroy(ham_renderer *r){
 
 	ham_object_manager_destroy(r->draw_groups);
 
-	renderer_vt->fini(r);
+	ham_mutex_destroy(r->draw_mut);
 
 	obj_vt->dtor(ham_super(r));
 
@@ -133,12 +193,27 @@ void ham_renderer_destroy(ham_renderer *r){
 	ham_dso_close(dso);
 }
 
-void ham_renderer_loop(ham_renderer *renderer, ham_f64 dt){
-	if(ham_unlikely(!renderer)) return;
+// bool ham_renderer_swapchain_reset(ham_renderer *r){
+// 	if(!ham_check(r != NULL)) return false;
+//
+// 	const auto vtable = (const ham_renderer_vtable*)ham_super(r)->vtable;
+// 	return vtable->swapchain_reset(r);
+// }
+
+bool ham_renderer_resize(ham_renderer *r, ham_u32 w, ham_u32 h){
+	if(!ham_check(r != NULL) || !ham_check(w > 0) || !ham_check(h > 0)){
+		return false;
+	}
+
+	const auto vptr = (const ham_renderer_vtable*)ham_super(r)->vtable;
+	return vptr->resize(r, w, h);
+}
+
+void ham_renderer_frame(ham_renderer *renderer, ham_f64 dt, const ham_renderer_frame_data *data){
+	if(ham_unlikely(!renderer) || !ham_check(data != NULL)) return;
 
 	const auto renderer_vt = (const ham_renderer_vtable*)ham_super(renderer)->vtable;
-
-	renderer_vt->loop(renderer, dt);
+	renderer_vt->frame(renderer, dt, data);
 }
 
 //
@@ -157,14 +232,13 @@ ham_draw_group *ham_draw_group_create(
 		return nullptr;
 	}
 
-	const auto obj = ham_object_new(r->draw_groups);
+	const auto obj = ham_object_new(r->draw_groups, num_shapes, shapes);
 	if(!obj){
-		ham_logapierrorf("Failed to allocate new draw group");
+		ham::logapierror("Failed to construct new draw group");
 		return nullptr;
 	}
 
 	const auto allocator = r->allocator;
-	const auto vtable = obj->vtable;
 	const auto ptr = (ham_draw_group*)obj;
 
 	ptr->r = r;
@@ -172,14 +246,14 @@ ham_draw_group *ham_draw_group_create(
 
 	ptr->num_shape_points = (ham_usize*)ham_allocator_alloc(allocator, alignof(ham_usize), sizeof(ham_usize) * num_shapes);
 	if(!ptr->num_shape_points){
-		ham_logapierrorf("Failed to allocate memory for draw group data");
+		ham::logapierror("Failed to allocate memory for draw group data");
 		ham_object_delete(r->draw_groups, obj);
 		return nullptr;
 	}
 
 	ptr->num_shape_indices = (ham_usize*)ham_allocator_alloc(allocator, alignof(ham_usize), sizeof(ham_usize) * num_shapes);
 	if(!ptr->num_shape_indices){
-		ham_logapierrorf("Failed to allocate memory for draw group data");
+		ham::logapierror("Failed to allocate memory for draw group data");
 		ham_allocator_free(allocator, ptr->num_shape_points);
 		ham_object_delete(r->draw_groups, obj);
 		return nullptr;
@@ -190,24 +264,13 @@ ham_draw_group *ham_draw_group_create(
 		ptr->num_shape_indices[i] = ham_shape_num_indices(shapes[i]);
 	}
 
-	if(!((const ham_draw_group_vtable*)vtable)->init(ptr, r, num_shapes, shapes)){
-		ham_logapierrorf("Failed to initialize draw group");
-		ham_allocator_free(allocator, ptr->num_shape_indices);
-		ham_allocator_free(allocator, ptr->num_shape_points);
-		ham_object_delete(r->draw_groups, obj);
-		return nullptr;
-	}
-
 	return ptr;
 }
 
 void ham_draw_group_destroy(ham_draw_group *group){
 	if(ham_unlikely(group == NULL)) return;
 
-	const auto vtable    = (const ham_draw_group_vtable*)ham_super(group)->vtable;
 	const auto allocator = group->r->allocator;
-
-	vtable->fini(group);
 
 	ham_allocator_free(allocator, group->num_shape_indices);
 	ham_allocator_free(allocator, group->num_shape_points);

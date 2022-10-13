@@ -1,6 +1,6 @@
 /*
  * Ham World Engine Runtime
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@
 
 #include "ham/engine/config.h"
 
-#include "ham/net.h"
+#include "ham/net.h" // IWYU pragma: keep
 #include "ham/object.h"
 
 HAM_C_API_BEGIN

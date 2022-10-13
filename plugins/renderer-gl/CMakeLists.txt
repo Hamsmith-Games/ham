@@ -20,43 +20,78 @@
 # Dependencies
 ##
 
-FetchContent_Declare(
-	glbinding_content
-	GIT_REPOSITORY https://github.com/cginternals/glbinding.git
-	GIT_TAG        28d32d9bbc72aedf815f18113b0bd3aa7b354108
-)
+find_package(Vulkan REQUIRED COMPONENTS glslc)
 
-FetchContent_GetProperties(glbinding_content)
-if(NOT glbinding_content_POPULATED)
-	FetchContent_Populate(glbinding_content)
+add_library(glad OBJECT glad/src/glad.c)
+add_library(glad::glad ALIAS glad)
 
-	set(BUILD_SHARED_LIBS_OLD ${BUILD_SHARED_LIBS})
+target_include_directories(glad PUBLIC glad/include)
 
-	set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-	set(OPTION_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-	set(OPTION_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+#FetchContent_Declare(
+#	glbinding_content
+#	GIT_REPOSITORY https://github.com/cginternals/glbinding.git
+#	GIT_TAG        28d32d9bbc72aedf815f18113b0bd3aa7b354108
+#)
 
-	add_subdirectory(${glbinding_content_SOURCE_DIR} ${glbinding_content_BINARY_DIR} EXCLUDE_FROM_ALL)
+#FetchContent_GetProperties(glbinding_content)
+#if(NOT glbinding_content_POPULATED)
+#	FetchContent_Populate(glbinding_content)
 
-	if(BUILD_SHARED_LIBS_OLD)
-		set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
-	endif()
-endif()
+#	set(BUILD_SHARED_LIBS_OLD ${BUILD_SHARED_LIBS})
+
+#	set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+#	set(OPTION_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+#	set(OPTION_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+#	add_subdirectory(${glbinding_content_SOURCE_DIR} ${glbinding_content_BINARY_DIR} EXCLUDE_FROM_ALL)
+
+#	if(BUILD_SHARED_LIBS_OLD)
+#		set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+#	endif()
+#endif()
 
 ##
 # Targets
 ##
 
+ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/screen.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert.spv)
+ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/screen.frag ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.frag.spv)
+ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/scene_info.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.vert.spv)
+ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/scene_info.frag ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.frag.spv)
+
+function(ham_ensure_file INPUT OUTPUT)
+	add_custom_command(
+		OUTPUT ${OUTPUT}
+		COMMAND ${CMAKE_COMMAND} -E copy ${INPUT} ${OUTPUT}
+		MAIN_DEPENDENCY ${INPUT}
+	)
+endfunction()
+
+ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/screen.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert)
+ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/screen.frag ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.frag)
+ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/scene_info.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.vert)
+ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/scene_info.frag ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.frag)
+
 set(
 	HAM_RENDERER_GL_SHADERS
-	${CMAKE_CURRENT_LIST_DIR}/screen.vert
-	${CMAKE_CURRENT_LIST_DIR}/screen.frag
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert.spv
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.frag.spv
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.vert.spv
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.frag.spv
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.frag
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.vert
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.frag
 )
 
 ham_add_plugin(
 	ham-renderer-gl
+	${HAM_RENDERER_GL_SHADERS}
 	renderer-gl.hpp
 	renderer-gl.cpp
+	draw-group-gl.cpp
 )
 
-target_link_libraries(ham-renderer-gl PRIVATE glbinding::glbinding glbinding::glbinding-aux)
+target_compile_definitions(ham-renderer-gl PRIVATE HAM_RENDERER_GL_IMPLEMENTATION)
+
+target_link_libraries(ham-renderer-gl PRIVATE robin_hood::robin_hood glad::glad)

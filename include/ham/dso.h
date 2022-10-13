@@ -137,6 +137,29 @@ static inline ham_usize ham_dso_get_num_symbols(ham_dso_handle handle){ return h
 
 HAM_C_API_END
 
+namespace ham{
+	class dso{
+		public:
+			dso() noexcept: m_handle(nullptr){}
+
+			explicit dso(const str8 &path, ham_dso_flags flags = HAM_DSO_LAZY) noexcept
+				: m_handle(ham_dso_open(path, flags)){}
+
+			operator bool() const noexcept{ return !!m_handle; }
+
+			usize num_symbols() const noexcept{ return ham_dso_get_num_symbols(m_handle.get()); }
+
+			void *symbol(const str8 &name) noexcept{ return ham_dso_symbol(m_handle.get(), name); }
+
+			usize iterate_symbols(ham_dso_iterate_symbols_fn fn, void *user){
+				return ham_dso_iterate_symbols(m_handle.get(), fn, user);
+			}
+
+		private:
+			unique_handle<ham_dso_handle, ham_dso_close> m_handle;
+	};
+}
+
 /**
  * @}
  */

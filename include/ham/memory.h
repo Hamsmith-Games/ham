@@ -197,31 +197,68 @@ namespace ham{
 	template<typename T>
 	class owned_ptr{
 		public:
-			explicit owned_ptr(T *ptr_, const allocator<T> &allocator_) noexcept
+			owned_ptr(std::nullptr_t = nullptr) noexcept
+				: m_allocator(nullptr)
+				, m_ptr(nullptr)
+			{}
+
+			template<
+				typename U,
+				std::enable_if_t<std::is_base_of_v<T, U>, int> = 0
+			>
+			explicit owned_ptr(U *ptr_, const allocator<T> &allocator_) noexcept
 				: m_allocator(allocator_)
 				, m_ptr(ptr_)
 			{}
 
-			owned_ptr(owned_ptr &&other) noexcept
+			template<
+				typename U,
+				std::enable_if_t<std::is_base_of_v<T, U>, int> = 0
+			>
+			owned_ptr(owned_ptr<U> &&other) noexcept
 				: m_allocator(other.m_allocator)
 				, m_ptr(other.m_ptr.exchange(nullptr))
 			{}
 
-			owned_ptr &operator=(owned_ptr &&other){
-				if(this != &other){
-					const auto new_ptr = other.m_ptr.exchange(nullptr);
-					const auto old_ptr = m_ptr.exchange(new_ptr);
-					if(old_ptr){
-						m_allocator.destroy(old_ptr);
-						m_allocator.deallocate(old_ptr, 1);
-					}
-
-					m_allocator = other.m_allocator;
+			~owned_ptr(){
+				const auto old_ptr = m_ptr.exchange(nullptr);
+				if(old_ptr){
+					m_allocator.destroy(old_ptr);
+					m_allocator.deallocate(old_ptr, 1);
 				}
 			}
 
+			template<
+				typename U,
+				std::enable_if_t<std::is_base_of_v<T, U>, int> = 0
+			>
+			owned_ptr &operator=(owned_ptr<U> &&other) noexcept{
+				if constexpr(std::is_same_v<T, U>){
+					if(this == &other) return *this;
+				}
+
+				const auto new_ptr = other.m_ptr.exchange(nullptr);
+				const auto old_ptr = m_ptr.exchange(new_ptr);
+				if(old_ptr){
+					m_allocator.destroy(old_ptr);
+					m_allocator.deallocate(old_ptr, 1);
+				}
+
+				m_allocator = other.m_allocator;
+
+				return *this;
+			}
+
+			template<
+				typename U,
+				std::enable_if_t<std::is_base_of_v<U, T>, int> = 0
+			>
+			operator owned_ptr<U>() &&noexcept{ return std::move(*this); }
+
 			T *operator->() noexcept{ return get(); }
 			const T *operator->() const noexcept{ return get(); }
+
+			operator bool() const noexcept{ return m_ptr.load(std::memory_order_relaxed) != nullptr; }
 
 			const allocator<T> &get_allocator() const noexcept{ return m_allocator; }
 
@@ -230,10 +267,37 @@ namespace ham{
 
 			T *release() noexcept{ return m_ptr.exchange(nullptr); }
 
+			void destroy() noexcept{
+				const auto old_ptr = m_ptr.exchange(nullptr);
+				if(old_ptr){
+					m_allocator.destroy(old_ptr);
+					m_allocator.deallocate(old_ptr, 1);
+				}
+			}
+
 		private:
 			allocator<T> m_allocator;
 			std::atomic<T*> m_ptr;
+
+			template<typename U>
+			friend class owned_ptr;
 	};
+
+	template<typename T, typename ... Args>
+	owned_ptr<T> make_owned(Args &&... args){
+		const auto allocator = ham_current_allocator();
+
+		const auto mem = ham_allocator_alloc(allocator, alignof(T), sizeof(T));
+		if(!mem) return nullptr;
+
+		const auto ptr = new(mem) T(std::forward<Args>(args)...);
+		if(!ptr){
+			ham_allocator_free(allocator, mem);
+			return nullptr;
+		}
+
+		return owned_ptr<T>(ptr, allocator);
+	}
 }
 
 #endif // __cplusplus

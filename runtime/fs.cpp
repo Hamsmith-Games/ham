@@ -1,6 +1,6 @@
 /*
  * Ham Runtime
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -119,7 +119,8 @@ static inline bool ham_impl_fstat(int fd, ham_file_info *ret){
 	struct stat stat_buf;
 	const int res = fstat(fd, &stat_buf);
 	if(res != 0){
-		ham_logapierrorf("Error in fstat: %s\n", strerror(errno));
+		ham::logapierror("Error in fstat: {}", strerror(errno));
+		//ham_logapierrorf("Error in fstat: %s", strerror(errno));
 		return false;
 	}
 
@@ -168,7 +169,7 @@ static inline bool ham_impl_fstat(int fd, ham_file_info *ret){
 static inline bool ham_impl_stat(const char *path, ham_file_info *ret){
 	const int fd = open(path, O_RDONLY);
 	if(fd == -1){
-		ham_logapierrorf("Error in open: %s\n", strerror(errno));
+		ham_logapierrorf("Error in open: %s", strerror(errno));
 		return false;
 	}
 
@@ -178,7 +179,7 @@ static inline bool ham_impl_stat(const char *path, ham_file_info *ret){
 
 	const int res = close(fd);
 	if(res != 0){
-		ham_logapiwarnf("Error in close: %s\n", strerror(errno));
+		ham_logapiwarnf("Error in close: %s", strerror(errno));
 	}
 
 	return true;

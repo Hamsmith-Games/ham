@@ -1,6 +1,6 @@
 /*
  * Ham Runtime
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -59,7 +59,7 @@ ham_net *ham_net_create(const char *plugin_id, const char *obj_id){
 		return nullptr;
 	}
 
-	const auto obj_info = obj_vt->info();
+	const auto obj_info = obj_vt->info;
 
 	const auto allocator = ham_current_allocator();
 
@@ -168,7 +168,7 @@ ham_net_socket *ham_net_socket_create(
 	const auto vtable = ((const ham_net_vtable*)ham_super(net)->vtable)->socket_vtable();
 	const auto obj_vt = ham_super(vtable);
 
-	const auto obj_info = obj_vt->info();
+	const auto obj_info = obj_vt->info;
 
 	const auto obj = (ham_net_socket*)ham_allocator_alloc(net->allocator, obj_info->alignment, obj_info->size);
 	if(!obj){
@@ -267,7 +267,7 @@ ham_net_connection *ham_net_connection_create(
 	const auto vtable = ((const ham_net_vtable*)ham_super(net)->vtable)->connection_vtable();
 	const auto obj_vt = ham_super(vtable);
 
-	const auto obj_info = obj_vt->info();
+	const auto obj_info = obj_vt->info;
 
 	const auto obj = (ham_net_connection*)ham_allocator_alloc(net->allocator, obj_info->alignment, obj_info->size);
 	if(!obj){

@@ -2,7 +2,7 @@
 
 /*
  * Ham Renderer Vulkan Shaders
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -27,7 +27,7 @@ layout(binding = 0) uniform VertexGlobalData{
 
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec3 norm;
-layout(location = 2) in vec3 uv;
+layout(location = 2) in vec2 uv;
 
 const vec2 positions[4] = vec2[](
     vec2(-1.0, -1.0),

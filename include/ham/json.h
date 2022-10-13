@@ -135,10 +135,10 @@ namespace ham{
 			json_value_view<Mutable> object_get(const char *key) const noexcept{ return ham_json_object_get(m_val, key); }
 
 			template<typename Fn>
-			usize object_iterate(Fn &&f) const noexcept(noexcept(std::forward<Fn>(f)(std::declval<const ham_json_value*>()))){
-				constexpr auto wrapper = +[](const ham_json_value *val, void *user) -> bool{
+			usize object_iterate(Fn &&f) const noexcept(noexcept(std::forward<Fn>(f)(std::declval<ham_str8>(), std::declval<const ham_json_value*>()))){
+				constexpr ham_json_object_iterate_fn wrapper = +[](ham_str8 key, const ham_json_value *val, void *user) -> bool{
 					const auto fptr = reinterpret_cast<std::remove_reference_t<Fn>*>(user);
-					return (*fptr)(val);
+					return (*fptr)(key, val);
 				};
 
 				return ham_json_object_iterate(m_val, wrapper, &f);
@@ -148,10 +148,10 @@ namespace ham{
 			json_value_view<Mutable> array_get(usize idx) const noexcept{ return ham_json_array_get(m_val, idx); }
 
 			template<typename Fn>
-			usize array_iterate(Fn &&f) const noexcept(noexcept(std::forward<Fn>(f)(std::declval<const ham_json_value*>()))){
-				constexpr auto wrapper = +[](const ham_json_value *val, void *user) -> bool{
+			usize array_iterate(Fn &&f) const noexcept(noexcept(std::forward<Fn>(f)(std::declval<usize>(), std::declval<const ham_json_value*>()))){
+				constexpr ham_json_array_iterate_fn wrapper = +[](ham_usize idx, const ham_json_value *val, void *user) -> bool{
 					const auto fptr = reinterpret_cast<std::remove_reference_t<Fn>*>(user);
-					return (*fptr)(val);
+					return (*fptr)(idx, val);
 				};
 
 				return ham_json_array_iterate(m_val, wrapper, &f);
@@ -170,6 +170,11 @@ namespace ham{
 
 					default: return nullptr;
 				}
+			}
+
+			json_value_view<Mutable> operator[](int idx) const noexcept{
+				if(idx < 0) return nullptr;
+				else return (*this)[usize(idx)];
 			}
 
 			json_value_view<Mutable> operator[](const char *key) const noexcept{

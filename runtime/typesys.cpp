@@ -1,6 +1,6 @@
 /*
  * Ham Runtime
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -21,12 +21,15 @@
 #include "ham/memory.h"
 #include "ham/colony.h"
 
+using namespace ham::typedefs;
+
 HAM_C_API_BEGIN
 
 struct ham_type{
 	const ham_typeset *ts;
-	ham_u32 flags;
-	ham_usize alignment, size;
+	const char *name;
+	u32 flags;
+	usize alignment, size;
 	const ham_type *nodes;
 };
 
@@ -62,13 +65,15 @@ struct ham_typeset{
 ham_nonnull_args(1)
 static inline const ham_type *ham_impl_typeset_new_type(
 	ham_typeset *ts,
+	const char *name,
 	ham_type_kind_flag kind,
 	ham_type_info_flag info,
-	ham_usize alignment,
-	ham_usize size
+	usize alignment,
+	usize size
 ){
 	const auto new_type = ts->types.emplace();
 	new_type->ts = ts;
+	new_type->name = name;
 	new_type->flags = ham_make_type_flags(kind, info);
 	new_type->alignment = alignment;
 	new_type->size = size;
@@ -83,57 +88,73 @@ ham_typeset *ham_typeset_create(){
 
 	ptr->allocator = allocator;
 
-	ptr->void_type   = ham_impl_typeset_new_type(ptr, HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_VOID,    0, 0);
-	ptr->unit_type   = ham_impl_typeset_new_type(ptr, HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_UNIT,    1, 1);
-	ptr->top_type    = ham_impl_typeset_new_type(ptr, HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_TOP,     0, 0);
-	ptr->bottom_type = ham_impl_typeset_new_type(ptr, HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_BOTTOM,  0, 0);
-	ptr->bool_type   = ham_impl_typeset_new_type(ptr, HAM_TYPE_NUMERIC,   HAM_TYPE_INFO_NUMERIC_BOOLEAN,   alignof(bool), sizeof(bool));
+	ptr->void_type   = ham_impl_typeset_new_type(ptr, "void",       HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_VOID,    0, 0);
+	ptr->unit_type   = ham_impl_typeset_new_type(ptr, "ham_unit",   HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_UNIT,    1, 1);
+	ptr->top_type    = ham_impl_typeset_new_type(ptr, "HAM_TOP",    HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_TOP,     0, 0);
+	ptr->bottom_type = ham_impl_typeset_new_type(ptr, "HAM_BOTTOM", HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_BOTTOM,  0, 0);
+	ptr->bool_type   = ham_impl_typeset_new_type(ptr, "bool",       HAM_TYPE_NUMERIC,   HAM_TYPE_INFO_NUMERIC_BOOLEAN,   alignof(bool), sizeof(bool));
+
+	constexpr const char *nat_names[] = { "u8", "u16", "u32", "u64", "u128" };
 
 	// nat types
-	for(ham_usize i = 0; i < std::size(ptr->nat_types); i++){
+	for(usize i = 0; i < std::size(ptr->nat_types); i++){
 		const auto size = 1UL << i;
-		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_NATURAL, size, size);
+		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, nat_names[i], HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_NATURAL, size, size);
 	}
+
+	constexpr const char *int_names[] = { "i8", "i16", "i32", "i64", "i128" };
 
 	// int types
-	for(ham_usize i = 0; i < std::size(ptr->int_types); i++){
+	for(usize i = 0; i < std::size(ptr->int_types); i++){
 		const auto size = 1UL << i;
-		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_INTEGER, size, size);
+		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, int_names[i], HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_INTEGER, size, size);
 	}
+
+	constexpr const char *rat_names[] = { "ham_rat8", "ham_rat16", "ham_rat32", "ham_rat64", "ham_rat128", "ham_rat256" };
 
 	// rat types
-	for(ham_usize i = 0; i < std::size(ptr->rat_types); i++){
+	for(usize i = 0; i < std::size(ptr->rat_types); i++){
 		const auto size = 1UL << i;
-		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_RATIONAL, size, size);
+		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, rat_names[i], HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_RATIONAL, size, size);
 	}
 
+	constexpr const char *float_names[] = { "f16", "f32", "f64", "f128" };
+
 	// float types
-	for(ham_usize i = 0; i < std::size(ptr->float_types); i++){
+	for(usize i = 0; i < std::size(ptr->float_types); i++){
 		const auto size = 2UL << i;
-		ptr->float_types[i] = ham_impl_typeset_new_type(ptr, HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_FLOATING_POINT, size, size);
+		ptr->float_types[i] = ham_impl_typeset_new_type(ptr, float_names[i], HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_FLOATING_POINT, size, size);
 	}
+
+	constexpr const char *str_names[] = {
+		"ham_str8", "ham_str16", "ham_str32"
+	};
 
 	// string types
 	for(int i = 0; i < 3; i++){
-		constexpr auto size = sizeof(void*) * 2;
-		constexpr auto alignment = alignof(void*);
-		ptr->str_types[i] = ham_impl_typeset_new_type(ptr, HAM_TYPE_STRING, (ham_type_info_flag)(HAM_TYPE_INFO_STRING_UTF8 + i), alignof(ham_str8), sizeof(ham_str8));
+		constexpr auto size = sizeof(uptr) * 2;
+		constexpr auto alignment = alignof(uptr);
+		ptr->str_types[i] = ham_impl_typeset_new_type(ptr, str_names[i], HAM_TYPE_STRING, (ham_type_info_flag)(HAM_TYPE_INFO_STRING_UTF8 + i), alignment, size);
 	}
 
-	constexpr ham_usize vec_sizes[] = {
+	constexpr usize vec_sizes[] = {
 		sizeof(ham_vec2),
 		sizeof(ham_vec3),
 		sizeof(ham_vec4),
 	};
 
-	constexpr ham_usize vec_aligns[] = {
+	constexpr usize vec_aligns[] = {
 		alignof(ham_vec2),
 		alignof(ham_vec3),
 		alignof(ham_vec4),
 	};
 
-	for(ham_usize i = 0; i < std::size(vec_sizes); i++){
-		ptr->vec_types[i] = ham_impl_typeset_new_type(ptr, HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_VECTOR, vec_aligns[i], vec_sizes[i]);
+	constexpr const char *vec_names[] = {
+		"ham_vec2", "ham_vec3", "ham_vec4"
+	};
+
+	for(usize i = 0; i < std::size(vec_sizes); i++){
+		ptr->vec_types[i] = ham_impl_typeset_new_type(ptr, vec_names[i], HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_VECTOR, vec_aligns[i], vec_sizes[i]);
 	}
 
 	return ptr;

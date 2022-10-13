@@ -1,6 +1,6 @@
 #
 # Hamsmith Runtime Plugins
-# Copyright (C) 2022  Hamsmith Ltd.
+# Copyright (C) 2022 Hamsmith Ltd.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -52,7 +52,33 @@ endif()
 # Renderer plugins
 ##
 
-add_subdirectory(renderer-vulkan)
+if(HAM_PLUGINS_ENABLE_GL OR HAM_PLUGINS_ENABLE_VULKAN)
+	find_package(Vulkan REQUIRED COMPONENTS glslc)
+
+	function(ham_compile_shader INPUT OUTPUT)
+		add_custom_command(
+			OUTPUT ${OUTPUT}
+			COMMAND Vulkan::glslc "${INPUT}" --target-env=vulkan1.2 -O $<$<CONFIG:Debug>:-g> -o "${OUTPUT}"
+			MAIN_DEPENDENCY "${INPUT}"
+		)
+    endfunction()
+
+	function(ham_compile_shader_gl INPUT OUTPUT)
+		add_custom_command(
+			OUTPUT ${OUTPUT}
+			COMMAND Vulkan::glslc -c "${INPUT}" --target-env=opengl -O -o "${OUTPUT}"
+			MAIN_DEPENDENCY "${INPUT}"
+		)
+    endfunction()
+endif()
+
+if(HAM_PLUGINS_ENABLE_GL)
+	add_subdirectory(renderer-gl)
+endif()
+
+if(HAM_PLUGINS_ENABLE_VULKAN)
+	add_subdirectory(renderer-vulkan)
+endif()
 
 ##
 # Installation

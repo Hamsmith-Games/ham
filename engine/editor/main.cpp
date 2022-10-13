@@ -33,12 +33,31 @@
 namespace editor = ham::engine::editor;
 
 int main(int argc, char *argv[]){
-	QApplication app(argc, argv);
 	QApplication::setApplicationDisplayName("Ham World Editor");
 	QApplication::setApplicationName("ham-engine-editor");
 	QApplication::setApplicationVersion(HAM_ENGINE_VERSION_STR);
 	QApplication::setOrganizationName("Hamsmith Ltd.");
 	QApplication::setOrganizationDomain("https://hamsmith.dev/");
+
+	QSurfaceFormat surfaceFmt;
+	surfaceFmt.setRenderableType(QSurfaceFormat::OpenGL);
+	surfaceFmt.setProfile(QSurfaceFormat::CoreProfile);
+	surfaceFmt.setVersion(4, 6);
+#ifdef HAM_DEBUG
+	surfaceFmt.setOption(QSurfaceFormat::FormatOption::DebugContext);
+#endif
+	surfaceFmt.setRedBufferSize(8);
+	surfaceFmt.setBlueBufferSize(8);
+	surfaceFmt.setGreenBufferSize(8);
+	surfaceFmt.setAlphaBufferSize(8);
+	surfaceFmt.setDepthBufferSize(24);
+	surfaceFmt.setStencilBufferSize(8);
+	surfaceFmt.setSwapBehavior(QSurfaceFormat::TripleBuffer);
+	surfaceFmt.setSwapInterval(1);
+
+	QSurfaceFormat::setDefaultFormat(surfaceFmt);
+
+	QApplication app(argc, argv);
 
 	QCommandLineParser cmd_parser;
 	cmd_parser.setApplicationDescription("The Ham world engine editor.");
@@ -125,11 +144,11 @@ int main(int argc, char *argv[]){
 		"}"
 	);
 
-	QVulkanInstance vk_inst;
-	vk_inst.setLayers({ "VK_LAYER_KHRONOS_validation" });
-	if(!vk_inst.create()){
-		qFatal("Failed to create Vulkan instance: %d", vk_inst.errorCode());
-	}
+//	QVulkanInstance vk_inst;
+//	vk_inst.setLayers({ "VK_LAYER_KHRONOS_validation" });
+//	if(!vk_inst.create()){
+//		qFatal("Failed to create Vulkan instance: %d", vk_inst.errorCode());
+//	}
 
 	const QStringList args = cmd_parser.positionalArguments();
 	if(args.empty()){

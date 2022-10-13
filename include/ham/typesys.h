@@ -29,6 +29,8 @@
 
 HAM_C_API_BEGIN
 
+typedef struct ham_typeset ham_typeset;
+
 typedef enum ham_type_kind_flag{
 	HAM_TYPE_THEORETIC,
 	HAM_TYPE_STRING,
@@ -83,7 +85,14 @@ ham_constexpr ham_nothrow static inline ham_type_info_flag ham_type_flags_info(h
 	return (ham_type_info_flag)((flags & HAM_TYPE_FLAGS_INFO_MASK) >> HAM_TYPE_FLAGS_INFO_SHIFT);
 }
 
-typedef struct ham_typeset ham_typeset;
+ham_api const char *ham_type_name(const ham_type *type);
+
+
+
+/**
+ * @defgroup HAM_TYPESYS_TYPESET Typesets
+ * @{
+ */
 
 ham_api ham_typeset *ham_typeset_create();
 
@@ -107,7 +116,39 @@ ham_api const ham_type *ham_typeset_str(const ham_typeset *ts, ham_str_encoding 
 
 ham_api const ham_type *ham_typeset_vec(const ham_typeset *ts, const ham_type *elem, ham_usize n);
 
+/**
+ * @}
+ */
+
 HAM_C_API_END
+
+#ifdef __cplusplus
+
+namespace ham{
+	template<typename TypeClass = void>
+	class basic_type{
+		public:
+			using pointer = const ham_type*;
+
+			basic_type(pointer ptr_ = nullptr) noexcept
+				: m_ptr(ptr_){}
+
+
+
+		private:
+			pointer m_ptr;
+	};
+
+	class typeset{
+		public:
+			typeset(): m_handle(ham_typeset_create()){}
+
+		private:
+			unique_handle<ham_typeset*, ham_typeset_destroy> m_handle;
+	};
+}
+
+#endif // __cplusplus
 
 /**
  * @}

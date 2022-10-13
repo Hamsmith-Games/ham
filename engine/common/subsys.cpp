@@ -1,6 +1,6 @@
 /*
  * Ham World Engine Runtime
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@ HAM_C_API_BEGIN
 
 struct ham_engine_subsys{
 	ham_engine *engine;
+	ham::str_buffer_utf8 name;
 
 	ham_engine_subsys_init_fn init_fn;
 	ham_engine_subsys_fini_fn fini_fn;
@@ -60,13 +61,15 @@ static inline ham_uptr ham_engine_subsys_thread_routine(void *data){
 	ham_ticker ticker;
 	ham_ticker_reset(&ticker);
 
+	ham_f64 dt;
+
 	while(subsys->running){
 		const auto min_dt = subsys->min_dt;
 
-		ham_f64 dt = ham_ticker_tick(&ticker, min_dt);
-		while(dt < min_dt){
+		dt = 0.0;
+		do{
 			dt += ham_ticker_tick(&ticker, min_dt - dt);
-		}
+		} while(dt < min_dt);
 
 		subsys->loop_fn(subsys->engine, dt, subsys->user);
 	}
@@ -125,6 +128,7 @@ ham_engine_subsys *ham_engine_subsys_create(
 	}
 
 	subsys->engine = engine;
+	subsys->name = name;
 	subsys->init_fn = init_fn;
 	subsys->fini_fn = fini_fn;
 	subsys->loop_fn = loop_fn;
@@ -156,6 +160,11 @@ ham_engine_subsys *ham_engine_subsys_create(
 ham_nothrow ham_engine *ham_engine_subsys_owner(ham_engine_subsys *subsys){
 	if(!ham_check(subsys != NULL)) return nullptr;
 	return subsys->engine;
+}
+
+ham_nothrow ham_str8 ham_engine_subsys_name(const ham_engine_subsys *subsys){
+	if(!ham_check(subsys != NULL)) return HAM_EMPTY_STR8;
+	return subsys->name.get();
 }
 
 ham_nothrow bool ham_engine_subsys_running(const ham_engine_subsys *subsys){
