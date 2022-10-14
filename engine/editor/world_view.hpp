@@ -1,6 +1,6 @@
 /*
  * Ham World Engine Editor
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,78 +24,22 @@
 
 #include <QWidget>
 
-#include <QOpenGLWidget>
-
-#include <QVulkanWindow>
-#include <QVulkanDeviceFunctions>
+#include "renderer_widget.hpp"
 
 namespace ham::engine::editor{
-	namespace detail{
-		class vulkan_renderer: public QVulkanWindowRenderer{
-			public:
-				explicit vulkan_renderer(QVulkanWindow *window_)
-					: m_window(window_)
-				{
-					m_frame_data.current_frame = 0;
-				}
-
-				void initResources() override;
-				void releaseResources() override;
-
-				void startNextFrame() override;
-
-			private:
-				QVulkanWindow *m_window;
-				ham_ticker m_ticker;
-				ham_renderer *m_r;
-				ham_renderer_frame_data m_frame_data;
-
-		};
-
-		class vulkan_window: public QVulkanWindow{
-			Q_OBJECT
-
-			public:
-				explicit vulkan_window(QWindow *parent = nullptr)
-					: QVulkanWindow(parent){}
-
-				vulkan_renderer *createRenderer() override{
-					return new vulkan_renderer(this);
-				}
-		};
-
-		class opengl_widget: public QOpenGLWidget{
-			Q_OBJECT
-
-			public:
-				explicit opengl_widget(QWidget *parent = nullptr);
-				~opengl_widget();
-
-			protected:
-				void initializeGL() override;
-				void resizeGL(int w, int h) override;
-				void paintGL() override;
-
-			private:
-				ham_renderer *m_r = nullptr;
-				ham_renderer_frame_data m_frame_data;
-				ham_ticker m_ticker;
-		};
-	}
-
 	class world_view: public QWidget{
 		Q_OBJECT
 
-		Q_PROPERTY(QWidget* renderer_widget READ renderer_widget CONSTANT)
+		Q_PROPERTY(renderer_widget* renderer READ renderer CONSTANT)
 
 		public:
 			explicit world_view(QWidget *parent = nullptr);
 			~world_view();
 
-			QWidget *renderer_widget() const noexcept{ return m_r_widget; }
+			renderer_widget *renderer() const noexcept{ return m_r_widget; }
 
 		private:
-			QWidget *m_r_widget;
+			renderer_widget *m_r_widget;
 	};
 }
 

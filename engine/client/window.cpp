@@ -47,7 +47,7 @@ engine::client_window_gl::client_window_gl(const ham_engine_app *app, Uint32 fla
 		throw std::runtime_error(fmt::format("Error in SDL_GL_MakeCurrent: {}", SDL_GetError()));
 	}
 
-	m_frame_data.gl.current_frame = 0;
+	m_frame_data.common.current_frame = 0;
 }
 
 engine::client_window_gl::~client_window_gl(){
@@ -59,5 +59,5 @@ void engine::client_window_gl::present(f64 dt, ham_renderer *r) const{
 
 	SDL_GL_SwapWindow(window_handle());
 
-	++m_frame_data.gl.current_frame;
+	++m_frame_data.common.current_frame;
 }

@@ -246,6 +246,8 @@
 
 #define HAM_MIME(type_, encoding_) type_ "; " encoding_
 
+#define HAM_MIME_BINARY HAM_MIME(HAM_MIME_TYPE_BIN, HAM_MIME_ENCODING_BINARY)
+
 //
 // Platform-specific stuff
 //

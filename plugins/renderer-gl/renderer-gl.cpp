@@ -346,6 +346,8 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 }
 
 static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const ham_renderer_frame_data *data){
+	(void)dt; (void)data;
+
 	GLint screen_fbo, screen_viewport[4];
 	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &screen_fbo);
 	glGetIntegerv(GL_VIEWPORT, screen_viewport);
@@ -386,8 +388,6 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	glBindVertexArray(r->screen_group->vao);
 
 	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_INT, nullptr);
-
-	// TODO: post-process scene and draw to screen
 
 	glViewport(screen_viewport[0], screen_viewport[1], screen_viewport[2], screen_viewport[3]);
 }

@@ -81,8 +81,12 @@ ham_add_executable(
 	main_window.hpp
 	main_window.cpp
 
+	renderer_widget.hpp
+	renderer_widget.cpp
+	renderer_widget_gl.cpp
+	renderer_widget_vulkan.cpp
+
 	world_view.hpp
-	vulkan.cpp
 	world_view.cpp
 )
 

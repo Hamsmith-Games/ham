@@ -32,20 +32,63 @@
 
 HAM_C_API_BEGIN
 
+typedef struct ham_camera{
+	ham_mat4 proj, view;
+	ham_vec3 pos, pyr;
+
+	//! @cond ignore
+	bool _ham_dirty;
+	//! @endcond
+} ham_camera;
+
+ham_nonnull_args(1)
+ham_api void ham_camera_reset_perspective(ham_camera *cam, ham_f32 aspect, ham_f32 fovy, ham_f32 minz, ham_f32 maxz);
+
+ham_nonnull_args(1)
+ham_api void ham_camera_reset_ortho(ham_camera *cam, ham_f32 top, ham_f32 bottom, ham_f32 left, ham_f32 right, ham_f32 minz, ham_f32 maxz);
+
+ham_nonnull_args(1)
+ham_constexpr ham_nothrow static inline const ham_mat4 *ham_camera_proj_matrix(const ham_camera *cam){
+	return &cam->proj;
+}
+
+ham_nonnull_args(1)
+ham_api const ham_mat4 *ham_camera_view_matrix(const ham_camera *cam);
+
+ham_nonnull_args(1)
+ham_constexpr ham_nothrow static inline void ham_camera_rotate(ham_camera *cam, ham_f32 rads, ham_vec3 axis){
+	cam->pyr.x += axis.x * rads;
+	cam->pyr.y += axis.y * rads;
+	cam->pyr.z += axis.z * rads;
+	cam->_ham_dirty = true;
+}
+
+ham_nonnull_args(1)
+ham_constexpr ham_nothrow static inline void ham_camera_translate(ham_camera *cam, ham_vec3 amnt){
+	cam->pos.x += amnt.x;
+	cam->pos.y += amnt.y;
+	cam->pos.z += amnt.z;
+	cam->_ham_dirty = true;
+}
+
+ham_nonnull_args(1)
+ham_constexpr ham_nothrow static inline void ham_camera_set_rotation(ham_camera *cam, ham_vec3 pyr){
+	cam->pyr = pyr;
+	cam->_ham_dirty = true;
+}
+
+ham_nonnull_args(1)
+ham_constexpr ham_nothrow static inline void ham_camera_set_position(ham_camera *cam, ham_vec3 pos){
+	cam->pos = pos;
+	cam->_ham_dirty = true;
+}
+
 typedef void*(*ham_gl_get_proc_addr)(const char *name);
 
 typedef struct ham_renderer_create_args_vulkan{
 	VkInstance instance;
-	VkPhysicalDevice physical_device;
-	VkDevice device;
+	VkSurfaceKHR surface;
 	PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
-	PFN_vkGetDeviceProcAddr vkGetDeviceProcAddr;
-
-	ham_u32 num_swapchain_images;
-	VkImage *swapchain_images;
-	VkImageView *swapchain_image_views;
-	VkImage depth_stencil_image;
-	VkImageView depth_stencil_image_view;
 } ham_renderer_create_args_vulkan;
 
 typedef struct ham_renderer_create_args_gl{
@@ -58,19 +101,24 @@ typedef union ham_renderer_create_args{
 	ham_renderer_create_args_gl gl;
 } ham_renderer_create_args;
 
-typedef struct ham_renderer_frame_data_vulkan{
+typedef struct ham_renderer_frame_data_common{
 	ham_u64 current_frame;
+	const ham_camera *cam;
+} ham_renderer_frame_data_common;
+
+typedef struct ham_renderer_frame_data_vulkan{
+	ham_renderer_frame_data_common common;
 	VkCommandBuffer command_buffer;
 	VkFramebuffer framebuffer;
 	VkRenderPass default_render_pass;
 } ham_renderer_frame_data_vulkan;
 
 typedef struct ham_renderer_frame_data_gl{
-	ham_u64 current_frame;
+	ham_renderer_frame_data_common common;
 } ham_renderer_frame_data_gl;
 
 typedef union ham_renderer_frame_data{
-	ham_u64 current_frame;
+	ham_renderer_frame_data_common common;
 	ham_renderer_frame_data_vulkan vulkan;
 	ham_renderer_frame_data_gl gl;
 } ham_renderer_frame_data;
