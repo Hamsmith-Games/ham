@@ -1,0 +1,4 @@
+ham_engine_add_app(
+	{{ham_project_name}}
+	app.cpp
+)

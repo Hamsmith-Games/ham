@@ -16,6 +16,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+include(CMakePackageConfigHelpers)
+
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
 find_package(GMP REQUIRED)
@@ -63,6 +65,19 @@ elseif(UNIX)
 else()
 	message(FATAL_ERROR "Unsupported platform")
 endif()
+
+configure_package_config_file(
+	HamConfig.cmake.in
+	${PROJECT_BINARY_DIR}/HamConfig.cmake
+	INSTALL_DESTINATION ${CMAKE_INSTALL_DATADIR}/ham/cmake
+	PATH_VARS CMAKE_INSTALL_INCLUDEDIR CMAKE_INSTALL_LIBDIR
+)
+
+write_basic_package_version_file(
+	${PROJECT_BINARY_DIR}/HamConfigVersion.cmake
+	VERSION ${PROJECT_VERSION}
+	COMPATIBILITY ExactVersion
+)
 
 add_library(ham SHARED ${HAM_SOURCES})
 add_library(ham::runtime ALIAS ham)

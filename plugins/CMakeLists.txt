@@ -29,7 +29,7 @@ find_package(Steamworks)
 set(HAM_PLUGIN_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 macro(ham_add_plugin TGT)
-	ham_add_library(${TGT} SHARED ${ARGN})
+	ham_add_library(${TGT} MODULE ${ARGN})
 	set(HAM_PLUGINS "${TGT};${HAM_PLUGINS}" PARENT_SCOPE)
 	set_target_properties(
 		${TGT} PROPERTIES

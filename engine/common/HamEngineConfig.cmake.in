@@ -16,11 +16,20 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-set(HamEngine_PREFIX ${CMAKE_CURRENT_LIST_DIR}/../../../)
+find_package(Ham CONFIG REQUIRED)
 
-set(HamEngine_INCLUDE_DIRS ${HamEngine_PREFIX}/include)
-set(HamEngine_LIBRARY_DIRS ${HamEngine_PREFIX}/lib)
-set(HamEngine_LIBRARIES ham ham-engine)
+set(HamEngine_VERSION @PROJECT_VERSION@)
+
+@PACKAGE_INIT@
+
+set_and_check(HamEngine_INCLUDE_DIR "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@")
+set_and_check(HamEngine_LIBRARY_DIR "@PACKAGE_CMAKE_INSTALL_LIBDIR@")
+
+check_required_components(HamEngine)
+
+set(HamEngine_INCLUDE_DIRS ${HamEngine_INCLUDE_DIR})
+set(HamEngine_LIBRARY_DIRS ${HamEngine_LIBRARY_DIR})
+set(HamEngine_LIBRARIES ham::runtime ham-engine)
 
 if(NOT TARGET ham-engine)
 	add_library(ham-engine INTERFACE)
@@ -32,3 +41,12 @@ if(NOT TARGET ham-engine)
 	target_link_directories(ham-engine INTERFACE ${HamEngine_LIBRARY_DIRS})
 	target_include_directories(ham-engine INTERFACE ${HamEngine_INCLUDE_DIRS})
 endif()
+
+macro(ham_engine_add_app TARGET)
+	ham_add_library(
+		${TARGET} MODULE
+		${ARGN}
+	)
+
+	target_link_libraries(${TARGET} PRIVATE ham::engine)
+endmacro()

@@ -16,6 +16,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+include(CMakePackageConfigHelpers)
+
 ham_add_library(
 	ham-engine SHARED
 	${HAM_ENGINE_HEADERS}
@@ -39,4 +41,17 @@ target_include_directories(
 target_link_libraries(
 	ham-engine PRIVATE
 	robin_hood::robin_hood
+)
+
+configure_package_config_file(
+	HamEngineConfig.cmake.in
+	${PROJECT_BINARY_DIR}/HamEngineConfig.cmake
+	INSTALL_DESTINATION ${CMAKE_INSTALL_DATADIR}/ham/cmake
+	PATH_VARS CMAKE_INSTALL_INCLUDEDIR CMAKE_INSTALL_LIBDIR
+)
+
+write_basic_package_version_file(
+	${PROJECT_BINARY_DIR}/HamEngineConfigVersion.cmake
+	VERSION ${PROJECT_VERSION}
+	COMPATIBILITY ExactVersion
 )

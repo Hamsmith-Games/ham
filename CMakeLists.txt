@@ -123,11 +123,29 @@ set(HAM_VERSION ${ham_VERSION})
 
 check_target_arch(HAM_TARGET_ARCH)
 
-if(HAM_TARGET_ARCH STREQUAL "x86_64")
+message(STATUS "Ham target arch: ${HAM_TARGET_ARCH}")
+
+if(HAM_TARGET_ARCH MATCHES "x86-64|x86-64-v2")
 	set(HAM_CPU_LIBS cpu::x86-64-v2)
+	set(HAM_CPU_FLAGS ${CPU_FEATURES_X86_64_V2_CFLAGS})
+elseif(HAM_TARGET_ARCH STREQUAL "x86-64-v3")
+	set(HAM_CPU_LIBS cpu::x86-64-v3)
+	set(HAM_CPU_FLAGS ${CPU_FEATURES_X86_64_V3_CFLAGS})
+elseif(HAM_TARGET_ARCH STREQUAL "x86-64-v4")
+	set(HAM_CPU_LIBS cpu::x86-64-v4)
+	set(HAM_CPU_FLAGS ${CPU_FEATURES_X86_64_V4_CFLAGS})
+elseif(HAM_TARGET_ARCH STREQUAL "armv8-a")
+	set(HAM_CPU_LIBS cpu::armv8-a)
+	set(HAM_CPU_FLAGS ${CPU_FEATURES_ARMV8_A_CFLAGS})
+elseif(HAM_TARGET_ARCH STREQUAL "armv8.1-a")
+	set(HAM_CPU_LIBS cpu::armv8.1-a)
+	set(HAM_CPU_FLAGS ${CPU_FEATURES_ARMV8_1_A_CFLAGS})
 else()
 	set(HAM_CPU_LIBS)
+	set(HAM_CPU_FLAGS)
 endif()
+
+message(STATUS "Ham target CPU flags: ${HAM_CPU_FLAGS}")
 
 # Build info
 
@@ -478,7 +496,9 @@ install(
 )
 
 install(
-	FILES runtime/HamConfig.cmake
+	FILES
+		${PROJECT_BINARY_DIR}/HamConfig.cmake
+		${PROJECT_BINARY_DIR}/HamConfigVersion.cmake
 	DESTINATION ${CMAKE_INSTALL_DATADIR}/ham/cmake
 )
 

@@ -105,7 +105,9 @@ set_target_properties(
 
 if(HAM_INSTALL_ENGINE)
 	install(
-		FILES common/HamEngineConfig.cmake
+		FILES
+			${PROJECT_BINARY_DIR}/HamEngineConfig.cmake
+			${PROJECT_BINARY_DIR}/HamEngineConfigVersion.cmake
 		DESTINATION ${CMAKE_INSTALL_DATADIR}/ham/cmake
 	)
 
