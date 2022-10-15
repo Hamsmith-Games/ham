@@ -42,7 +42,7 @@ typedef struct ham_object ham_object;
 /**
  * @brief Virtual function table.
  */
-typedef struct ham_object_vtable  ham_object_vtable;
+typedef struct ham_object_vtable ham_object_vtable;
 
 /**
  * @brief Helper type for easily creating and destroying objects.
@@ -169,7 +169,7 @@ struct ham_object_vtable{
 };
 
 struct ham_object{
-	const ham_object_vtable *vtable;
+	const ham_object_vtable *vptr;
 };
 
 #define ham_derive(base) base HAM_SUPER_NAME;
@@ -200,11 +200,14 @@ struct ham_object{
 #define ham_object_ctor_name(obj_name) HAM_CONCAT(ham_object_ctor_prefix, obj_name)
 #define ham_object_dtor_name(obj_name) HAM_CONCAT(ham_object_dtor_prefix, obj_name)
 
+#define ham_expose_object_vptr(derived_obj) \
+	ham_extern_c ham_public ham_export ham_nothrow const ham_object_vtable *ham_object_vptr_name(derived_obj)();
+
 //! @cond ignore
 #define ham_impl_define_object(obj_depth_, obj_, vtable_depth_, vtable_, ctor_, dtor_, vtable_body_) \
-	ham_extern_c ham_public ham_export ham_nothrow const ham_object_vtable *ham_object_vptr_name(obj_)(); \
+	ham_expose_object_vptr(obj_) \
 	static ham_object *ham_object_ctor_name(obj_)(ham_object *ptr, ham_u32 nargs, va_list va){ \
-		ptr->vtable = ham_object_vptr_name(obj_)(); \
+		ptr->vptr = ham_object_vptr_name(obj_)(); \
 		obj_ *const ret = (ctor_)((obj_*)ptr, nargs, va); \
 		return ret ? ham_super_n(obj_depth_, ret) : nullptr; \
 	} \

@@ -34,6 +34,10 @@ if(NOT gns_content_POPULATED)
 	add_subdirectory(${gns_content_SOURCE_DIR} ${gns_content_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
+##
+# Targets
+##
+
 ham_add_plugin(
 	ham-net-gns
 	net-gns.h

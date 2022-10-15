@@ -131,7 +131,7 @@ void ham_entity_destroy(ham_entity *ent){
 
 	const auto world = ent->world;
 
-	const auto vtable = (const ham_entity_vtable*)ham_super(ent)->vtable;
+	const auto vtable = (const ham_entity_vtable*)ham_super(ent)->vptr;
 
 	ham_object_manager *man;
 

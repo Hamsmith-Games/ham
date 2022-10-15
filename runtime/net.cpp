@@ -70,7 +70,7 @@ ham_net *ham_net_create(const char *plugin_id, const char *obj_id){
 		ham_dso_close(dll);
 	}
 
-	mem->vtable = obj_vt;
+	mem->vptr = obj_vt;
 
 	const auto ptr = (ham_net*)obj_vt->ctor((ham_object*)mem, 0, nullptr);
 	if(!ptr){
@@ -100,7 +100,7 @@ ham_net *ham_net_create(const char *plugin_id, const char *obj_id){
 void ham_net_destroy(ham_net *net){
 	if(ham_unlikely(!net)) return;
 
-	const auto vtable = ham_super(net)->vtable;
+	const auto vtable = ham_super(net)->vptr;
 	const auto dso = net->dso;
 
 	((const ham_net_vtable*)vtable)->fini(net);
@@ -112,7 +112,7 @@ void ham_net_destroy(ham_net *net){
 void ham_net_loop(ham_net *net, ham_f64 dt){
 	if(!ham_check(net != NULL)) return;
 
-	const auto vtable = (const ham_net_vtable*)ham_super(net)->vtable;
+	const auto vtable = (const ham_net_vtable*)ham_super(net)->vptr;
 
 	vtable->loop(net, dt);
 }
@@ -126,13 +126,13 @@ bool ham_net_find_peer(ham_net *net, ham_net_peer *ret, ham_str8 query){
 		return false;
 	}
 
-	const auto vtable = (const ham_net_vtable*)ham_super(net)->vtable;
+	const auto vtable = (const ham_net_vtable*)ham_super(net)->vptr;
 
 	return vtable->find_peer(net, ret, query);
 }
 
 static inline ham_net_socket *ham_impl_net_socket_construct(ham_net_socket *sock, ...){
-	const auto obj_vt = ham_super(sock)->vtable;
+	const auto obj_vt = ham_super(sock)->vptr;
 	//const auto obj_info = obj_vt->info();
 
 	va_list va;
@@ -165,7 +165,7 @@ ham_net_socket *ham_net_socket_create(
 		return nullptr;
 	}
 
-	const auto vtable = ((const ham_net_vtable*)ham_super(net)->vtable)->socket_vtable();
+	const auto vtable = ((const ham_net_vtable*)ham_super(net)->vptr)->socket_vtable();
 	const auto obj_vt = ham_super(vtable);
 
 	const auto obj_info = obj_vt->info;
@@ -176,7 +176,7 @@ ham_net_socket *ham_net_socket_create(
 		return nullptr;
 	}
 
-	ham_super(obj)->vtable = obj_vt;
+	ham_super(obj)->vptr = obj_vt;
 	obj->net = net;
 	obj->peer = HAM_NET_EMPTY_PEER;
 	obj->port = port;
@@ -198,7 +198,7 @@ ham_net_socket *ham_net_socket_create(
 void ham_net_socket_destroy(ham_net_socket *socket){
 	if(ham_unlikely(socket == NULL)) return;
 
-	const auto obj_vt = ham_super(socket)->vtable;
+	const auto obj_vt = ham_super(socket)->vptr;
 	const auto allocator = socket->net->allocator;
 
 	obj_vt->dtor(ham_super(socket));
@@ -215,7 +215,7 @@ ham_usize ham_net_socket_recv(ham_net_socket *socket, ham_net_socket_recv_fn rec
 		return false;
 	}
 
-	const auto vtable = (const ham_net_socket_vtable*)ham_super(socket)->vtable;
+	const auto vtable = (const ham_net_socket_vtable*)ham_super(socket)->vptr;
 
 	return vtable->recv(socket, recv_fn, user);
 }
@@ -225,7 +225,7 @@ ham_usize ham_net_socket_send(ham_net_socket *socket, const ham_net_connection *
 		return (ham_usize)-1;
 	}
 
-	const auto vtable = (const ham_net_socket_vtable*)ham_super(socket)->vtable;
+	const auto vtable = (const ham_net_socket_vtable*)ham_super(socket)->vptr;
 
 	return vtable->send(socket, conn, buf, buf_len);
 }
@@ -235,7 +235,7 @@ ham_usize ham_net_socket_send(ham_net_socket *socket, const ham_net_connection *
 //
 
 static inline ham_net_connection *ham_impl_net_connection_construct(ham_net_connection *conn, ham_u32 nargs, ...){
-	const auto vtable = ham_super(conn)->vtable;
+	const auto vtable = ham_super(conn)->vptr;
 
 	va_list va;
 	va_start(va, nargs);
@@ -264,7 +264,7 @@ ham_net_connection *ham_net_connection_create(
 		return nullptr;
 	}
 
-	const auto vtable = ((const ham_net_vtable*)ham_super(net)->vtable)->connection_vtable();
+	const auto vtable = ((const ham_net_vtable*)ham_super(net)->vptr)->connection_vtable();
 	const auto obj_vt = ham_super(vtable);
 
 	const auto obj_info = obj_vt->info;
@@ -275,7 +275,7 @@ ham_net_connection *ham_net_connection_create(
 		return nullptr;
 	}
 
-	ham_super(obj)->vtable = obj_vt;
+	ham_super(obj)->vptr = obj_vt;
 	obj->net = net;
 	obj->peer = remote_peer;
 	obj->connected = false;
@@ -298,7 +298,7 @@ void ham_net_connection_destroy(ham_net_connection *conn){
 	if(ham_unlikely(!conn)) return;
 
 	const auto allocator = conn->net->allocator;
-	const auto obj_vt = ham_super(conn)->vtable;
+	const auto obj_vt = ham_super(conn)->vptr;
 
 	obj_vt->dtor(ham_super(conn));
 	ham_allocator_free(allocator, conn);
@@ -309,7 +309,7 @@ ham_usize ham_net_connection_recv(ham_net_connection *conn, ham_net_connection_r
 		return false;
 	}
 
-	const auto vtable = (const ham_net_connection_vtable*)ham_super(conn)->vtable;
+	const auto vtable = (const ham_net_connection_vtable*)ham_super(conn)->vptr;
 
 	return vtable->recv(conn, recv_fn, user);
 }
@@ -319,7 +319,7 @@ bool ham_net_connection_send(ham_net_connection *conn, const void *data, ham_usi
 		return false;
 	}
 
-	const auto vtable = (const ham_net_connection_vtable*)ham_super(conn)->vtable;
+	const auto vtable = (const ham_net_connection_vtable*)ham_super(conn)->vptr;
 
 	return vtable->send(conn, data, len);
 }

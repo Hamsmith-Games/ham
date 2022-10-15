@@ -139,7 +139,7 @@ ham_api ham_object *ham_object_vnew_init(
 
 	const auto vtable = manager->obj_vtable;
 
-	mem->vtable = vtable;
+	mem->vptr = vtable;
 
 	if(init_fn && !init_fn(mem, user)){
 		ham_logapierrorf("Failed to initialize object memory");
@@ -154,7 +154,7 @@ ham_api ham_object *ham_object_vnew_init(
 		return nullptr;
 	}
 
-	ret->vtable = vtable; // make sure no funny business happens
+	ret->vptr = vtable; // make sure no funny business happens
 
 	return ret;
 }

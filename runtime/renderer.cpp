@@ -113,7 +113,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 		return nullptr;
 	}
 
-	obj->vtable    = obj_vtable;
+	obj->vptr    = obj_vtable;
 	r->allocator   = allocator;
 	r->dso         = dso;
 	r->plugin      = plugin;
@@ -122,7 +122,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 	r->draw_list   = draw_list;
 	r->tmp_list    = tmp_list;
 
-	const auto ret = ham_impl_renderer_construct(obj->vtable, obj, args);
+	const auto ret = ham_impl_renderer_construct(obj->vptr, obj, args);
 	if(!ret){
 		ham::logapierror("Failed to construct renderer object '{}'", obj_id);
 		ham_buffer_finish(&draw_list);
@@ -137,7 +137,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 
 	// in case somebody did something weird in a constructor, we have to set these again
 	// TODO: only do this in debug builds?
-	obj->vtable      = obj_vtable;
+	obj->vptr      = obj_vtable;
 	ret->allocator   = allocator;
 	ret->dso         = dso;
 	ret->plugin      = plugin;
@@ -162,7 +162,7 @@ void ham_renderer_destroy(ham_renderer *r){
 	if(ham_unlikely(!r)) return;
 
 	const auto allocator = r->allocator;
-	const auto obj_vt = ham_super(r)->vtable;
+	const auto obj_vt = ham_super(r)->vptr;
 	//const auto renderer_vt = (const ham_renderer_vtable*)obj_vt;
 
 	const auto plugin = r->plugin;
@@ -174,7 +174,7 @@ void ham_renderer_destroy(ham_renderer *r){
 	ham_object_manager_iterate(
 		r->draw_groups,
 		[](ham_object *obj, void*){
-			const auto vtable = (const ham_draw_group_vtable*)obj->vtable;
+			const auto vtable = (const ham_draw_group_vtable*)obj->vptr;
 			const auto group = (ham_draw_group*)obj;
 			return true;
 		},
@@ -205,14 +205,14 @@ bool ham_renderer_resize(ham_renderer *r, ham_u32 w, ham_u32 h){
 		return false;
 	}
 
-	const auto vptr = (const ham_renderer_vtable*)ham_super(r)->vtable;
+	const auto vptr = (const ham_renderer_vtable*)ham_super(r)->vptr;
 	return vptr->resize(r, w, h);
 }
 
 void ham_renderer_frame(ham_renderer *renderer, ham_f64 dt, const ham_renderer_frame_data *data){
 	if(ham_unlikely(!renderer) || !ham_check(data != NULL)) return;
 
-	const auto renderer_vt = (const ham_renderer_vtable*)ham_super(renderer)->vtable;
+	const auto renderer_vt = (const ham_renderer_vtable*)ham_super(renderer)->vptr;
 	renderer_vt->frame(renderer, dt, data);
 }
 

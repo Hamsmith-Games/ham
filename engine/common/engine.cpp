@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Ham World Engine Runtime
  * Copyright (C) 2022 Hamsmith Ltd.
  *
@@ -51,7 +51,7 @@ struct ham_impl_engine_data{
 
 static inline ham_uptr ham_impl_engine_thread_main(void *user){
 	const auto engine = reinterpret_cast<ham_engine*>(user);
-	const auto vtable = ham_super(engine)->vtable;
+	const auto vtable = ham_super(engine)->vptr;
 
 	const char *engine_name = vtable->info()->type_id;
 

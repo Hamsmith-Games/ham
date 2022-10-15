@@ -64,9 +64,9 @@ void ham_net_socket_steam_status_changed(SteamNetConnectionStatusChangedCallback
 			auto new_conn = &emplace_res.first->second;
 			auto new_obj = ham_super_n(2, new_conn);
 
-			const auto net_vtable = (const ham_net_vtable*)ham_super(sock_obj->net)->vtable;
+			const auto net_vtable = (const ham_net_vtable*)ham_super(sock_obj->net)->vptr;
 
-			new_obj->vtable = (const ham_object_vtable*)net_vtable->connection_vtable();
+			new_obj->vptr = (const ham_object_vtable*)net_vtable->connection_vtable();
 
 			ham_super(new_conn)->net = sock_obj->net;
 			ham_super(new_conn)->peer = remote_peer;
@@ -167,11 +167,11 @@ static inline ham_net_socket_steam *ham_net_socket_steam_ctor(ham_net_socket_ste
 			return nullptr;
 		}
 
-		const auto net_vt = (const ham_net_vtable*)ham_super(ham_super(sock)->net)->vtable;
+		const auto net_vt = (const ham_net_vtable*)ham_super(ham_super(sock)->net)->vptr;
 
 		const auto conn_obj = ham_super(conn_ptr);
 
-		ham_super(conn_obj)->vtable = (const ham_object_vtable*)net_vt->connection_vtable();
+		ham_super(conn_obj)->vptr = (const ham_object_vtable*)net_vt->connection_vtable();
 
 		conn_obj->net = ham_super(sock)->net;
 		conn_obj->peer = peer;

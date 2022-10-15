@@ -49,6 +49,12 @@ if(STEAMWORKS_FOUND)
 endif()
 
 ##
+# Audio plugins
+##
+
+add_subdirectory(audio-oalsoft)
+
+##
 # Renderer plugins
 ##
 
