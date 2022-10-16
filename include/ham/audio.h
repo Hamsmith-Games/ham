@@ -29,23 +29,45 @@
 
 HAM_C_API_BEGIN
 
-typedef struct ham_audio_context ham_audio_context;
-typedef struct ham_audio_context_vtable ham_audio_context_vtable;
+typedef enum ham_audio_sample_format{
+	HAM_AUDIO_SAMPLE_U8,
+	HAM_AUDIO_SAMPLE_U16,
+	HAM_AUDIO_SAMPLE_U32,
+	HAM_AUDIO_SAMPLE_F32,
 
-typedef struct ham_audio_listener ham_audio_listener;
-typedef struct ham_audio_source ham_audio_source;
+	HAM_AUDIO_SAMPLE_FORMAT_COUNT
+} ham_audio_sample_format;
 
-ham_api ham_audio_context *ham_audio_context_create(const ham_audio_context_vtable *vptr);
-ham_api void ham_audio_context_destroy();
+typedef struct ham_audio ham_audio;
+typedef struct ham_audio_stream ham_audio_stream;
 
-ham_api ham_audio_listener *ham_audio_get_listener(ham_audio_context *ctx, ham_u32 idx);
+typedef struct ham_audio_vtable ham_audio_vtable;
 
-ham_api ham_audio_source *ham_audio_source_create(ham_audio_context *ctx);
-ham_api void ham_audio_source_destroy(ham_audio_source *source, ham_u32 num_channels, ham_u32 sample_rate);
+ham_api ham_audio *ham_audio_create(const ham_audio_vtable *vptr);
+ham_api void ham_audio_destroy();
 
-ham_api bool ham_audio_source_play(ham_audio_source *source);
-ham_api bool ham_audio_source_pause(ham_audio_source *source);
-ham_api bool ham_audio_source_stop(ham_audio_source *source);
+ham_api ham_vec3 ham_audio_position(const ham_audio *ctx);
+ham_api ham_vec3 ham_audio_rotation(const ham_audio *ctx);
+ham_api ham_vec3 ham_audio_velocity(const ham_audio *ctx);
+
+ham_api void ham_audio_set_position(ham_audio *ctx, ham_vec3 pos);
+ham_api void ham_audio_set_rotation(ham_audio *ctx, ham_vec3 pyr);
+ham_api void ham_audio_set_velocity(ham_audio *ctx, ham_vec3 vel);
+
+ham_api ham_audio_stream *ham_audio_stream_create(ham_audio *ctx, ham_audio_sample_format sample_format, ham_u32 num_channels, ham_u32 sample_rate);
+ham_api void ham_audio_stream_destroy(ham_audio_stream *stream);
+
+ham_api ham_vec3 ham_audio_stream_position(const ham_audio_stream *stream);
+ham_api ham_vec3 ham_audio_stream_rotation(const ham_audio_stream *stream);
+ham_api ham_vec3 ham_audio_stream_velocity(const ham_audio_stream *stream);
+
+ham_api void ham_audio_stream_set_position(ham_audio_stream *stream, ham_vec3 pos);
+ham_api void ham_audio_stream_set_rotation(ham_audio_stream *stream, ham_vec3 pyr);
+ham_api void ham_audio_stream_set_velocity(ham_audio_stream *stream, ham_vec3 vel);
+
+ham_api bool ham_audio_stream_play (ham_audio_stream *source);
+ham_api bool ham_audio_stream_pause(ham_audio_stream *source);
+ham_api bool ham_audio_stream_stop (ham_audio_stream *source);
 
 HAM_C_API_END
 

@@ -23,6 +23,8 @@
 #include <QObject>
 #include <QDir>
 
+#define HAM_ENGINE_EDITOR_TEMPLATE_JSON_PATH ".ham/engine-template.json"
+
 namespace ham::engine::editor{
 	QString default_project_path();
 

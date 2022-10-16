@@ -8,20 +8,18 @@
 
 HAM_C_API_BEGIN
 
-typedef struct ham_audio_context_oalsoft{
-	ham_derive(ham_audio_context)
+typedef struct ham_audio_oalsoft{
+	ham_derive(ham_audio)
 
 	ALCdevice *alc_dev;
 	ALCcontext *alc_ctx;
-} ham_audio_context_oalsoft;
+} ham_audio_oalsoft;
 
-typedef struct ham_audio_listener_oalsoft{
-	ham_derive(ham_audio_listener)
-} ham_audio_listener_oalsoft;
+typedef struct ham_audio_stream_oalsoft{
+	ham_derive(ham_audio_stream)
 
-typedef struct ham_audio_source_oalsoft{
-	ham_derive(ham_audio_source)
-} ham_audio_source_oalsoft;
+	ham_vec3 pos, pyr, vel;
+} ham_audio_stream_oalsoft;
 
 HAM_C_API_END
 

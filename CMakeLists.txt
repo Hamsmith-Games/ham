@@ -306,25 +306,6 @@ option(HAM_INSTALL_ENGINE  "Whether to install the world engine"        OFF)
 option(HAM_PLUGINS_ENABLE_GL     "Whether to enable OpenGL-related plugins" ON)
 option(HAM_PLUGINS_ENABLE_VULKAN "Whether to enable Vulkan-related plugins" OFF)
 
-# Platform specific options
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-	option(HAM_VK_WIN32   "Whether to enable Win32 Vulkan extensions"   ON)
-	option(HAM_VK_WAYLAND "Whether to enable Wayland Vulkan extensions" OFF)
-	option(HAM_VK_XCB     "Whether to enable XCB Vulkan extensions"     OFF)
-	option(HAM_VK_XLIB    "Whether to enable Xlib Vulkan extensions"    OFF)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-	option(HAM_VK_WIN32   "Whether to enable Win32 Vulkan extensions"   OFF)
-	option(HAM_VK_WAYLAND "Whether to enable Wayland Vulkan extensions" ON)
-	option(HAM_VK_XCB     "Whether to enable XCB Vulkan extensions"     ON)
-	option(HAM_VK_XLIB    "Whether to enable Xlib Vulkan extensions"    OFF)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-	option(HAM_VK_WIN32   "Whether to enable Win32 Vulkan extensions"   OFF)
-	option(HAM_VK_WAYLAND "Whether to enable Wayland Vulkan extensions" OFF)
-	option(HAM_VK_XCB     "Whether to enable XCB Vulkan extensions"     OFF)
-	option(HAM_VK_XLIB    "Whether to enable Xlib Vulkan extensions"    ON) # dunno, don't care
-endif()
-
 # Build options
 
 set(HAM_ENGINE_MAX_SUBSYSTEMS "16" CACHE STRING "Maximum number of subsystems allowed in an engine before an error")

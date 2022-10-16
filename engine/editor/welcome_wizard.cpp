@@ -221,7 +221,7 @@ editor::project_wizard::template_page::template_page(QWidget *parent)
 
 	for(auto &&template_subdir : template_dirs){
 		const auto tmpl_dir = QDir(":/templates/" + template_subdir);
-		const auto json_path = tmpl_dir.path() + "/ham-engine-template.json";
+		const auto json_path = tmpl_dir.path() + "/" HAM_ENGINE_EDITOR_TEMPLATE_JSON_PATH;
 
 		qDebug() << "Checking for template JSON:" << json_path;
 

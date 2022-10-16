@@ -48,7 +48,9 @@ endif()
 
 ham_add_plugin(
 	ham-audio-oalsoft
-	audio_context_oalsoft.cpp
+	audio-oalsoft.h
+	audio_oalsoft.cpp
+	audio_stream_oalsoft.cpp
 )
 
 target_link_libraries(ham-audio-oalsoft PRIVATE OpenAL)

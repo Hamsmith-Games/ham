@@ -323,64 +323,6 @@ namespace ham{
 
 		template<typename T>
 		concept HamObjectVTable = is_ham_object_vtable_v<T>;
-
-		// Type for
-
-		template<typename ... Ts>
-		struct type_for_functor{
-			template<typename Fn>
-			constexpr static void call(Fn &&fn){
-				if constexpr(requires {
-					{ (fn.template operator()<Ts>(), ...) };
-				}){
-					(std::forward<Fn>(fn).template operator()<Ts>(), ...);
-				}
-				else{
-					(std::forward<Fn>(fn)(type_tag<Ts>{}), ...);
-				}
-			}
-
-			template<typename Fn>
-			constexpr void operator()(Fn &&fn){ call(std::forward<Fn>(fn)); }
-		};
-
-		template<typename Fn, typename ... Ts>
-		static void type_for(Fn &&f){
-			constexpr type_for_functor<Ts...> functor;
-			functor(std::forward<Fn>(f));
-		}
-
-		// Static for
-
-		template<auto ... Vals>
-		struct static_for_functor{
-			template<typename Fn>
-			constexpr static void call(Fn &&fn){
-				if constexpr(requires {
-					{ (fn.template operator()<Vals>(), ...) };
-				}){
-					(std::forward<Fn>(fn).template operator()<Vals>(), ...);
-				}
-				else{
-					(std::forward<Fn>(fn)(Vals), ...);
-				}
-			}
-
-			template<typename Fn>
-			constexpr void operator()(Fn &&fn){ call(std::forward<Fn>(fn)); }
-		};
-
-		template<typename Fn, auto ... Vals>
-		static void static_for(value_tag<Vals...>, Fn &&f){
-			constexpr static_for_functor<Vals...> functor;
-			functor(std::forward<Fn>(f));
-		}
-
-		template<typename Fn, usize ... Is>
-		static void static_for(index_seq<Is...>, Fn &&f){
-			constexpr static_for_functor<Is...> functor;
-			functor(std::forward<Fn>(f));
-		}
 	}
 
 	template<typename Obj>

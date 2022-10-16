@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <uchar.h>
 
 HAM_C_API_BEGIN
@@ -194,6 +195,190 @@ typedef union alignas(16) ham_vec4{
 #endif
 } ham_vec4;
 
+ham_constexpr ham_nothrow static inline ham_vec2 ham_make_vec2(ham_f32 x, ham_f32 y){
+	return (ham_vec2){ .data = { x, y } };
+}
+
+ham_constexpr ham_nothrow static inline ham_vec3 ham_make_vec3(ham_f32 x, ham_f32 y, ham_f32 z){
+	return (ham_vec3){ .data = { x, y, z } };
+}
+
+ham_constexpr ham_nothrow static inline ham_vec4 ham_make_vec4(ham_f32 x, ham_f32 y, ham_f32 z, ham_f32 w){
+	return (ham_vec4){ .data = { x, y, z, w } };
+}
+
+//! @cond ignore
+
+#define HAM_IMPL_VEC_OP_2(a_, b_, op_) ((ham_vec2){ .data = { a_.x op_ b_.x, a_.y op_ b_.y } })
+#define HAM_IMPL_VEC_OP_3(a_, b_, op_) ((ham_vec3){ .data = { a_.x op_ b_.x, a_.y op_ b_.y, a_.z op_ b_.z } })
+
+#ifdef HAM_SIMD
+#	define HAM_IMPL_VEC_OP_4(a_, b_, op_) ((ham_vec4){ .v4f32 = a_.v4f32 op_ b_.v4f32 })
+#else
+#	define HAM_IMPL_VEC_OP_4(a_, b_, op_) ((ham_vec4){ .data = { a_.x op_ b_.x, a_.y op_ b_.y, a_.z op_ b_.z, a_.w op_ b_.w } })
+#endif
+
+#define HAM_IMPL_VEC_OP_N_(impl_, a_, b_, op_) impl_(a_, b_, op_)
+#define HAM_IMPL_VEC_OP_N(n_, a_, b_, op_) HAM_IMPL_VEC_OP_N_(HAM_IMPL_VEC_OP_##n_, a_, b_, op_)
+
+//! @endcond
+
+ham_constexpr ham_nothrow static inline ham_vec2 ham_vec2_add(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, +); }
+ham_constexpr ham_nothrow static inline ham_vec2 ham_vec2_sub(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, -); }
+ham_constexpr ham_nothrow static inline ham_vec2 ham_vec2_mul(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, *); }
+ham_constexpr ham_nothrow static inline ham_vec2 ham_vec2_div(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, /); }
+
+ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_add(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, +); }
+ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_sub(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, -); }
+ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_mul(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, *); }
+ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_div(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, /); }
+
+ham_constexpr ham_nothrow static inline ham_vec4 ham_vec4_add(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, +); }
+ham_constexpr ham_nothrow static inline ham_vec4 ham_vec4_sub(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, -); }
+ham_constexpr ham_nothrow static inline ham_vec4 ham_vec4_mul(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, *); }
+ham_constexpr ham_nothrow static inline ham_vec4 ham_vec4_div(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, /); }
+
+ham_constexpr ham_nothrow static inline ham_f32 ham_vec2_dot(ham_vec2 a, ham_vec2 b){ return sqrtf((a.x * b.x) + (a.y * b.y)); }
+ham_constexpr ham_nothrow static inline ham_f32 ham_vec3_dot(ham_vec3 a, ham_vec3 b){ return sqrtf((a.x * b.x) + (a.y * b.y) + (a.z * b.z)); }
+
+ham_constexpr ham_nothrow static inline ham_f32 ham_vec4_dot(ham_vec4 a, ham_vec4 b){
+#ifdef HAM_SIMD
+	const ham_vec4 product = (ham_vec4){ .v4f32 = a.v4f32 * b.v4f32 };
+	return sqrtf(product.x + product.y + product.z + product.w);
+#else
+	return sqrtf((a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w));
+#endif
+}
+
+ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_cross(ham_vec3 a, ham_vec3 b){
+	return (ham_vec3){
+		.data = {
+			a.y * b.z - a.z * b.y,
+			a.z * b.x - a.x * b.z,
+			a.x * b.y - a.y * b.x,
+		}
+	};
+}
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup HAM_QUAT Quaternions
+ * @{
+ */
+
+typedef union alignas(16) ham_quat{
+	struct { ham_f32 x, y, z, w; };
+	ham_f32 data[4];
+#ifdef HAM_SIMD
+	ham_v4f32 v4f32;
+#endif
+} ham_quat;
+
+ham_constexpr ham_nothrow static inline ham_quat ham_quat_identity(){
+	return (ham_quat){ .data = { 0.f, 0.f, 0.f, 1.f } };
+}
+
+ham_constexpr ham_nothrow static inline ham_quat ham_quat_axis(ham_f32 angle, ham_vec3 axis){
+	const ham_f32 angle_2 = angle * 0.5f;
+	const ham_f32 sin_angle_2 = sinf(angle_2);
+	return (ham_quat){
+		.data = { axis.x * sin_angle_2, axis.y * sin_angle_2, axis.z * sin_angle_2, cosf(angle_2) }
+	};
+}
+
+ham_constexpr ham_nothrow static inline ham_quat ham_quat_pitch(ham_f32 pitch){
+	const ham_f32 pitch_2 = pitch * 0.5f;
+	return (ham_quat){
+		.data = { sinf(pitch_2), 0.f, 0.f, cosf(pitch_2) }
+	};
+}
+
+ham_constexpr ham_nothrow static inline ham_quat ham_quat_yaw(ham_f32 yaw){
+	const ham_f32 yaw_2 = yaw * 0.5f;
+	return (ham_quat){
+		.data = { 0.f, sinf(yaw_2), 0.f, cosf(yaw_2) }
+	};
+}
+
+ham_constexpr ham_nothrow static inline ham_quat ham_quat_roll(ham_f32 roll){
+	const ham_f32 roll_2 = roll * 0.5f;
+	return (ham_quat){
+		.data = { 0.f, 0.f, sinf(roll_2), cosf(roll_2) }
+	};
+}
+
+ham_constexpr ham_nothrow static inline ham_f32 ham_quat_length(ham_quat q){
+#ifdef HAM_SIMD
+	q.v4f32 *= q.v4f32;
+#else
+	q.x *= q.x;
+	q.y *= q.y;
+	q.z *= q.z;
+	q.w *= q.w;
+#endif
+	return sqrtf(q.x + q.y + q.z + q.w);
+}
+
+ham_constexpr ham_nothrow static inline ham_quat ham_quat_normalize(ham_quat q){
+	const ham_f32 coef = 1.0 / ham_quat_length(q);
+	return (ham_quat){ .data = { coef * q.x, coef * q.y, coef * q.z, coef * q.w } };
+}
+
+ham_constexpr ham_nothrow static inline ham_quat ham_quat_add(ham_quat a, ham_quat b){
+#ifdef HAM_SIMD
+	return (ham_quat){ .v4f32 = a.v4f32 + b.v4f32 };
+#else
+	return (ham_quat){ .data = { a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w } };
+#endif
+}
+
+ham_constexpr ham_nothrow static inline ham_quat ham_quat_mul(ham_quat a, ham_quat b){
+	const ham_vec3 a_xyz = ham_make_vec3(a.x, a.y, a.z);
+	const ham_vec3 b_xyz = ham_make_vec3(b.x, b.y, b.z);
+	const ham_vec3 xyz_cross = ham_vec3_cross(a_xyz, b_xyz);
+
+	return (ham_quat){
+		.data = {
+			(a.w * b.x) + (b.w * a.x) + xyz_cross.x,
+			(a.w * b.y) + (b.w * a.y) + xyz_cross.y,
+			(a.w * b.z) + (b.w * a.z) + xyz_cross.z,
+			(a.w * b.w) - ham_vec3_dot(a_xyz, b_xyz),
+		}
+	};
+}
+
+ham_constexpr ham_nothrow static inline ham_quat ham_quat_hamilton(ham_quat a, ham_quat b){
+#ifdef HAM_SIMD
+	return (ham_quat){ .v4f32 = a.v4f32 * (b.x + b.y + b.z + b.w) };
+#else
+	return (ham_quat){
+		.data = {
+			(a.x * b.x) + (a.x * b.y) + (a.x * b.z) + (a.x * b.w),
+			(a.y * b.x) + (a.y * b.y) + (a.y * b.z) + (a.y * b.w),
+			(a.z * b.x) + (a.z * b.y) + (a.z * b.z) + (a.z * b.w),
+			(a.w * b.x) + (a.w * b.y) + (a.w * b.z) + (a.w * b.w),
+		}
+	};
+#endif
+}
+
+ham_constexpr ham_nothrow static inline ham_vec3 ham_quat_mul_vec3(ham_quat q, ham_vec3 v){
+	const ham_quat p   = { .data = { v.x, v.y, v.z, 0.f } };
+	const ham_quat q_c = { .data = { -q.x, -q.y, -q.z, q.w } };
+
+	// H(a, b) = HamiltonProduct(a, b)
+	//
+	// p' = q * p * q_c
+	// p' = H(H(q, p), q_c)
+
+	const ham_quat p_c = ham_quat_hamilton(ham_quat_hamilton(q, p), q_c);
+
+	return (ham_vec3){ .data = { p_c.x, p_c.y, p_c.z } };
+}
+
 /**
  * @}
  */
@@ -244,6 +429,27 @@ ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_identity(){
 			0.f, 1.f, 0.f, 0.f,
 			0.f, 0.f, 1.f, 0.f,
 			0.f, 0.f, 0.f, 1.f,
+		}
+	};
+}
+
+ham_constexpr ham_nothrow static inline ham_mat3 ham_mat3_from_quat(ham_quat q){
+	return (ham_mat3){
+		.data = {
+			1.f - (2.f * q.y * q.y) - (2.f * q.z * q.z), (2.f * q.x * q.y) - (2.f * q.z * q.w),        (2.f * q.x * q.z) + (2.f * q.y * q.w),
+			(2.f * q.x * q.y) + (2.f * q.z * q.w),       1.f - (2.f * q.x * q.x) - (2.0f * q.z * q.z), (2.f * q.y * q.z) - (2.f * q.x * q.w),
+			(2.f * q.x * q.z) - (2.f * q.y * q.w),       (2.f * q.y * q.z) + (2.f * q.x * q.w),        1.f - (2.f * q.x * q.x) - (2.f * q.y * q.y)
+		}
+	};
+}
+
+ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_from_quat(ham_quat q){
+	return (ham_mat4){
+		.data = {
+			1.f - (2.f * q.y * q.y) - (2.f * q.z * q.z), (2.f * q.x * q.y) - (2.f * q.z * q.w),        (2.f * q.x * q.z) + (2.f * q.y * q.w),       0.f,
+			(2.f * q.x * q.y) + (2.f * q.z * q.w),       1.f - (2.f * q.x * q.x) - (2.0f * q.z * q.z), (2.f * q.y * q.z) - (2.f * q.x * q.w),       0.f,
+			(2.f * q.x * q.z) - (2.f * q.y * q.w),       (2.f * q.y * q.z) + (2.f * q.x * q.w),        1.f - (2.f * q.x * q.x) - (2.f * q.y * q.y), 0.0f,
+			0.f, 0.f, 0.f, 1.f
 		}
 	};
 }
@@ -1459,11 +1665,474 @@ namespace ham{
 	using str16 = basic_str<char16>;
 	using str32 = basic_str<char32>;
 
+	using str = basic_str<uchar>;
+
 	static_assert(layout_is_same_v<str8,  ham_str8>);
 	static_assert(layout_is_same_v<str16, ham_str16>);
 	static_assert(layout_is_same_v<str32, ham_str32>);
 
-	using str = basic_str<uchar>;
+	namespace meta{
+		// Type for
+
+		template<typename ... Ts>
+		struct type_for_functor{
+			template<typename Fn>
+			constexpr static void call(Fn &&fn){
+				if constexpr(requires {
+					{ (fn.template operator()<Ts>(), ...) };
+				}){
+					(std::forward<Fn>(fn).template operator()<Ts>(), ...);
+				}
+				else{
+					(std::forward<Fn>(fn)(type_tag<Ts>{}), ...);
+				}
+			}
+
+			template<typename Fn>
+			constexpr void operator()(Fn &&fn){ call(std::forward<Fn>(fn)); }
+		};
+
+		template<typename Fn, typename ... Ts>
+		static void type_for(Fn &&f){
+			constexpr type_for_functor<Ts...> functor;
+			functor(std::forward<Fn>(f));
+		}
+
+		// Static for
+
+		template<auto ... Vals>
+		struct static_for_functor{
+			template<typename Fn>
+			constexpr static void call(Fn &&fn){
+				if constexpr(requires {
+					{ (fn.template operator()<Vals>(), ...) };
+				}){
+					(std::forward<Fn>(fn).template operator()<Vals>(), ...);
+				}
+				else{
+					(std::forward<Fn>(fn)(Vals), ...);
+				}
+			}
+
+			template<typename Fn>
+			constexpr void operator()(Fn &&fn){ call(std::forward<Fn>(fn)); }
+		};
+
+		template<typename Fn, auto ... Vals>
+		static void static_for(value_tag<Vals...>, Fn &&f){
+			constexpr static_for_functor<Vals...> functor;
+			functor(std::forward<Fn>(f));
+		}
+
+		template<typename Fn, usize ... Is>
+		static void static_for(index_seq<Is...>, Fn &&f){
+			constexpr static_for_functor<Is...> functor;
+			functor(std::forward<Fn>(f));
+		}
+
+		template<usize N, typename Fn>
+		static void static_for_n(Fn &&f){
+			static_for(make_index_seq<N>(), std::forward<Fn>(f));
+		}
+	}
+
+	namespace detail{
+		template<typename T, usize N>
+		union ham_vec_gen{
+			struct {
+				T x, y, z, w;
+			};
+			T data[N];
+		};
+
+		template<typename T>
+		union ham_vec_gen<T, 2>{
+			struct {
+				T x, y;
+			};
+			T data[2];
+		};
+
+		template<typename T>
+		union ham_vec_gen<T, 3>{
+			struct {
+				T x, y, z;
+			};
+			T data[3];
+		};
+
+		template<typename T, usize N>
+		struct vec_data: id<ham_vec_gen<T, N>>{};
+
+		template<> struct vec_data<f32, 2>: id<ham_vec2>{};
+		template<> struct vec_data<f32, 3>: id<ham_vec3>{};
+		template<> struct vec_data<f32, 4>: id<ham_vec4>{};
+
+		template<typename T, usize N>
+		using vec_data_t = typename vec_data<T, N>::type;
+
+		template<typename T, usize N>
+		struct vec_ops{
+			using data_type = vec_data_t<T, N>;
+
+			static constexpr void add(data_type &ret, const data_type &lhs, const data_type &rhs) noexcept{
+				static_for_n<N>([&ret, &lhs, &rhs]<usize Idx>(){ ret.data[Idx] = lhs.data[Idx] + rhs.data[Idx]; });
+			}
+
+			static constexpr void sub(data_type &ret, const data_type &lhs, const data_type &rhs) noexcept{
+				static_for_n<N>([&ret, &lhs, &rhs]<usize Idx>(){ ret.data[Idx] = lhs.data[Idx] - rhs.data[Idx]; });
+			}
+
+			static constexpr void mul(data_type &ret, const data_type &lhs, const data_type &rhs) noexcept{
+				static_for_n<N>([&ret, &lhs, &rhs]<usize Idx>(){ ret.data[Idx] = lhs.data[Idx] * rhs.data[Idx]; });
+			}
+
+			static constexpr void div(data_type &ret, const data_type &lhs, const data_type &rhs) noexcept{
+				static_for_n<N>([&ret, &lhs, &rhs]<usize Idx>(){ ret.data[Idx] = lhs.data[Idx] / rhs.data[Idx]; });
+			}
+
+			static constexpr void dot(T &ret, const data_type &lhs, const data_type &rhs) noexcept{
+				ret = T(0);
+				static_for_n<N>([&ret, &lhs, &rhs]<usize Idx>(){ ret.data[Idx] += lhs.data[Idx] * rhs.data[Idx]; });
+				ret = std::sqrt(ret);
+			}
+
+			static constexpr void length(T &ret, const data_type &v) noexcept{
+				dot(ret, v, v);
+			}
+
+			template<
+				bool IsFloat = std::is_floating_point_v<T>,
+				std::enable_if_t<IsFloat, int> = 0
+			>
+			static constexpr void normalize(data_type &ret, const data_type &a) noexcept{
+				T len_;
+				length(len_, a);
+				static_for_n<N>([&ret, &a, len_]<usize Idx>(){ ret.data[Idx] = a.data[Idx] / len_; });
+			}
+
+			template<
+				bool IsVec3 = (N == 3),
+				std::enable_if_t<IsVec3, int> = 0
+			>
+			static constexpr void cross(data_type &ret, const data_type &a, const data_type &b) noexcept{
+				ret = ham_vec3{
+					.data = {
+						a.y * b.z - a.z * b.y,
+						a.z * b.x - a.x * b.z,
+						a.x * b.y - a.y * b.x
+					}
+				};
+			}
+		};
+
+		template<>
+		struct vec_ops<f32, 4>{
+			static constexpr void add(ham_vec4 &ret, const ham_vec4 &lhs, const ham_vec4 &rhs) noexcept{
+				ret.v4f32 = lhs.v4f32 + rhs.v4f32;
+			}
+
+			static constexpr void sub(ham_vec4 &ret, const ham_vec4 &lhs, const ham_vec4 &rhs) noexcept{
+				ret.v4f32 = lhs.v4f32 - rhs.v4f32;
+			}
+
+			static constexpr void mul(ham_vec4 &ret, const ham_vec4 &lhs, const ham_vec4 &rhs) noexcept{
+				ret.v4f32 = lhs.v4f32 * rhs.v4f32;
+			}
+
+			static constexpr void div(ham_vec4 &ret, const ham_vec4 &lhs, const ham_vec4 &rhs) noexcept{
+				ret.v4f32 = lhs.v4f32 / rhs.v4f32;
+			}
+
+			static constexpr void dot(f32 &ret, const ham_vec4 &lhs, const ham_vec4 &rhs) noexcept{
+				ret = ham_vec4_dot(lhs, rhs);
+			}
+
+			static constexpr void length(f32 &ret, const ham_vec4 &v) noexcept{
+				dot(ret, v, v);
+			}
+
+			static constexpr void normalize(ham_vec4 &ret, const ham_vec4 &v) noexcept{
+				f32 len_;
+				length(len_, v);
+				ret.v4f32 = v.v4f32 / len_;
+			}
+		};
+	}
+
+	template<typename T, usize N>
+	class basic_vec{
+		public:
+			static_assert(N > 1);
+
+			using ops = detail::vec_ops<T, N>;
+
+			template<
+				bool IsVec2 = N == 2,
+				std::enable_if_t<IsVec2, int> = 0
+			>
+			constexpr basic_vec(T x_, T y_) noexcept
+				: m_data{ .data = { x_, y_ } }{}
+
+			template<
+				bool IsVec3 = N == 3,
+				std::enable_if_t<IsVec3, int> = 0
+			>
+			constexpr basic_vec(T x_, T y_, T z_) noexcept
+				: m_data{ .data = { x_, y_, z_ } }{}
+
+			template<
+				bool IsVec4 = N == 4,
+				std::enable_if_t<IsVec4, int> = 0
+			>
+			constexpr basic_vec(T x_, T y_, T z_, T w_) noexcept
+				: m_data{ .data = { x_, y_, z_, w_ } }{}
+
+			constexpr explicit basic_vec(T all) noexcept
+				: basic_vec(all, meta::make_index_seq<N>()){}
+
+			constexpr basic_vec(const basic_vec&) noexcept = default;
+
+			constexpr basic_vec &operator=(const basic_vec&) noexcept = default;
+
+			// Conversion ham_vecN <-> basic_vec<f32, N>
+
+			template<
+				bool IsHamVec2 = (N == 2 && std::is_same_v<T, f32>),
+				std::enable_if_t<IsHamVec2, int> = 0
+			>
+			constexpr basic_vec(const ham_vec2 &v) noexcept
+				: m_data(v){}
+
+			template<
+				bool IsHamVec3 = (N == 3 && std::is_same_v<T, f32>),
+				std::enable_if_t<IsHamVec3, int> = 0
+			>
+			constexpr basic_vec(const ham_vec3 &v) noexcept
+				: m_data(v){}
+
+			template<
+				bool IsHamVec4 = (N == 4 && std::is_same_v<T, f32>),
+				std::enable_if_t<IsHamVec4, int> = 0
+			>
+			constexpr basic_vec(const ham_vec4 &v) noexcept
+				: m_data(v){}
+
+			template<
+				bool IsHamVec2 = (N == 2 && std::is_same_v<T, f32>),
+				std::enable_if_t<IsHamVec2, int> = 0
+			>
+			constexpr operator ham_vec2&() noexcept{ return m_data; }
+
+			template<
+				bool IsHamVec2 = (N == 2 && std::is_same_v<T, f32>),
+				std::enable_if_t<IsHamVec2, int> = 0
+			>
+			constexpr operator const ham_vec2&() const noexcept{ return m_data; }
+
+			template<
+				bool IsHamVec3 = (N == 3 && std::is_same_v<T, f32>),
+				std::enable_if_t<IsHamVec3, int> = 0
+			>
+			constexpr operator ham_vec3&() noexcept{ return m_data; }
+
+			template<
+				bool IsHamVec3 = (N == 3 && std::is_same_v<T, f32>),
+				std::enable_if_t<IsHamVec3, int> = 0
+			>
+			constexpr operator const ham_vec3&() const noexcept{ return m_data; }
+
+			template<
+				bool IsHamVec4 = (N == 4 && std::is_same_v<T, f32>),
+				std::enable_if_t<IsHamVec4, int> = 0
+			>
+			constexpr operator ham_vec4&() noexcept{ return m_data; }
+
+			template<
+				bool IsHamVec4 = (N == 4 && std::is_same_v<T, f32>),
+				std::enable_if_t<IsHamVec4, int> = 0
+			>
+			constexpr operator const ham_vec4&() const noexcept{ return m_data; }
+
+			constexpr T &x() noexcept{ return m_data.x; }
+			constexpr const T &x() const noexcept{ return m_data.x; }
+
+			constexpr T &y() noexcept{ return m_data.y; }
+			constexpr const T &y() const noexcept{ return m_data.y; }
+
+			template<
+				bool HasZ = (N > 2),
+				std::enable_if_t<HasZ, int> = 0
+			>
+			constexpr T &z() noexcept{ return m_data.z; }
+
+			template<
+				bool HasZ = (N > 2),
+				std::enable_if_t<HasZ, int> = 0
+			>
+			constexpr const T &z() const noexcept{ return m_data.z; }
+
+			template<
+				bool HasW = (N > 3),
+				std::enable_if_t<HasW, int> = 0
+			>
+			constexpr T &w() noexcept{ return m_data.w; }
+
+			template<
+				bool HasW = (N > 3),
+				std::enable_if_t<HasW, int> = 0
+			>
+			constexpr const T &w() const noexcept{ return m_data.w; }
+
+			constexpr T *data() noexcept{ return m_data; }
+			constexpr const T *data() const noexcept{ return m_data; }
+
+			constexpr basic_vec &operator+=(const basic_vec &other) noexcept{
+				ops::add(m_data, m_data, other.m_data);
+				return *this;
+			}
+
+			constexpr basic_vec &operator-=(const basic_vec &other) noexcept{
+				ops::sub(m_data, m_data, other.m_data);
+				return *this;
+			}
+
+			constexpr basic_vec &operator*=(const basic_vec &other) noexcept{
+				ops::mul(m_data, m_data, other.m_data);
+				return *this;
+			}
+
+			constexpr basic_vec &operator/=(const basic_vec &other) noexcept{
+				ops::div(m_data, m_data, other.m_data);
+				return *this;
+			}
+
+			constexpr basic_vec operator+(const basic_vec &other) noexcept{
+				basic_vec ret;
+				ops::add(ret.m_data, m_data, other.m_data);
+				return ret;
+			}
+
+			constexpr basic_vec operator-(const basic_vec &other) noexcept{
+				basic_vec ret;
+				ops::sub(ret.m_data, m_data, other.m_data);
+				return ret;
+			}
+
+			constexpr basic_vec operator*(const basic_vec &other) noexcept{
+				basic_vec ret;
+				ops::mul(ret.m_data, m_data, other.m_data);
+				return ret;
+			}
+
+			constexpr basic_vec operator/(const basic_vec &other) noexcept{
+				basic_vec ret;
+				ops::div(ret.m_data, m_data, other.m_data);
+				return ret;
+			}
+
+			constexpr T dot(const basic_vec &other) noexcept{
+				T ret;
+				ops::dot(ret, m_data, other.m_data);
+				return ret;
+			}
+
+			template<
+				bool IsVec3 = (N == 3),
+				std::enable_if_t<IsVec3, int> = 0
+			>
+			constexpr basic_vec cross(const basic_vec &other) noexcept{
+				basic_vec ret;
+				ops::cross(ret.m_data, m_data, other.m_data);
+				return ret;
+			}
+
+			constexpr T length() const noexcept{
+				T ret;
+				ops::length(ret, m_data);
+				return ret;
+			}
+
+			constexpr basic_vec &normalize() noexcept{
+				ops::normalize(m_data, m_data);
+				return *this;
+			}
+
+			constexpr basic_vec normalized() const noexcept{
+				basic_vec ret;
+				ops::normalize(ret.m_data, m_data);
+				return ret;
+			}
+
+		private:
+			template<usize ... Is>
+			basic_vec(T all, meta::index_seq<Is...>)
+				: m_data{ .data = { (Is, all)... } }{}
+
+			detail::vec_data_t<T, N> m_data;
+	};
+
+	using vec2 = basic_vec<f32, 2>;
+	using vec3 = basic_vec<f32, 3>;
+	using vec4 = basic_vec<f32, 4>;
+
+	using dvec2 = basic_vec<f64, 2>;
+	using dvec3 = basic_vec<f64, 3>;
+	using dvec4 = basic_vec<f64, 4>;
+
+	class quat{
+		public:
+			constexpr quat() noexcept
+				: m_q{ .data = { 0.f, 0.f, 0.f, 1.f } }{}
+
+			constexpr quat(f32 x_, f32 y_, f32 z_, f32 w_)
+				: m_q{ .data = { x_, y_, z_, w_ } }{}
+
+			constexpr quat(const ham_quat &q) noexcept
+				: m_q(q){}
+
+			constexpr quat(const quat&) noexcept = default;
+
+			constexpr quat &operator=(const quat&) noexcept = default;
+
+			operator ham_quat&() noexcept{ return m_q; }
+			operator const ham_quat&() const noexcept{ return m_q; }
+
+			constexpr static quat from_angles(f32 angle, const vec3 &axis){ return ham_quat_axis(angle, axis); }
+
+			constexpr static quat from_pitch(f32 pitch){ return ham_quat_pitch(pitch); }
+			constexpr static quat from_yaw(f32 yaw){ return ham_quat_yaw(yaw); }
+			constexpr static quat from_roll(f32 roll){ return ham_quat_roll(roll); }
+
+			constexpr quat &operator+=(const quat &other) noexcept{
+				m_q = ham_quat_add(m_q, other.m_q);
+				return *this;
+			}
+
+			constexpr quat &operator*=(const quat &other) noexcept{
+				m_q = ham_quat_mul(m_q, other.m_q);
+				return *this;
+			}
+
+			constexpr quat operator+(const quat &other) const noexcept{ return ham_quat_add(m_q, other.m_q); }
+			constexpr quat operator*(const quat &other) const noexcept{ return ham_quat_mul(m_q, other.m_q); }
+
+			// Rotate a vector
+			constexpr vec3 operator*(const vec3 &v) const noexcept{ return ham_quat_mul_vec3(m_q, v); }
+
+			constexpr quat &normalize() noexcept{
+				m_q = ham_quat_normalize(m_q);
+				return *this;
+			}
+
+			constexpr quat normalized() const noexcept{ return ham_quat_normalize(m_q); }
+
+			constexpr ham_mat3 to_mat3() const noexcept{ return ham_mat3_from_quat(m_q); }
+			constexpr ham_mat4 to_mat4() const noexcept{ return ham_mat4_from_quat(m_q); }
+
+		private:
+			ham_quat m_q;
+	};
 
 	namespace str_literals{
 		constexpr inline auto operator""_str(const char8  *ptr, usize len){ return str8 (ptr, len); }

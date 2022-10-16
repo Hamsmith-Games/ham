@@ -134,7 +134,7 @@ editor::project_template::project_template(const QDir &dir, QObject *parent)
 		throw project_dir_error{};
 	}
 
-	const auto json_path = dir.path() + "/ham-engine-template.json";
+	const auto json_path = dir.path() + "/" HAM_ENGINE_EDITOR_TEMPLATE_JSON_PATH;
 	if(!QFileInfo::exists(json_path)){
 		qWarning() << "Project template JSON does not exist" << json_path;
 		throw project_dir_error{};
@@ -185,45 +185,7 @@ editor::project_template::project_template(const QDir &dir, QObject *parent)
 
 editor::project_template::~project_template(){}
 
-bool editor::project_template::createInDir(
-	const QDir &proj_dir,
-	const QString &proj_name,
-	const QString &proj_display_name,
-	const QString &proj_author,
-	const QString &proj_desc
-) const
-{
-	/*
-	int (*start)(void *closure);
-	int (*put)(void *closure, const char *name, int escape, FILE *file);
-	int (*enter)(void *closure, const char *name);
-	int (*next)(void *closure);
-	int (*leave)(void *closure);
-	int (*partial)(void *closure, const char *name, struct mustach_sbuf *sbuf);
-	int (*emit)(void *closure, const char *buffer, size_t size, int escape, FILE *file);
-	int (*get)(void *closure, const char *name, struct mustach_sbuf *sbuf);
-	void (*stop)(void *closure, int status);
-	*/
-
-	// enter next leave
-
-	QHash<QString, QByteArray> vars;
-
-	vars["ham_engine_version"] = QByteArrayLiteral(HAM_ENGINE_VERSION_STR);
-	vars["ham_engine_version_major"] = QByteArrayLiteral(HAM_STRINGIFY(HAM_ENGINE_VERSION_MAJOR));
-	vars["ham_engine_version_minor"] = QByteArrayLiteral(HAM_STRINGIFY(HAM_ENGINE_VERSION_MINOR));
-	vars["ham_engine_version_patch"] = QByteArrayLiteral(HAM_STRINGIFY(HAM_ENGINE_VERSION_PATCH));
-	vars["ham_project_id"] = QByteArrayLiteral("480");
-	vars["ham_project_name"] = proj_name.toUtf8();
-	vars["ham_project_display_name"] = proj_display_name.toUtf8();
-	vars["ham_project_author"] = proj_author.toUtf8();
-	vars["ham_project_description"] = proj_desc.toUtf8();
-	vars["ham_project_license"] = "UNLICENSED";
-	vars["ham_project_version"] = QByteArrayLiteral("0.0.1");
-	vars["ham_project_version_major"] = QByteArrayLiteral("0");
-	vars["ham_project_version_minor"] = QByteArrayLiteral("0");
-	vars["ham_project_version_patch"] = QByteArrayLiteral("1");
-
+static bool ham_impl_write_project_template_path(const QDir &tmpl_dir, const QDir &proj_dir, const QHash<QString, QByteArray> &vars){
 	static const mustach_itf mustach_fns = {
 		.start = nullptr,
 		.put = nullptr,
@@ -264,50 +226,116 @@ bool editor::project_template::createInDir(
 		.stop = nullptr,
 	};
 
-	const auto tmpl_files = m_dir.entryList(QDir::Files);
-	for(auto &&file_name : tmpl_files){
-		if(file_name == "ham-engine-template.json") continue;
+	const auto tmpl_dir_path = tmpl_dir.absolutePath();
 
-		const auto tmpl_file_path = QString("%1/%2").arg(m_dir.path(), file_name);
+	if(!tmpl_dir.exists()){
+		const auto tmpl_dir_utf8 = tmpl_dir_path.toUtf8();
+		qWarning() << "Project template directory does not exist" << tmpl_dir_path;
+		return false;
+	}
 
-		if(!file_name.endsWith(".in")){
-			if(!QFile::copy(tmpl_file_path, QString("%1/%2").arg(proj_dir.path(), file_name))){
-				qWarning() << "Failed to copy template file" << file_name << "to" << QString("%1/%2").arg(proj_dir.path(), file_name);
+	const auto proj_dir_path = proj_dir.absolutePath();
+
+	if(!proj_dir.exists() && !QDir().mkdir(proj_dir.absolutePath())){
+		const auto proj_dir_utf8 = proj_dir_path.toUtf8();
+		qWarning() << "Failed to create project directory" << proj_dir_path;
+		return false;
+	}
+
+	const auto tmpl_files = tmpl_dir.entryList(QDir::Files);
+	const auto tmpl_subdirs = tmpl_dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+
+	for(const auto &tmpl_file_name : tmpl_files){
+		if(tmpl_file_name == "ham-engine-template.json") continue;
+
+		const auto tmpl_file_path = QString("%1/%2").arg(tmpl_dir_path, tmpl_file_name);
+
+		if(!tmpl_file_name.endsWith(".in")){
+			const auto proj_file_path = QString("%1/%2").arg(proj_dir_path, tmpl_file_name);
+			if(!QFile::copy(tmpl_file_path, proj_file_path)){
+				const auto tmpl_file_utf8 = tmpl_file_path.toUtf8();
+				const auto proj_file_utf8 = proj_file_path.toUtf8();
+
+				qWarning() << "Failed to copy template file" << tmpl_file_path << "to" << proj_file_path;
+				return false;
 			}
-
-			continue;
 		}
 
 		QFile tmpl_file(tmpl_file_path);
 		if(!tmpl_file.open(QFile::ReadOnly)){
-			qWarning() << "Failed to open template file" << file_name;
+			const auto tmpl_file_utf8 = tmpl_file_path.toUtf8();
+			qWarning() << "Failed to open template file" << tmpl_file_path;
 			continue;
 		}
 
 		const auto tmpl_file_data = tmpl_file.readAll();
 
+		tmpl_file.close();
+
 		char *mustach_out = nullptr;
 		size_t mustach_out_size = 0;
 
-		const int mustach_res = mustach_mem(tmpl_file_data.constData(), qMax(tmpl_file_data.size()-1, 0), &mustach_fns, &vars, 0, &mustach_out, &mustach_out_size);
+		const int mustach_res = mustach_mem(tmpl_file_data.constData(), qMax(tmpl_file_data.size()-1, 0), &mustach_fns, (void*)&vars, 0, &mustach_out, &mustach_out_size);
 		if(mustach_res != 0){
-			qWarning() << "Error in mustach_mem(" << file_name << ")";
+			qWarning() << "Error in mustach_mem(" << tmpl_file_path << ")";
 			continue;
 		}
 
-		const auto out_file_path = QString("%1/%2").arg(proj_dir.path(), file_name.first(file_name.size()-3)); // filename.size()-3 == without .in ext
+		const auto proj_file_path = QString("%1/%2").arg(proj_dir.path(), tmpl_file_path.first(tmpl_file_path.size()-3)); // filename.size()-3 == without .in ext
 
-		QFile out_file(out_file_path);
+		QFile out_file(proj_file_path);
 		if(!out_file.open(QFile::WriteOnly)){
-			qWarning() << "Error opening file for writing" << out_file_path;
+			qWarning() << "Error opening file for writing" << proj_file_path;
 			continue;
 		}
 
 		if(out_file.write(mustach_out, mustach_out_size) != mustach_out_size){
-			qWarning() << "Error writing file" << out_file_path;
+			qWarning() << "Error writing file" << proj_file_path;
 			continue;
+		}
+
+		out_file.close();
+	}
+
+	for(const auto &tmpl_subdir : tmpl_subdirs){
+		if(tmpl_subdir.startsWith(".")) continue; // skip hidden directories
+
+		const auto inner_tmpl_dir = QString("%1/%2").arg(tmpl_dir_path, tmpl_subdir);
+		const auto inner_proj_dir = QString("%1/%2").arg(proj_dir_path, tmpl_subdir);
+
+		if(!ham_impl_write_project_template_path(inner_tmpl_dir, inner_proj_dir, vars)){
+			qWarning() << "Error copying template subdirectory" << inner_tmpl_dir;
+			return false;
 		}
 	}
 
 	return true;
+}
+
+bool editor::project_template::createInDir(
+	const QDir &proj_dir,
+	const QString &proj_name,
+	const QString &proj_display_name,
+	const QString &proj_author,
+	const QString &proj_desc
+) const
+{
+	QHash<QString, QByteArray> vars;
+
+	vars["ham_engine_version"] = QByteArrayLiteral(HAM_ENGINE_VERSION_STR);
+	vars["ham_engine_version_major"] = QByteArrayLiteral(HAM_STRINGIFY(HAM_ENGINE_VERSION_MAJOR));
+	vars["ham_engine_version_minor"] = QByteArrayLiteral(HAM_STRINGIFY(HAM_ENGINE_VERSION_MINOR));
+	vars["ham_engine_version_patch"] = QByteArrayLiteral(HAM_STRINGIFY(HAM_ENGINE_VERSION_PATCH));
+	vars["ham_project_id"] = QByteArrayLiteral("480");
+	vars["ham_project_name"] = proj_name.toUtf8();
+	vars["ham_project_display_name"] = proj_display_name.toUtf8();
+	vars["ham_project_author"] = proj_author.toUtf8();
+	vars["ham_project_description"] = proj_desc.toUtf8();
+	vars["ham_project_license"] = "UNLICENSED";
+	vars["ham_project_version"] = QByteArrayLiteral("0.0.1");
+	vars["ham_project_version_major"] = QByteArrayLiteral("0");
+	vars["ham_project_version_minor"] = QByteArrayLiteral("0");
+	vars["ham_project_version_patch"] = QByteArrayLiteral("1");
+
+	return ham_impl_write_project_template_path(m_dir, proj_dir, vars);
 }

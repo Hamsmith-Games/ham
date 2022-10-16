@@ -45,14 +45,18 @@ const vec2 uvs[] = vec2[](
     vec2(0.0, 1.0)
 );
 
+layout(location = 0) in vec3 vert;
+layout(location = 1) in vec3 norm;
+layout(location = 2) in vec2 uv;
+
 layout(location = 0) out vec3 vert_f;
 layout(location = 1) out vec3 norm_f;
 layout(location = 2) out vec2 uv_f;
 
 void main(){
-	vert_f = verts[gl_VertexID];
-	norm_f = norms[gl_VertexID];
-	uv_f   = uvs[gl_VertexID];
+	vert_f = vert;
+	norm_f = norm;
+	uv_f   = uv;
 
-	gl_Position = vec4(verts[gl_VertexID], 1.0);
+	gl_Position = vec4(vert, 1.0);
 }
