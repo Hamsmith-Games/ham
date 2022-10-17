@@ -261,6 +261,7 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/parse.h
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/shape.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/camera.h
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/gl.h # just a dispatch/helper header, not a loader
 	${HAM_SOURCE_INCLUDE_DIR}/ham/vk.h # same applies here

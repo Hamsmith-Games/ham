@@ -66,6 +66,10 @@ ham_api ham_shape *ham_shape_create_rect(ham_f32 w, ham_f32 h);
 
 ham_api ham_shape *ham_shape_create_square(ham_f32 dim);
 
+ham_api ham_shape *ham_shape_create_cuboid(ham_f32 w, ham_f32 h, ham_f32 d);
+
+ham_api ham_shape *ham_shape_create_cube(ham_f32 dim);
+
 /**
  * Destroy a shape.
  * @param shape shape to destroy
@@ -76,6 +80,7 @@ ham_api ham_shape *ham_shape_create_square(ham_f32 dim);
 ham_api void ham_shape_destroy(ham_shape *shape);
 
 ham_api ham_shape_kind ham_shape_get_kind(const ham_shape *shape);
+ham_api ham_vertex_order ham_shape_vertex_order(const ham_shape *shape);
 
 ham_api ham_usize ham_shape_num_points(const ham_shape *shape);
 ham_api ham_usize ham_shape_num_indices(const ham_shape *shape);

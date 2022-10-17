@@ -19,6 +19,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+layout(std140, binding = 0) uniform RenderData{
+	float time;
+	mat4 view_proj;
+} globals;
+
 layout(location = 0) in vec3 vert_f;
 layout(location = 1) in vec3 norm_f;
 layout(location = 2) in vec2 uv_f;

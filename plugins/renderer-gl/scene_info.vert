@@ -19,6 +19,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+out gl_PerVertex {
+	vec4 gl_Position;
+	float gl_PointSize;
+};
+
+layout(std140, binding = 0) uniform RenderData{
+	float time;
+	mat4 view_proj;
+} globals;
+
 layout(location = 0) in vec3 vert;
 layout(location = 1) in vec3 norm;
 layout(location = 2) in vec2 uv;

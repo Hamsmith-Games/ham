@@ -106,8 +106,9 @@ static inline void ham_renderer_gl_debug_callback(
 	GLenum severity,
 	GLsizei length,
 	const GLchar *message,
-	const void *userParam
+	const void *user_param
 ){
+	(void)user_param;
 
 	ham::log_level level;
 
@@ -165,11 +166,12 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	glGetIntegerv(GL_NUM_EXTENSIONS, &num_exts);
 
 	robin_hood::unordered_flat_set<std::string_view> required_exts = {
+		"GL_KHR_debug",
 		"GL_ARB_direct_state_access",
 		"GL_ARB_separate_shader_objects",
-		"GL_ARB_gl_spirv",
-		"GL_ARB_spirv_extensions",
-		"GL_KHR_debug",
+		//"GL_ARB_gl_spirv",
+		//"GL_ARB_spirv_extensions",
+		"GL_ARB_shading_language_include",
 	};
 
 	for(GLint i = 0; i < num_exts; i++){
@@ -199,9 +201,23 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	glEnable(GL_DEBUG_OUTPUT);
 #endif
 
+	GLuint global_ubo;
+	glCreateBuffers(1, &global_ubo);
+
+	GLbitfield access_flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+
+	glNamedBufferStorage(global_ubo, sizeof(ham_renderer_gl_global_ubo_data), nullptr, access_flags);
+
+	void *global_ubo_map = glMapNamedBufferRange(global_ubo, 0, sizeof(ham_renderer_gl_global_ubo_data), access_flags);
+	if(!global_ubo_map){
+		ham::logapierror("Error in glMapNamedBufferRange");
+		return nullptr;
+	}
+
 	const auto scene_info_vert = ham_renderer_gl_load_shader(r, GL_VERTEX_SHADER, HAM_LIT("shaders-gl/scene_info.vert"));
 	if(scene_info_vert == (u32)-1){
 		ham::logapierror("Error loading scene info vertex shader");
+		glDeleteBuffers(1, &global_ubo);
 		return nullptr;
 	}
 
@@ -209,6 +225,7 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	if(scene_info_frag == (u32)-1){
 		ham::logapierror("Error loading scene info fragment shader");
 		glDeleteProgram(scene_info_vert);
+		glDeleteBuffers(1, &global_ubo);
 		return nullptr;
 	}
 
@@ -217,6 +234,7 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		ham::logapierror("Error creating scene info shader pipeline");
 		glDeleteProgram(scene_info_vert);
 		glDeleteProgram(scene_info_frag);
+		glDeleteBuffers(1, &global_ubo);
 		return nullptr;
 	}
 
@@ -226,6 +244,7 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		glDeleteProgramPipelines(1, &scene_info_pipeline);
 		glDeleteProgram(scene_info_vert);
 		glDeleteProgram(scene_info_frag);
+		glDeleteBuffers(1, &global_ubo);
 		return nullptr;
 	}
 
@@ -236,6 +255,7 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		glDeleteProgram(scene_info_vert);
 		glDeleteProgram(scene_info_frag);
 		glDeleteProgram(screen_vert);
+		glDeleteBuffers(1, &global_ubo);
 		return nullptr;
 	}
 
@@ -247,6 +267,7 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		glDeleteProgram(scene_info_frag);
 		glDeleteProgram(screen_vert);
 		glDeleteProgram(screen_frag);
+		glDeleteBuffers(1, &global_ubo);
 		return nullptr;
 	}
 
@@ -267,7 +288,12 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	ret->scene_info_pipeline = scene_info_pipeline;
 
 	const auto unit_sq = ham_shape_unit_square();
-	ret->screen_group = (ham_draw_group_gl*)ham_draw_group_create(ham_super(ret), 1, &unit_sq);
+	ret->screen_group = (ham_draw_group_gl*)ham_draw_group_create(ham_super(ret), 1, &unit_sq); // TODO: check this
+
+	ret->global_ubo = global_ubo;
+	ret->global_ubo_writep = global_ubo_map;
+
+	ret->total_time = 0.0;
 
 	return ret;
 }
@@ -280,6 +306,8 @@ static inline void ham_renderer_gl_dtor(ham_renderer_gl *r){
 	glDeleteProgramPipelines(1, &r->screen_post_pipeline);
 	glDeleteProgram(r->screen_post_vert);
 	glDeleteProgram(r->screen_post_frag);
+
+	glDeleteBuffers(1, &r->global_ubo);
 
 	glDeleteFramebuffers(1, &r->fbo);
 	glDeleteTextures(HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT, r->fbo_attachments);
@@ -346,7 +374,10 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 }
 
 static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const ham_renderer_frame_data *data){
-	(void)dt; (void)data;
+	(void)data;
+
+	const f32 t = (f32)r->total_time;
+	memcpy((char*)r->global_ubo_writep + offsetof(ham_renderer_gl_global_ubo_data, time), &t, sizeof(f32));
 
 	GLint screen_fbo, screen_viewport[4];
 	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &screen_fbo);
@@ -359,6 +390,7 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 //	glBindProgramPipeline(r->scene_info_pipeline);
+//	glBindBufferBase(GL_UNIFORM_BUFFER, 0, r->global_ubo);
 
 //	ham_object_manager_iterate(
 //		ham_super(r)->draw_groups, [](ham_object *obj, void *user) -> bool{
@@ -375,6 +407,9 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 
 	// TODO: do lighting pass
 
+	//const ham_mat4 *const view_mat = ham_camera_view_matrix(data->common.cam);
+	//const ham_mat4 *const proj_mat = ham_camera_proj_matrix(data->common.cam);
+
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)screen_fbo);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, r->fbo);
 
@@ -383,6 +418,8 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 
 	glBindProgramPipeline(r->screen_post_pipeline);
 
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, r->global_ubo);
+
 	static const GLuint indices[] = { 0, 1, 2, 3 };
 
 	glBindVertexArray(r->screen_group->vao);
@@ -390,6 +427,8 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_INT, nullptr);
 
 	glViewport(screen_viewport[0], screen_viewport[1], screen_viewport[2], screen_viewport[3]);
+
+	r->total_time += dt;
 }
 
 ham_define_renderer(ham_renderer_gl, ham_draw_group_gl)
