@@ -55,7 +55,6 @@ struct ham_renderer_vulkan{
 	VkDevice vk_dev;
 
 	ham_u32 vk_graphics_family, vk_present_family;
-
 	VkQueue vk_graphics_queue, vk_present_queue;
 
 	VkSwapchainKHR vk_swapchain;

@@ -129,7 +129,7 @@ static inline ham_object *ham_impl_object_new_init(
  * @param user data passed to \p init_fn
  * @returns newly created object or ``NULL`` on error
  */
-#define ham_object_new_init(manager, init_fn, user, ...) (ham_impl_object_new_init(manager, (view_fn), (user), HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__))
+#define ham_object_new_init(manager, init_fn, user, ...) (ham_impl_object_new_init(manager, (init_fn), (user), HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__))
 
 /**
  * @brief Create a new object.

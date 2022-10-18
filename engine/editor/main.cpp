@@ -40,23 +40,23 @@ int main(int argc, char *argv[]){
 	QApplication::setOrganizationName("Hamsmith Ltd.");
 	QApplication::setOrganizationDomain("https://hamsmith.dev/");
 
-	QSurfaceFormat surfaceFmt;
-	surfaceFmt.setRenderableType(QSurfaceFormat::OpenGL);
-	surfaceFmt.setProfile(QSurfaceFormat::CoreProfile);
-	surfaceFmt.setVersion(4, 6);
-#ifdef HAM_DEBUG
-	surfaceFmt.setOption(QSurfaceFormat::FormatOption::DebugContext);
-#endif
-	surfaceFmt.setRedBufferSize(8);
-	surfaceFmt.setBlueBufferSize(8);
-	surfaceFmt.setGreenBufferSize(8);
-	surfaceFmt.setAlphaBufferSize(8);
-	surfaceFmt.setDepthBufferSize(24);
-	surfaceFmt.setStencilBufferSize(8);
-	surfaceFmt.setSwapBehavior(QSurfaceFormat::TripleBuffer);
-	surfaceFmt.setSwapInterval(1);
+//	QSurfaceFormat surfaceFmt;
+//	surfaceFmt.setRenderableType(QSurfaceFormat::OpenGL);
+//	surfaceFmt.setProfile(QSurfaceFormat::CoreProfile);
+//	surfaceFmt.setVersion(4, 6);
+//#ifdef HAM_DEBUG
+//	surfaceFmt.setOption(QSurfaceFormat::FormatOption::DebugContext);
+//#endif
+//	surfaceFmt.setRedBufferSize(8);
+//	surfaceFmt.setBlueBufferSize(8);
+//	surfaceFmt.setGreenBufferSize(8);
+//	surfaceFmt.setAlphaBufferSize(8);
+//	surfaceFmt.setDepthBufferSize(24);
+//	surfaceFmt.setStencilBufferSize(8);
+//	surfaceFmt.setSwapBehavior(QSurfaceFormat::TripleBuffer);
+//	surfaceFmt.setSwapInterval(1);
 
-	QSurfaceFormat::setDefaultFormat(surfaceFmt);
+//	QSurfaceFormat::setDefaultFormat(surfaceFmt);
 
 	QApplication app(argc, argv);
 

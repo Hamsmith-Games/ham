@@ -305,7 +305,7 @@ option(HAM_INSTALL_ENGINE  "Whether to install the world engine"        OFF)
 # Plugin options
 
 option(HAM_PLUGINS_ENABLE_GL     "Whether to enable OpenGL-related plugins" ON)
-option(HAM_PLUGINS_ENABLE_VULKAN "Whether to enable Vulkan-related plugins" OFF)
+option(HAM_PLUGINS_ENABLE_VULKAN "Whether to enable Vulkan-related plugins" ON)
 
 # Build options
 

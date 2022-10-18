@@ -24,8 +24,6 @@
 #include "ham/fs.h"
 #include "ham/functional.h"
 
-#include "vk_mem_alloc.h"
-
 using namespace ham::typedefs;
 
 HAM_C_API_BEGIN
@@ -47,6 +45,184 @@ HAM_PLUGIN(
 	ham_renderer_on_load_vulkan,
 	ham_renderer_on_unload_vulkan
 )
+
+//
+// Devices
+//
+
+ham_nonnull_args(1)
+static inline bool ham_renderer_vulkan_init_phys_device(ham_renderer_vulkan *r){
+	ham_u32 num_devices = 0;
+	VkResult dev_res = r->vk_fns.vkEnumeratePhysicalDevices(r->vk_inst, &num_devices, nullptr);
+	if(dev_res != VK_SUCCESS){
+		ham_logapierrorf("Error in vkEnumeratePhysicalDevices: %s", ham::vk::result_to_str(dev_res));
+		return false;
+	}
+	else if(num_devices == 0){
+		ham_logapierrorf("Failed to find VkPhysicalDevices: no devices");
+		return false;
+	}
+
+	ham::std_vector<VkPhysicalDevice> phys_devs(num_devices);
+
+	dev_res = r->vk_fns.vkEnumeratePhysicalDevices(r->vk_inst, &num_devices, phys_devs.data());
+	if(dev_res != VK_SUCCESS){
+		ham_logapierrorf("Error in vkEnumeratePhysicalDevices: %s", ham::vk::result_to_str(dev_res));
+		return false;
+	}
+
+	VkPhysicalDeviceProperties selected_props{}, props{};
+	VkPhysicalDeviceFeatures selected_feats{}, feats{};
+
+	VkPhysicalDevice selected = nullptr;
+	ham_u32 selected_graphics = 0;
+	ham_u32 selected_present = 0;
+
+	for(ham_usize i = 0; i < phys_devs.size(); i++){
+		const auto dev = phys_devs[i];
+
+		r->vk_fns.vkGetPhysicalDeviceProperties(dev, &props);
+		r->vk_fns.vkGetPhysicalDeviceFeatures(dev, &feats);
+
+		if(selected && selected_props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU){
+			if(props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU){
+				// TODO: not just compare framebuffer total size
+
+				const ham_usize largest_fb =
+					props.limits.maxFramebufferWidth *
+					props.limits.maxFramebufferHeight *
+					props.limits.maxFramebufferLayers;
+
+				const ham_usize best_large_fb =
+					selected_props.limits.maxFramebufferWidth *
+					selected_props.limits.maxFramebufferHeight *
+					selected_props.limits.maxFramebufferLayers;
+
+				if(largest_fb < best_large_fb) continue;
+			}
+			else if(props.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU){
+				// try to be discrete
+				continue;
+			}
+		}
+
+		ham_u32 num_queues = 0;
+		r->vk_fns.vkGetPhysicalDeviceQueueFamilyProperties(dev, &num_queues, nullptr);
+
+		if(num_queues == 0){
+			continue;
+		}
+
+		VkSurfaceCapabilitiesKHR caps;
+		r->vk_fns.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(dev, r->vk_surface, &caps);
+
+		ham::std_vector<VkQueueFamilyProperties> family_props(num_queues);
+		r->vk_fns.vkGetPhysicalDeviceQueueFamilyProperties(dev, &num_queues, family_props.data());
+
+		ham_u32 graphics_family = (ham_u32)-1;
+		ham_u32 present_family = (ham_u32)-1;
+
+		for(ham_u32 i = 0; i < num_queues; i++){
+			const auto &props = family_props[i];
+			if(props.queueFlags & VK_QUEUE_GRAPHICS_BIT){
+				graphics_family = i;
+
+				VkBool32 present_support = false;
+				r->vk_fns.vkGetPhysicalDeviceSurfaceSupportKHR(dev, i, r->vk_surface, &present_support);
+
+				if(present_support){
+					present_family = i;
+				}
+			}
+		}
+
+		if(graphics_family == (ham_u32)-1){
+			ham_logapidebugf("No graphics support found for device: %s", props.deviceName);
+			continue;
+		}
+		else if(present_family == (ham_u32)-1){
+			ham_logapidebugf("No present support found for device: %s", props.deviceName);
+			continue;
+		}
+
+		selected = dev;
+		selected_props = props;
+		selected_feats = feats;
+		selected_graphics = graphics_family;
+		selected_present = present_family;
+	}
+
+	if(!selected){
+		ham_logapierrorf("No physical device with VK_QUEUE_GRAPHICS_BIT queue and present support found");
+		return false;
+	}
+
+	r->vk_phys_dev = selected;
+	r->vk_graphics_family = selected_graphics;
+	r->vk_present_family = selected_present;
+	return true;
+}
+
+ham_nonnull_args(1)
+static inline bool ham_renderer_vulkan_init_logical_device(ham_renderer_vulkan *r){
+	const float graphics_priority = 1.f;
+
+	VkDeviceQueueCreateInfo queue_infos[2];
+
+	auto &&graphics_queue_info = queue_infos[0];
+	graphics_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+	graphics_queue_info.pNext = nullptr;
+	graphics_queue_info.flags = 0;
+	graphics_queue_info.queueFamilyIndex = r->vk_graphics_family;
+	graphics_queue_info.queueCount = 1;
+	graphics_queue_info.pQueuePriorities = &graphics_priority;
+
+	VkDeviceQueueCreateInfo present_queue_info;
+	if(r->vk_graphics_family != r->vk_present_family){
+		auto &&present_queue_info = queue_infos[1];
+		present_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		present_queue_info.pNext = nullptr;
+		present_queue_info.queueFamilyIndex = r->vk_present_family;
+		present_queue_info.queueCount = 1;
+		present_queue_info.pQueuePriorities = &graphics_priority;
+	}
+
+	VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dyn_state_features{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT,
+		.pNext = nullptr,
+		.extendedDynamicState = VK_TRUE,
+	};
+
+	VkPhysicalDeviceFeatures2 features;
+	memset(&features, 0, sizeof(features));
+
+	features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	features.pNext = &dyn_state_features;
+
+	const char *dev_exts[] = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME
+	};
+
+	VkDeviceCreateInfo dev_info;
+	dev_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	dev_info.pNext = &features;
+	dev_info.flags = 0;
+	dev_info.queueCreateInfoCount = 1 + (r->vk_graphics_family != r->vk_present_family);
+	dev_info.pQueueCreateInfos = queue_infos;
+	dev_info.enabledLayerCount = 0;
+	dev_info.ppEnabledLayerNames = nullptr;
+	dev_info.enabledExtensionCount = (ham_u32)std::size(dev_exts);
+	dev_info.ppEnabledExtensionNames = dev_exts;
+	dev_info.pEnabledFeatures = nullptr;
+
+	const auto res = r->vk_fns.vkCreateDevice(r->vk_phys_dev, &dev_info, nullptr, &r->vk_dev);
+	if(res != VK_SUCCESS){
+		ham_logapierrorf("Error in vkCreateDevice: %s", ham::vk::result_to_str(res));
+		return false;
+	}
+
+	return true;
+}
 
 //
 // Swapchain
@@ -1093,8 +1269,8 @@ static inline bool ham_renderer_vulkan_swapchain_reset(ham_renderer_vulkan *r){
 
 ham_nonnull_args(1)
 static inline ham_renderer_vulkan *ham_renderer_vulkan_ctor(ham_renderer_vulkan *mem, ham_u32 nargs, va_list va){
-	if(nargs != 3){
-		ham::logapierror("Wrong number of arguments passed: {}, expected 3 (VkInstance, VkSurfaceKHR, PFN_vkGetInstanceProcAddr)", nargs);
+	if(nargs != 1){
+		ham::logapierror("Wrong number of arguments passed: {}, expected 1 (const ham_renderer_create_args*)", nargs);
 		return nullptr;
 	}
 
@@ -1102,19 +1278,12 @@ static inline ham_renderer_vulkan *ham_renderer_vulkan_ctor(ham_renderer_vulkan 
 
 	const auto r = new(mem) ham_renderer_vulkan;
 
+	// zero all members
+	memset((char*)r + sizeof(ham_renderer), 0, sizeof(ham_renderer_vulkan) - sizeof(ham_renderer));
+
 	r->vk_inst = create_args->vulkan.instance;
 	r->vk_surface = create_args->vulkan.surface;
-	r->vk_phys_dev = create_args->vulkan.physical_device;
-	r->vk_dev = create_args->vulkan.device;
-
-	memset(&r->vk_fns, 0, sizeof(r->vk_fns));
-	memset(&r->vma_vk_fns, 0, sizeof(r->vma_vk_fns));
-
 	r->vk_fns.vkGetInstanceProcAddr = create_args->vulkan.vkGetInstanceProcAddr;
-	r->vk_fns.vkGetDeviceProcAddr   = create_args->vulkan.vkGetDeviceProcAddr;
-
-	r->vma_vk_fns.vkGetInstanceProcAddr = r->vk_fns.vkGetInstanceProcAddr;
-	r->vma_vk_fns.vkGetDeviceProcAddr   = r->vk_fns.vkGetDeviceProcAddr;
 
 #define HAM_RESOLVE_VK(fn_id) \
 	r->vk_fns.fn_id = (PFN_##fn_id)r->vk_fns.vkGetInstanceProcAddr(r->vk_inst, #fn_id); \
@@ -1139,6 +1308,21 @@ static inline ham_renderer_vulkan *ham_renderer_vulkan_ctor(ham_renderer_vulkan 
 	HAM_RESOLVE_VK(vkDestroyDevice)
 
 #undef HAM_RESOLVE_VK
+
+	if(!ham_renderer_vulkan_init_phys_device(r)){
+		ham::logapierror("Error initializing physical device");
+		std::destroy_at(r);
+		return nullptr;
+	}
+
+	if(!ham_renderer_vulkan_init_logical_device(r)){
+		ham::logapierror("Error initializing logical device");
+		std::destroy_at(r);
+		return nullptr;
+	}
+
+	r->vma_vk_fns.vkGetInstanceProcAddr = r->vk_fns.vkGetInstanceProcAddr;
+	r->vma_vk_fns.vkGetDeviceProcAddr   = r->vk_fns.vkGetDeviceProcAddr;
 
 #define HAM_RESOLVE_VK_DEV(fn_id) \
 	r->vk_fns.fn_id = (PFN_##fn_id)r->vk_fns.vkGetDeviceProcAddr(r->vk_dev, #fn_id); \
@@ -1353,7 +1537,6 @@ static inline ham_renderer_vulkan *ham_renderer_vulkan_ctor(ham_renderer_vulkan 
 		return nullptr;
 	}
 
-	/*
 	// add sync objs to cleanup
 	cleanup_fn = [old{std::move(cleanup_fn)}](ham_renderer_vulkan *r){
 		for(ham_u32 i = 0; i < ham_impl_max_queued_frames; i++){
@@ -1363,7 +1546,17 @@ static inline ham_renderer_vulkan *ham_renderer_vulkan_ctor(ham_renderer_vulkan 
 		}
 		old(r);
 	};
-	*/
+
+	const ham_shape *const shapes[] = {
+		ham_shape_unit_square()
+	};
+
+	r->screen_draw_group = (ham_draw_group_vulkan*)ham_draw_group_create(ham_super(r), 1, shapes);
+	if(!r->screen_draw_group){
+		ham::logapierror("Error creating screen draw group");
+		cleanup_fn(r);
+		return nullptr;
+	}
 
 	return r;
 }
@@ -1371,6 +1564,8 @@ static inline ham_renderer_vulkan *ham_renderer_vulkan_ctor(ham_renderer_vulkan 
 ham_nonnull_args(1)
 ham_nothrow static inline void ham_renderer_vulkan_dtor(ham_renderer_vulkan *r){
 	r->vk_fns.vkDeviceWaitIdle(r->vk_dev);
+
+	ham_draw_group_destroy(ham_super(r->screen_draw_group));
 
 	for(ham_u32 i = 0; i < ham_impl_max_queued_frames; i++){
 		r->vk_fns.vkDestroyFence(r->vk_dev, r->vk_frame_fences[i], nullptr);
@@ -1399,27 +1594,27 @@ ham_nothrow static inline void ham_renderer_vulkan_dtor(ham_renderer_vulkan *r){
 }
 
 //
-// init/fini
+// Resize
 //
 
 ham_nonnull_args(1)
-static inline bool ham_renderer_vulkan_init(ham_renderer_vulkan *r){
-	const ham_shape *const shapes[] = {
-		ham_shape_unit_square()
-	};
+static inline bool ham_renderer_vulkan_resize(ham_renderer_vulkan *r, ham_u32 w, ham_u32 h){
+	const u32 cur_w = r->vk_swapchain_extent.width;
+	const u32 cur_h = r->vk_swapchain_extent.height;
 
-	r->screen_draw_group = (ham_draw_group_vulkan*)ham_draw_group_create(ham_super(r), 1, shapes);
-	if(!r->screen_draw_group){
-		ham::logapierror("Error creating screen draw group");
+	if(w != 0 && h != 0){
+		r->vk_swapchain_extent = VkExtent2D{ w, h };
+	}
+
+	if(!ham_renderer_vulkan_swapchain_reset(r)){
+		ham::logapierror("Error recreating swapchain");
+		if(w != 0 && h != 0){
+			r->vk_swapchain_extent = VkExtent2D{ cur_w, cur_h };
+		}
 		return false;
 	}
 
 	return true;
-}
-
-ham_nonnull_args(1)
-static inline void ham_renderer_vulkan_fini(ham_renderer_vulkan *r){
-
 }
 
 //
@@ -1430,10 +1625,77 @@ ham_nonnull_args(1)
 static inline void ham_renderer_vulkan_frame(ham_renderer_vulkan *r, ham_f64 dt, const ham_renderer_frame_data *data){
 	(void)dt;
 
-	vmaSetCurrentFrameIndex(r->vma_allocator, (u32)data->current_frame);
+	vmaSetCurrentFrameIndex(r->vma_allocator, (u32)data->common.current_frame);
 
-	if(!ham_renderer_vulkan_fill_command_buffers(r, data->vulkan.command_buffer, swap_idx)){
+	const auto frame_idx = data->common.current_frame % ham_impl_max_queued_frames;
+
+	VkResult res = r->vk_fns.vkWaitForFences(r->vk_dev, 1, &r->vk_frame_fences[frame_idx], VK_TRUE, HAM_U64_MAX);
+	if(res != VK_SUCCESS){
+		ham::logapierror("Failed to get current frame fence");
+		return;
+	}
+
+	u32 swap_idx;
+	res = r->vk_fns.vkAcquireNextImageKHR(r->vk_dev, r->vk_swapchain, HAM_U64_MAX, r->vk_img_sems[frame_idx], VK_NULL_HANDLE, &swap_idx);
+	if(res == VK_ERROR_OUT_OF_DATE_KHR){
+		ham_renderer_vulkan_swapchain_reset(r);
+		return;
+	}
+	else if(res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR){
+		ham::logapierror("Error in vkAcquireNextImageKHR: {}", ham_vk_result_str(res));
+		return;
+	}
+
+	res = r->vk_fns.vkResetFences(r->vk_dev, 1, &r->vk_frame_fences[frame_idx]);
+	if(res != VK_SUCCESS){
+		ham::logapierror("Error in vkResetFences: {}", ham_vk_result_str(res));
+		return;
+	}
+
+	res = r->vk_fns.vkResetCommandBuffer(r->vk_cmd_bufs[frame_idx], 0);
+	if(res != VK_SUCCESS){
+		ham::logapierror("Error in vkResetCommandBuffer: {}", ham_vk_result_str(res));
+		return;
+	}
+
+	if(!ham_renderer_vulkan_fill_command_buffers(r, frame_idx, swap_idx)){
 		ham::logapierror("Failed to fill command buffers");
+	}
+
+	constexpr VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+	VkSubmitInfo submit_info{
+		VK_STRUCTURE_TYPE_SUBMIT_INFO, nullptr,
+		1, &r->vk_img_sems[frame_idx],
+		wait_stages,
+		1, &r->vk_cmd_bufs[frame_idx],
+		1, &r->vk_render_sems[frame_idx],
+	};
+
+	res = r->vk_fns.vkQueueSubmit(r->vk_graphics_queue, 1, &submit_info, r->vk_frame_fences[frame_idx]);
+	if(res != VK_SUCCESS){
+		ham::logapierror("Error in vkQueueSubmit: {}", ham_vk_result_str(res));
+		return;
+	}
+
+	VkPresentInfoKHR present_info{
+		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.pNext = nullptr,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &r->vk_render_sems[frame_idx],
+		.swapchainCount = 1,
+		.pSwapchains = &r->vk_swapchain,
+		.pImageIndices = &swap_idx,
+		.pResults = nullptr,
+	};
+
+	res = r->vk_fns.vkQueuePresentKHR(r->vk_present_queue, &present_info);
+	if(res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || r->swapchain_dirty){
+		ham_renderer_vulkan_swapchain_reset(r);
+	}
+	else if(res != VK_SUCCESS){
+		ham::logapierror("Error in vkQueuePresentKHR: {}", ham_vk_result_str(res));
+		return;
 	}
 }
 

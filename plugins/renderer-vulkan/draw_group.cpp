@@ -21,19 +21,17 @@
 HAM_C_API_BEGIN
 
 ham_draw_group_vulkan *ham_draw_group_vulkan_ctor(ham_draw_group_vulkan *mem, ham_u32 nargs, va_list va){
-	(void)nargs; (void)va;
-	return new(mem) ham_draw_group_vulkan;
-}
+	if(nargs != 2){
+		ham::logapierror("Wrong number of args {}, expected 2 (ham_usize num_shapes, const ham_shape *const *shapes)");
+		return nullptr;
+	}
 
-void ham_draw_group_vulkan_dtor(ham_draw_group_vulkan *group){
-	std::destroy_at(group);
-}
+	const ham_usize num_shapes = va_arg(va, ham_usize);
+	const ham_shape *const *const shapes = va_arg(va, const ham_shape* const*);
 
-bool ham_draw_group_vulkan_init(
-	ham_draw_group_vulkan *group,
-	ham_renderer_vulkan *r,
-	ham_usize num_shapes, const ham_shape *const *shapes
-){
+	const auto r = (ham_renderer_vulkan*)ham_super(mem)->r;
+	const auto group = new(mem) ham_draw_group_vulkan;
+
 	ham_usize total_num_points = 0, total_num_indices = 0;
 
 	for(ham_usize i = 0; i < num_shapes; i++){
@@ -65,8 +63,9 @@ bool ham_draw_group_vulkan_init(
 
 	ham::vk::result res = vmaCreateBuffer(r->vma_allocator, &buffer_create_info, &alloc_create_info, &group->vbo, &group->vbo_alloc, nullptr);
 	if(res != VK_SUCCESS){
-		ham_logapierrorf("Error in vmaCreateBuffer: %s", res.to_str());
-		return false;
+		ham::logapierror("Error in vmaCreateBuffer: %s", res.to_str());
+		std::destroy_at(group);
+		return nullptr;
 	}
 
 	buffer_create_info.size  = total_ibo_size;
@@ -74,9 +73,10 @@ bool ham_draw_group_vulkan_init(
 
 	res = vmaCreateBuffer(r->vma_allocator, &buffer_create_info, &alloc_create_info, &group->ibo, &group->ibo_alloc, nullptr);
 	if(res != VK_SUCCESS){
-		ham_logapierrorf("Error in vmaCreateBuffer: %s", res.to_str());
+		ham::logapierror("Error in vmaCreateBuffer: %s", res.to_str());
 		vmaDestroyBuffer(r->vma_allocator, group->vbo, group->vbo_alloc);
-		return false;
+		std::destroy_at(group);
+		return nullptr;
 	}
 
 	buffer_create_info.size  = num_shapes * sizeof(VkDrawIndexedIndirectCommand);
@@ -84,10 +84,11 @@ bool ham_draw_group_vulkan_init(
 
 	res = vmaCreateBuffer(r->vma_allocator, &buffer_create_info, &alloc_create_info, &group->cbo, &group->cbo_alloc, nullptr);
 	if(res != VK_SUCCESS){
-		ham_logapierrorf("Error in vmaCreateBuffer: %s", res.to_str());
+		ham::logapierror("Error in vmaCreateBuffer: %s", res.to_str());
 		vmaDestroyBuffer(r->vma_allocator, group->ibo, group->vbo_alloc);
 		vmaDestroyBuffer(r->vma_allocator, group->vbo, group->vbo_alloc);
-		return false;
+		std::destroy_at(group);
+		return nullptr;
 	}
 
 	void *vbo_mem, *ibo_mem, *cbo_mem;
@@ -145,13 +146,19 @@ bool ham_draw_group_vulkan_init(
 	vmaUnmapMemory(r->vma_allocator, group->ibo_alloc);
 	vmaUnmapMemory(r->vma_allocator, group->cbo_alloc);
 
-	return true;
+	return group;
 }
 
-void ham_draw_group_vulkan_fini(ham_draw_group_vulkan *group){
-	vmaDestroyBuffer(((ham_renderer_vulkan*)ham_super(group)->r)->vma_allocator, group->cbo, group->cbo_alloc);
-	vmaDestroyBuffer(((ham_renderer_vulkan*)ham_super(group)->r)->vma_allocator, group->ibo, group->ibo_alloc);
-	vmaDestroyBuffer(((ham_renderer_vulkan*)ham_super(group)->r)->vma_allocator, group->vbo, group->vbo_alloc);
+void ham_draw_group_vulkan_dtor(ham_draw_group_vulkan *group){
+	const auto r = (ham_renderer_vulkan*)ham_super(group)->r;
+
+	vmaDestroyBuffer(r->vma_allocator, group->cbo, group->cbo_alloc);
+	vmaDestroyBuffer(r->vma_allocator, group->ibo, group->ibo_alloc);
+	vmaDestroyBuffer(r->vma_allocator, group->vbo, group->vbo_alloc);
+
+	std::destroy_at(group);
 }
+
+ham_define_draw_group(ham_draw_group_vulkan)
 
 HAM_C_API_END

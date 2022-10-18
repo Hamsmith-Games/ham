@@ -83,6 +83,7 @@ namespace ham::engine::editor{
 
 		private:
 			QVulkanInstance *m_inst;
+			QWindow *m_win;
 	};
 }
 

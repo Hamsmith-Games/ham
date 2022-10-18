@@ -21,6 +21,7 @@
 #include <QWindow>
 #include <QVulkanInstance>
 #include <QVulkanFunctions>
+#include <QPaintEvent>
 
 #include <QBoxLayout>
 
@@ -33,23 +34,28 @@ static thread_local QVulkanInstance *ham_impl_vulkan_inst = nullptr;
 editor::renderer_widget_vulkan::renderer_widget_vulkan(QWidget *parent)
 	: renderer_widget(parent)
 	, m_inst(new QVulkanInstance)
+	, m_win(new QWindow(this->windowHandle()))
 {
+	m_inst->setApiVersion(QVersionNumber(1, 1));
+
 	#ifdef HAM_DEBUG
 	m_inst->setLayers(QByteArrayList() << "VK_LAYER_KHRONOS_validation");
+	m_inst->setExtensions(QByteArrayList() << VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 	#endif
 
 	if(!m_inst->create()){
 		qFatal("Failed to create QVulkanInstance: %s", ham_vk_result_str(m_inst->errorCode()));
 	}
 
-	const auto win = new QWindow();
-	const auto container = QWidget::createWindowContainer(win);
+	m_win->setSurfaceType(QSurface::VulkanSurface);
+	m_win->setVulkanInstance(m_inst);
+	//m_win->show();
 
-	win->setSurfaceType(QSurface::VulkanSurface);
-	win->show();
-	win->setVulkanInstance(m_inst);
+	const auto container = QWidget::createWindowContainer(m_win);
 
-	const auto surface = m_inst->surfaceForWindow(win);
+	container->show();
+
+	const auto surface = m_inst->surfaceForWindow(m_win);
 
 	container->setContentsMargins(0, 0, 0, 0);
 
@@ -84,13 +90,15 @@ editor::renderer_widget_vulkan::renderer_widget_vulkan(QWidget *parent)
 		resize_renderer(width(), height());
 	};
 
-	connect(win, &QWindow::widthChanged, this, resize_handler);
-	connect(win, &QWindow::heightChanged, this, resize_handler);
+	connect(m_win, &QWindow::widthChanged, this, resize_handler);
+	connect(m_win, &QWindow::heightChanged, this, resize_handler);
 }
 
 editor::renderer_widget_vulkan::~renderer_widget_vulkan(){}
 
 void editor::renderer_widget_vulkan::paintEvent(QPaintEvent *ev){
-	renderer_widget::paintEvent(ev);
+	//renderer_widget::paintEvent(ev);
 	paint_renderer();
+	m_inst->presentQueued(m_win);
+	ev->accept();
 }

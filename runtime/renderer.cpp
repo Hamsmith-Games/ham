@@ -232,37 +232,65 @@ ham_draw_group *ham_draw_group_create(
 		return nullptr;
 	}
 
-	const auto obj = ham_object_new(r->draw_groups, num_shapes, shapes);
-	if(!obj){
-		ham::logapierror("Failed to construct new draw group");
-		return nullptr;
-	}
-
 	const auto allocator = r->allocator;
-	const auto ptr = (ham_draw_group*)obj;
 
-	ptr->r = r;
-	ptr->num_shapes = num_shapes;
-
-	ptr->num_shape_points = (ham_usize*)ham_allocator_alloc(allocator, alignof(ham_usize), sizeof(ham_usize) * num_shapes);
-	if(!ptr->num_shape_points){
-		ham::logapierror("Failed to allocate memory for draw group data");
-		ham_object_delete(r->draw_groups, obj);
+	const auto num_shape_points_arr = (ham_usize*)ham_allocator_alloc(allocator, alignof(ham_usize), sizeof(ham_usize) * num_shapes);
+	if(!num_shape_points_arr){
+		ham::logapierror("Failed to allocate memory for draw group point count data");
 		return nullptr;
 	}
 
-	ptr->num_shape_indices = (ham_usize*)ham_allocator_alloc(allocator, alignof(ham_usize), sizeof(ham_usize) * num_shapes);
-	if(!ptr->num_shape_indices){
-		ham::logapierror("Failed to allocate memory for draw group data");
-		ham_allocator_free(allocator, ptr->num_shape_points);
-		ham_object_delete(r->draw_groups, obj);
+	const auto num_shape_indices_arr = (ham_usize*)ham_allocator_alloc(allocator, alignof(ham_usize), sizeof(ham_usize) * num_shapes);
+	if(!num_shape_indices_arr){
+		ham::logapierror("Failed to allocate memory for draw group index count data");
+		ham_allocator_free(allocator, num_shape_points_arr);
 		return nullptr;
 	}
 
 	for(ham_usize i = 0; i < num_shapes; i++){
-		ptr->num_shape_points[i] = ham_shape_num_points(shapes[i]);
-		ptr->num_shape_indices[i] = ham_shape_num_indices(shapes[i]);
+		num_shape_points_arr[i]  = ham_shape_num_points(shapes[i]);
+		num_shape_indices_arr[i] = ham_shape_num_indices(shapes[i]);
 	}
+
+	struct draw_group_data{
+		ham_renderer *r;
+		ham_usize num_shapes;
+		const ham_shape *const *shapes;
+		ham_usize *num_shape_points_arr;
+		ham_usize *num_shape_indices_arr;
+	};
+
+	draw_group_data data{r, num_shapes, shapes, num_shape_points_arr, num_shape_indices_arr};
+
+	const auto obj = ham_object_new_init(
+		r->draw_groups,
+		[](ham_object *obj, void *user){
+			const auto group = (ham_draw_group*)obj;
+			const auto data  = (draw_group_data*)user;
+
+			group->r = data->r;
+			group->num_shapes = data->num_shapes;
+			group->num_shape_points = data->num_shape_points_arr;
+			group->num_shape_indices = data->num_shape_indices_arr;
+
+			return true;
+		},
+		&data,
+		num_shapes, shapes
+	);
+	if(!obj){
+		ham::logapierror("Failed to construct new draw group");
+		ham_allocator_free(allocator, num_shape_indices_arr);
+		ham_allocator_free(allocator, num_shape_points_arr);
+		return nullptr;
+	}
+
+	const auto ptr = (ham_draw_group*)obj;
+
+	ptr->r = r;
+	ptr->num_shapes = num_shapes;
+	ptr->num_shape_points = num_shape_points_arr;
+	ptr->num_shape_indices = num_shape_indices_arr;
 
 	return ptr;
 }

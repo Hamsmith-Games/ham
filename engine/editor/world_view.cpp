@@ -31,7 +31,7 @@ editor::world_view::world_view(QWidget *parent)
 {
 	setContentsMargins(0, 0, 0, 0);
 
-	m_r_widget = new editor::renderer_widget_gl(this);
+	m_r_widget = new editor::renderer_widget_vulkan(this);
 
 	const auto lay = new QHBoxLayout(this);
 
