@@ -45,7 +45,7 @@ endif()
 ham_add_executable(
 	ham-engine-client
 	client.h
-	#vulkan.cpp
+	vulkan.cpp
 	window.cpp
 	net.cpp
 	video.cpp

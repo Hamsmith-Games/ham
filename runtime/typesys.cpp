@@ -17,6 +17,7 @@
  */
 
 #include "ham/typesys.h"
+#include "ham/math.h"
 #include "ham/log.h"
 #include "ham/memory.h"
 #include "ham/colony.h"

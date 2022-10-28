@@ -26,7 +26,6 @@
  */
 
 #include "dso.h"
-#include "typesys.h"
 
 #include <stdarg.h>
 
@@ -232,6 +231,15 @@ struct ham_object{
 		return ham_super_n(vtable_depth_, &ret); \
 	}
 //! @endcond
+
+#define ham_declare_object(obj, base) \
+	typedef struct obj obj; \
+	typedef struct obj##_vtable obj##_vtable; \
+	typedef struct base##_vtable obj##_vtable_base; \
+	typedef struct base obj##_base; \
+	ham_nothrow static inline base *obj##_super(obj *ptr){ return (base*)ptr; } \
+	ham_nothrow static inline const base##_vtable *obj##_vtable_super(const obj##_vtable *vptr){ return (const base##_vtable*)vptr; } \
+	ham_nothrow static inline const obj##_vtable *obj##_vptr(obj *ptr){ return (const obj##_vtable*)((ham_object*)ptr)->vptr; }
 
 #define ham_define_object_x(obj_depth, obj, vtable_depth, vtable, ctor, dtor, vtable_body) \
 	ham_impl_define_object(obj_depth, obj, vtable_depth, vtable, ctor, dtor, vtable_body)
@@ -456,6 +464,115 @@ namespace ham{
 				using vtable_ptr       = const vtable_type*;
 
 				static bool register_(){ return false; }
+		};
+	}
+
+	template<typename T, typename ... Args>
+	concept Callable = requires(const T &t){ t(std::declval<Args>()...); };
+
+	template<typename Object, meta::cexpr_str Name, typename Sig, auto Ptr>
+	class object_method;
+
+	template<typename Object, meta::cexpr_str Name, typename Ret, typename ... Args, auto Ptr>
+		requires Callable<decltype(Ptr), Object*, Args...> || Callable<decltype(Ptr), const Object*, Args...>
+	class object_method<Object, Name, Ret(Args...), Ptr>{
+		public:
+			using result_type = Ret;
+			using param_types = type_tag<Args...>;
+			using pointer = decltype(Ptr);
+
+			constexpr static bool is_const = Callable<decltype(Ptr), const Object*, Args...>;
+
+			constexpr static str8 name() noexcept{ return Name; }
+
+			constexpr static pointer ptr() noexcept{ return Ptr; }
+
+			template<
+				bool IsConst = is_const,
+				std::enable_if_t<!IsConst, int> = 0,
+				typename ... UArgs
+			>
+			constexpr static decltype(auto) call(Object *self, UArgs &&... args) noexcept(noexcept(Ptr(std::forward<UArgs>(args)...))){
+				if constexpr(std::is_void_v<Ret>){
+					Ptr(self, std::forward<UArgs>(args)...);
+				}
+				else{
+					return Ptr(self, std::forward<UArgs>(args)...);
+				}
+			}
+
+			template<
+				bool IsConst = is_const,
+				std::enable_if_t<IsConst, int> = 0,
+				typename ... UArgs
+			>
+			constexpr static decltype(auto) call(const Object *self, UArgs &&... args) noexcept(noexcept(Ptr(std::forward<UArgs>(args)...))){
+				if constexpr(std::is_void_v<Ret>){
+					Ptr(self, std::forward<UArgs>(args)...);
+				}
+				else{
+					return Ptr(self, std::forward<UArgs>(args)...);
+				}
+			}
+	};
+
+	namespace detail{
+		template<typename Object, typename ... Methods>
+		struct object_builder{
+			static constexpr std::array<str8, sizeof...(Methods)> method_names() noexcept{
+				return { Methods::name()... };
+			}
+
+			static constexpr std::tuple<typename Methods::pointer...> method_ptrs() noexcept{
+				return std::make_tuple(Methods::ptr()...);
+			}
+
+			static const ::ham_object_info *object_info() noexcept{
+				static const ::ham_object_info ret{
+					.type_id = meta::type_name_v<Object>,
+					.alignment = alignof(Object),
+					.size = sizeof(Object),
+				};
+				return &ret;
+			}
+
+			static ham_object *object_ctor(ham_object *obj, ham_u32 nargs, va_list va){
+				return new(obj) Object();
+			}
+
+			static void object_dtor(ham_object *obj){
+				const auto actual_ptr = reinterpret_cast<Object*>(obj);
+				actual_ptr->~Object();
+			}
+
+			struct vtable{
+				vtable(){
+					::ham_object_vtable *super = ham_super(this);
+					super->info = object_info();
+					super->ctor = object_ctor;
+					super->dtor = object_dtor;
+					methods = method_ptrs();
+				}
+
+				ham_derive(::ham_object_vtable);
+				std::tuple<typename Methods::pointer...> methods;
+			};
+
+			static const ::ham_object_vtable *object_vptr() noexcept{
+				static const vtable ret;
+				return ham_super(&ret);
+			}
+		};
+
+		template<meta::cexpr_str QueryName, typename ... Methods>
+		struct object_method_query;
+
+		template<meta::cexpr_str QueryName, typename Head, typename ... Tail>
+		struct object_method_query<QueryName, Head, Tail...>: object_method_query<QueryName, Tail...>{};
+
+		template<meta::cexpr_str QueryName, typename Object, typename Ret, typename ... Args, auto Ptr, typename ... Methods>
+		struct object_method_query<QueryName, object_method<Object, QueryName, Ret(Args...), Ptr>, Methods...>{
+			using type = object_method<Object, QueryName, Ret(Args...), Ptr>;
 		};
 	}
 

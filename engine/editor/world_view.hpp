@@ -19,18 +19,34 @@
 #ifndef HAM_ENGINE_EDITOR_WORLD_VIEW_HPP
 #define HAM_ENGINE_EDITOR_WORLD_VIEW_HPP 1
 
-#include "ham/time.h"
-#include "ham/renderer.h"
-
 #include <QWidget>
+#include <QMenu>
 
 #include "renderer_widget.hpp"
 
 namespace ham::engine::editor{
+	class world_view;
+
+	class world_context_menu: public QMenu{
+		Q_OBJECT
+
+		Q_PROPERTY(ham::engine::editor::world_view* world_view READ world_view CONSTANT)
+
+		public:
+			explicit world_context_menu(class world_view *world_view_, QWidget *parent = nullptr);
+			~world_context_menu();
+
+			class world_view *world_view() noexcept{ return m_view; }
+			const class world_view *world_view() const noexcept{ return m_view; }
+
+		private:
+			class world_view *m_view;
+	};
+
 	class world_view: public QWidget{
 		Q_OBJECT
 
-		Q_PROPERTY(renderer_widget* renderer READ renderer CONSTANT)
+		Q_PROPERTY(ham::engine::editor::renderer_widget* renderer READ renderer CONSTANT)
 
 		public:
 			explicit world_view(QWidget *parent = nullptr);
@@ -38,8 +54,29 @@ namespace ham::engine::editor{
 
 			renderer_widget *renderer() const noexcept{ return m_r_widget; }
 
+			void show_context_menu(const QPoint &pos);
+
+			bool eventFilter(QObject *watched, QEvent *ev) override;
+
+		protected:
+			void mouseMoveEvent(QMouseEvent *ev) override;
+			void mousePressEvent(QMouseEvent *ev) override;
+			void mouseReleaseEvent(QMouseEvent *ev) override;
+
+			void keyPressEvent(QKeyEvent *ev) override;
+			void keyReleaseEvent(QKeyEvent *ev) override;
+
+			void resizeEvent(QResizeEvent *ev) override;
+
 		private:
 			renderer_widget *m_r_widget;
+			draw_group m_gizmo_group;
+
+			ham::camera m_cam;
+			Qt::MouseButton m_cam_btn = Qt::MiddleButton;
+			bool m_cam_held = false;
+			QPointF m_cam_last_pos;
+			ham::vec3 m_cam_dir;
 	};
 }
 

@@ -34,6 +34,10 @@ namespace ham::engine::editor{
 			class project *project() const noexcept{ return m_proj; }
 			class world_view *world_view() noexcept{ return m_world_view; }
 
+		protected:
+			void changeEvent(QEvent *event) override;
+			void resizeEvent(QResizeEvent *ev) override;
+
 		private:
 			class project *m_proj;
 			class world_view *m_world_view;

@@ -25,7 +25,7 @@
  * @{
  */
 
-#include "typedefs.h"
+#include "math.h"
 
 HAM_C_API_BEGIN
 
@@ -69,6 +69,8 @@ ham_api ham_shape *ham_shape_create_square(ham_f32 dim);
 ham_api ham_shape *ham_shape_create_cuboid(ham_f32 w, ham_f32 h, ham_f32 d);
 
 ham_api ham_shape *ham_shape_create_cube(ham_f32 dim);
+
+ham_api ham_shape *ham_shape_create_heightfield();
 
 /**
  * Destroy a shape.

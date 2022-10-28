@@ -25,118 +25,88 @@
  * @{
  */
 
-#include "typedefs.h"
+#include "math.h"
 
 namespace ham::meta{
-	template<typename Char, usize N>
+	template<usize N>
 	struct cexpr_str{
 		public:
-			consteval cexpr_str(const Char (&lit)[N+1]) noexcept
+			consteval cexpr_str(const char (&lit)[N+1]) noexcept
 				: cexpr_str(lit, make_index_seq<N>()){}
 
 			consteval cexpr_str(const cexpr_str &other) noexcept
 				: cexpr_str(other.m_chars, make_index_seq<N>()){}
 
 			constexpr static usize size() noexcept{ return N; }
-			constexpr const Char *data() const noexcept{ return m_chars; }
+			constexpr const char *data() const noexcept{ return m_chars; }
 
-			constexpr operator basic_str<Char>() const noexcept{ return basic_str(m_chars, N); }
+			constexpr operator str8() const noexcept{ return basic_str(m_chars, N); }
 
-			constexpr bool operator==(const cexpr_str<Char, N> &other) const noexcept{
+			constexpr bool operator==(const str8 &other) const noexcept{
+				if(other.size() != N) return false;
+
 				for(usize i = 0; i < size(); i++){
-					if(m_chars[i] != other.m_chars[i]) return false;
+					if(m_chars[i] != other[i]) return false;
 				}
 
 				return true;
 			}
 
-			template<usize M>
-			constexpr bool operator==(const cexpr_str<Char, M>&) const noexcept{ return false; }
+			constexpr bool operator!=(const str8 &other) const noexcept{
+				if(other.size() != N) return true;
 
-			constexpr bool operator!=(const cexpr_str<Char, N> &other) const noexcept{
 				for(usize i = 0; i < size(); i++){
-					if(m_chars[i] == other.m_chars[i]) return false;
+					if(m_chars[i] != other[i]) return true;
 				}
 
-				return true;
+				return false;
 			}
 
 			template<usize M>
-			constexpr bool operator!=(const cexpr_str<Char, M>&) const noexcept{ return true; }
-
-			template<usize M>
-			constexpr auto operator+(const cexpr_str<Char, M> &other) const noexcept{
+			constexpr auto operator+(const cexpr_str<M> &other) const noexcept{
 				return concat_impl(other, make_index_seq<N>(), make_index_seq<M>());
 			}
 
+			char m_chars[N+1];
+
 		private:
 			template<usize ... Is>
-			consteval cexpr_str(const Char *lit, index_seq<Is...>)
+			consteval cexpr_str(const char *lit, index_seq<Is...>)
 				: m_chars{ lit[Is]..., '\0' }{}
 
-			template<typename ... Chars>
-			consteval cexpr_str(Chars ... chars) noexcept
-				: m_chars{ chars..., '\0' }
-			{
-				static_assert(sizeof...(Chars) == N);
-			}
+//			template<typename ... Chars>
+//			consteval cexpr_str(Chars ... chars) noexcept
+//				: m_chars{ chars..., '\0' }
+//			{
+//				static_assert(sizeof...(Chars) == N);
+//			}
 
 			template<usize M, usize ... Is, usize ... Js>
-			constexpr auto concat_impl(const cexpr_str<Char, M> &other, index_seq<Is...>, index_seq<Js...>){
-				return cexpr_str<Char, N+M>(m_chars[Is]..., other.m_chars[Js]...);
+			constexpr auto concat_impl(const cexpr_str<M> &other, index_seq<Is...>, index_seq<Js...>){
+				return cexpr_str<N+M>(m_chars[Is]..., other.m_chars[Js]...);
 			}
-
-			Char m_chars[N+1];
 	};
 
-	template<typename Char, usize N>
-	cexpr_str(const Char(&)[N]) -> cexpr_str<Char, N>;
+	template<usize N>
+	cexpr_str(const char(&)[N]) -> cexpr_str<N-1>;
 
 	template<cexpr_str Str>
-	using constant_cexpr_str = meta::constant_value<decltype(Str), Str>;
+	struct constant_str{
+		constexpr static auto value = Str;
+	};
+
+	template<cexpr_str Str>
+	constexpr inline auto constant_str_v = constant_str<Str>::value;
 }
 
 namespace ham{
 	namespace str_literals{
 		template<meta::cexpr_str Str>
-		constexpr inline auto operator""_cexpr(){ return Str; }
+		constexpr inline auto operator "" _c() noexcept{ return Str; }
 	}
 }
 
 namespace ham::meta{
-	//! @cond ignore
-	namespace detail{
-		constexpr inline str8 type_name_void() noexcept{ return "void"; }
-		constexpr inline str8 type_name_bool() noexcept{ return "bool"; }
-
-		constexpr inline str8 type_name_char8()  noexcept{ return "char8"; }
-		constexpr inline str8 type_name_char16() noexcept{ return "char16"; }
-		constexpr inline str8 type_name_char32() noexcept{ return "char32"; }
-
-		constexpr inline str8 type_name_i8()   noexcept{ return "i8"; }
-		constexpr inline str8 type_name_u8()   noexcept{ return "u8"; }
-		constexpr inline str8 type_name_i16()  noexcept{ return "i16"; }
-		constexpr inline str8 type_name_u16()  noexcept{ return "u16"; }
-		constexpr inline str8 type_name_i32()  noexcept{ return "i32"; }
-		constexpr inline str8 type_name_u32()  noexcept{ return "u32"; }
-		constexpr inline str8 type_name_i64()  noexcept{ return "i64"; }
-		constexpr inline str8 type_name_u64()  noexcept{ return "u64"; }
-		constexpr inline str8 type_name_i128() noexcept{ return "i128"; }
-		constexpr inline str8 type_name_u128() noexcept{ return "u128"; }
-
-		constexpr inline str8 type_name_f16()  noexcept{ return "f16"; }
-		constexpr inline str8 type_name_f32()  noexcept{ return "f32"; }
-		constexpr inline str8 type_name_f64()  noexcept{ return "f64"; }
-		constexpr inline str8 type_name_f128() noexcept{ return "f128"; }
-
-		constexpr inline str8 type_name_str8()  noexcept{ return "str8"; }
-		constexpr inline str8 type_name_str16() noexcept{ return "str16"; }
-		constexpr inline str8 type_name_str32() noexcept{ return "str32"; }
-
-		constexpr inline str8 type_name_uuid() noexcept{ return "uuid"; }
-	}
-	//! @endcond
-
 	template<typename T>
 	struct type_name{
 		template<typename U = T>
@@ -180,50 +150,44 @@ namespace ham::meta{
 		constexpr static str8 value = get_name();
 	};
 
-	//! @cond ignore
-#define HAM_IMPL_TYPE_NAME(typename_) constexpr static str8 value = HAM_CONCAT(detail::type_name_, typename_)()
-	//! @endcond
-
 	template<typename T>
 	constexpr inline auto type_name_v = type_name<T>::value;
 
-	template<> struct type_name<void>{ HAM_IMPL_TYPE_NAME(void); };
-	template<> struct type_name<bool>{ HAM_IMPL_TYPE_NAME(bool); };
+	template<> struct type_name<ham_vec2>: constant_str<"vec2">{};
+	template<> struct type_name<ham_vec3>: constant_str<"vec3">{};
+	template<> struct type_name<ham_vec4>: constant_str<"vec4">{};
 
-	template<> struct type_name<char8> { HAM_IMPL_TYPE_NAME(char8); };
-	template<> struct type_name<char16>{ HAM_IMPL_TYPE_NAME(char16); };
-	template<> struct type_name<char32>{ HAM_IMPL_TYPE_NAME(char32); };
+	template<> struct type_name<void>: constant_str<"void">{};
+	template<> struct type_name<bool>: constant_str<"bool">{};
 
-	template<> struct type_name<i8> { HAM_IMPL_TYPE_NAME(i8); };
-	template<> struct type_name<u8> { HAM_IMPL_TYPE_NAME(u8); };
-	template<> struct type_name<i16>{ HAM_IMPL_TYPE_NAME(i16); };
-	template<> struct type_name<u16>{ HAM_IMPL_TYPE_NAME(u16); };
-	template<> struct type_name<i32>{ HAM_IMPL_TYPE_NAME(i32); };
-	template<> struct type_name<u32>{ HAM_IMPL_TYPE_NAME(u32); };
-	template<> struct type_name<i64>{ HAM_IMPL_TYPE_NAME(i64); };
-	template<> struct type_name<u64>{ HAM_IMPL_TYPE_NAME(u64); };
+	template<> struct type_name<char8>:  constant_str<"char8">{};
+	template<> struct type_name<char16>: constant_str<"char16">{};
+	template<> struct type_name<char32>: constant_str<"char32">{};
+
+	template<> struct type_name<i8>:  constant_str<"i8">{};
+	template<> struct type_name<u8>:  constant_str<"u8">{};
+	template<> struct type_name<i16>: constant_str<"i16">{};
+	template<> struct type_name<u16>: constant_str<"u16">{};
+	template<> struct type_name<i32>: constant_str<"i32">{};
+	template<> struct type_name<u32>: constant_str<"u32">{};
+	template<> struct type_name<i64>: constant_str<"i64">{};
+	template<> struct type_name<u64>: constant_str<"u64">{};
 
 #ifdef HAM_INT128
-	template<> struct type_name<i128>{ HAM_IMPL_TYPE_NAME(i128); };
-	template<> struct type_name<u128>{ HAM_IMPL_TYPE_NAME(u128); };
+	template<> struct type_name<i128>: constant_str<"i128">{};
+	template<> struct type_name<u128>: constant_str<"u128">{};
 #endif
 
 #ifdef HAM_FLOAT16
-	template<> struct type_name<f16>{ HAM_IMPL_TYPE_NAME(f16); };
+	template<> struct type_name<f16>: constant_str<"f16">{};
 #endif
 
-	template<> struct type_name<f32>{ HAM_IMPL_TYPE_NAME(f32); };
-	template<> struct type_name<f64>{ HAM_IMPL_TYPE_NAME(f64); };
+	template<> struct type_name<f32>: constant_str<"f32">{};
+	template<> struct type_name<f64>: constant_str<"f64">{};
 
 #ifdef HAM_FLOAT128
-	template<> struct type_name<f128>{ HAM_IMPL_TYPE_NAME(f128); };
+	template<> struct type_name<f128>: constant_str<"f128">{};
 #endif
-
-	template<> struct type_name<ham_str8> { HAM_IMPL_TYPE_NAME(str8); };
-	template<> struct type_name<ham_str16>{ HAM_IMPL_TYPE_NAME(str16); };
-	template<> struct type_name<ham_str32>{ HAM_IMPL_TYPE_NAME(str32); };
-
-	template<> struct type_name<ham_uuid>{ HAM_IMPL_TYPE_NAME(uuid); };
 }
 
 /**

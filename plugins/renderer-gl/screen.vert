@@ -24,27 +24,6 @@ out gl_PerVertex {
 	float gl_PointSize;
 };
 
-const vec3 verts[] = vec3[](
-    vec3(-1.0, -1.0, 0.0),
-    vec3( 1.0, -1.0, 0.0),
-    vec3( 1.0,  1.0, 0.0),
-    vec3(-1.0,  1.0, 0.0)
-);
-
-const vec3 norms[] = vec3[](
-    vec3(0.0, 0.0, 1.0),
-    vec3(0.0, 0.0, 1.0),
-    vec3(0.0, 0.0, 1.0),
-    vec3(0.0, 0.0, 1.0)
-);
-
-const vec2 uvs[] = vec2[](
-    vec2(0.0, 0.0),
-    vec2(1.0, 0.0),
-    vec2(1.0, 1.0),
-    vec2(0.0, 1.0)
-);
-
 layout(location = 0) in vec3 vert;
 layout(location = 1) in vec3 norm;
 layout(location = 2) in vec2 uv;
@@ -54,9 +33,9 @@ layout(location = 1) out vec3 norm_f;
 layout(location = 2) out vec2 uv_f;
 
 void main(){
-	vert_f = vert;
+	vert_f = vert * 2.0;
 	norm_f = norm;
 	uv_f   = uv;
 
-	gl_Position = vec4(vert, 1.0);
+	gl_Position = vec4(vert * 2.0, 1.0);
 }

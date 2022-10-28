@@ -85,6 +85,7 @@ editor::renderer_widget_gl::renderer_widget_gl(QWidget *parent)
 	: renderer_widget(parent)
 {
 	const auto glwidget = new detail::renderer_opengl_widget(this);
+	glwidget->setAttribute(Qt::WA_TransparentForMouseEvents);
 
 	const auto lay = new QBoxLayout(QBoxLayout::LeftToRight, this);
 

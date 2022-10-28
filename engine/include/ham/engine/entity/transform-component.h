@@ -16,36 +16,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef HAM_ENGINE_WORLD_H
-#define HAM_ENGINE_WORLD_H 1
-
 /**
- * @defgroup HAM_ENGINE_WORLD World management
- * @ingroup HAM_ENGINE
+ * @defgroup HAM_ENGINE_ENTITY_TRANSFORM_COMPONENT Transform component
+ * @ingroup HAM_ENGINE_ENTITY_COMPONENTS
  * @{
  */
 
-#include "ham/engine/config.h"
+#ifndef HAM_ENGINE_ENTITY_TRANSFORM_COMPONENT_H
+#define HAM_ENGINE_ENTITY_TRANSFORM_COMPONENT_H 1
 
-#include "ham/net.h" // IWYU pragma: keep
+#include "../entity.h"
 
-#include "entity.h"
+ham_declare_object(ham_entity_component_transform, ham_entity_component)
 
-HAM_C_API_BEGIN
+struct ham_entity_component_transform{
+	ham_derive(ham_entity_component)
 
-typedef struct ham_world ham_world;
-
-//! A single world partition, part of a larger world tree
-typedef struct ham_world_partition ham_world_partition;
-
-ham_engine_api ham_world *ham_world_create(ham_str8 name);
-
-ham_engine_api void ham_world_destroy(ham_world *world);
-
-HAM_C_API_END
+	ham_mat4 trans;
+};
 
 /**
  * @}
  */
 
-#endif // !HAM_ENGINE_WORLD_H
+#endif // !HAM_ENGINE_ENTITY_TRANSFORM_COMPONENT_H

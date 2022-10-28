@@ -46,7 +46,7 @@ typedef struct ham_screen{
  */
 
 /**
- * Base engine object.
+ * @brief Base engine object.
  */
 typedef struct ham_engine ham_engine;
 
@@ -59,24 +59,6 @@ ham_engine_api extern ham_engine *ham_impl_gengine;
 ham_nothrow static inline ham_engine *ham_gengine(){
 	return ham_impl_gengine;
 }
-
-/**
- * @brief Create a new engine.
- * @warning It is not advised to create multiple engines in the same process.
- * @param plugin_id id of the engine plugin
- * @param obj_id id of the engine object within \p plugin_id
- * @param argc ``argc`` passed from ``main``
- * @param argv ``argv`` passed from ``main``
- * @returns newly created engine or ``NULL`` on error
- * @see ham_engine_subsystem_create
- * @see ham_engine_exec
- * @see ham_engine_destroy
- */
-ham_engine_api ham_engine *ham_engine_create(
-	const char *plugin_id,
-	const char *obj_id,
-	int argc, char **argv
-);
 
 typedef bool(*ham_engine_app_init_fn)(ham_engine *engine, void *user);
 typedef void(*ham_engine_app_fini_fn)(ham_engine *engine, void *user);
@@ -98,10 +80,10 @@ ham_engine_api ham_nothrow bool ham_engine_app_load_json(ham_engine_app *ret, co
 /**
  * @brief Create a new engine.
  * @warning You can not create multiple engine instances in the same _process_.
- * @param[in] app engine application information
+ * @param app engine application information
  * @returns newly created engine or ``NULL`` on error
  */
-ham_engine_api ham_engine *ham_engine_create2(const ham_engine_app *app);
+ham_engine_api ham_engine *ham_engine_create(const ham_engine_app *app);
 
 /**
  * @brief Destroy an engine.
@@ -221,8 +203,6 @@ ham_engine_api ham_nothrow bool ham_engine_subsys_launch(ham_engine_subsys *subs
 HAM_C_API_END
 
 #ifdef __cplusplus
-
-#include "ham/str_buffer.h"
 
 namespace ham::engine{
 	template<typename App, typename ... Subsystems>

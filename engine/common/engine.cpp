@@ -1,205 +1,38 @@
-/*
- * Ham World Engine Runtime
- * Copyright (C) 2022 Hamsmith Ltd.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 #include "ham/engine.h"
-#include "ham/engine-object.h"
-#include "ham/memory.h"
-#include "ham/plugin.h"
+
 #include "ham/check.h"
 #include "ham/fs.h"
-#include "ham/json.h"
+#include "ham/async.h"
+#include "ham/plugin.h"
 
-#include <unistd.h>
-#include <getopt.h>
-#include <dirent.h>
+#include "ham/std_vector.hpp"
+
+using namespace ham::typedefs;
 
 HAM_C_API_BEGIN
 
-static ham_engine *ham_impl_gengine = nullptr;
+struct ham_engine{
+	const ham_allocator *allocator;
+	ham_engine_app app;
 
-ham_extern_c ham_public ham_export ham_nothrow ham_u32 ham_net_steam_appid(){
+	std::atomic<usize> num_subsystems;
+	ham_engine_subsys *subsystems[HAM_ENGINE_MAX_SUBSYSTEMS];
+
+	std::atomic_bool running;
+	std::atomic<int> status;
+	std::atomic<f64> min_dt;
+};
+
+ham::mutex ham_impl_gengine_mut;
+ham_engine *ham_impl_gengine = nullptr;
+
+ham_public ham_export ham_nothrow ham_u32 ham_net_steam_appid(){
 	if(!ham_impl_gengine){
-		ham_logapiwarnf("Steam networking initialized before engine");
+		ham::logapiwarn("Steam networking initialized before engine");
 		return 480;
 	}
 
-	return ham_impl_gengine->app_info.appid;
-}
-
-struct ham_impl_engine_data{
-	ham::str8 vtable_id;
-	ham_dso_handle dso_handle = nullptr;
-	ham_plugin *plugin = nullptr;
-	const ham_engine_vtable *vtable = nullptr;
-	ham_app_info app_info;
-};
-
-static inline ham_uptr ham_impl_engine_thread_main(void *user){
-	const auto engine = reinterpret_cast<ham_engine*>(user);
-	const auto vtable = ham_super(engine)->vptr;
-
-	const char *engine_name = vtable->info()->type_id;
-
-	ham_loginfof(
-		"ham-engine",
-		"Creating engine for app: %s v%u.%u.%u",
-		engine->app_info.display_name,
-		engine->app_info.version.major,
-		engine->app_info.version.minor,
-		engine->app_info.version.patch
-	);
-
-	ham_logdebugf("ham-engine", "Waiting for engine mutex...");
-
-	if(!ham_mutex_lock(engine->mut)){
-		ham_logerrorf("ham-engine", "Error locking engine mutex");
-		engine->status = 1;
-		return 1;
-	}
-
-	if(!ham_plugin_init(engine->plugin)){
-		ham_logerrorf("ham-engine", "Error initializing plugin '%s'", engine_name);
-		engine->status = 1;
-		ham_mutex_unlock(engine->mut);
-		return 1;
-	}
-
-	ham_logdebugf("ham-engine", "Initialized plugin");
-
-	const auto engine_vt = (const ham_engine_vtable*)vtable;
-
-	if(!vtable->ctor(ham_super(engine), 0, nullptr)){
-		ham_logerrorf("ham-engine", "Error constructing engine object '%s' (%p)", engine_name, engine);
-
-		ham_plugin_fini(engine->plugin);
-		ham_logdebugf("ham-engine", "Finished plugin (%p)", engine->plugin);
-
-		engine->status = 1;
-		ham_mutex_unlock(engine->mut);
-		return 1;
-	}
-
-	ham_logdebugf("ham-engine", "Constructed engine object '%s' (%p)", engine_name, engine);
-
-	if(!engine_vt->init(engine)){
-		ham_logerrorf("ham-engine", "Error initializing engine object '%s' (%p)", engine_name, engine);
-
-		vtable->dtor(ham_super(engine));
-		ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
-
-		ham_plugin_fini(engine->plugin);
-		ham_logdebugf("ham-engine", "Finished plugin (%p)", engine->plugin);
-
-		engine->status = 1;
-		ham_mutex_unlock(engine->mut);
-		return 1;
-	}
-
-	ham_logdebugf("ham-engine", "Initialized engine object '%s' (%p)", engine_name, engine);
-
-	ham_logdebugf("ham-engine", "Posting engine semaphore...");
-
-	if(!ham_sem_post(engine->sem)){
-		ham_logerrorf("ham-engine", "Error posting engine semaphore");
-		engine->status = 1;
-
-		engine_vt->fini(engine);
-		ham_logdebugf("ham-engine", "Finished engine object '%s' (%p)", engine_name, engine);
-
-		vtable->dtor(ham_super(engine));
-		ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
-
-		ham_plugin_fini(engine->plugin);
-		ham_logdebugf("ham-engine", "Finished plugin (%p)", engine->plugin);
-
-		return 1;
-	}
-
-	ham_logdebugf("ham-engine", "Waiting for engine launch condition...");
-
-	// prevent spurious wakeups
-	while(!engine->running){
-		if(!ham_cond_wait(engine->cond, engine->mut)){
-			ham_logerrorf("ham-engine", "Error in ham_cond_wait");
-
-			engine_vt->fini(engine);
-			ham_logdebugf("ham-engine", "Finished engine object '%s' (%p)", engine_name, engine);
-
-			vtable->dtor(ham_super(engine));
-			ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
-
-			ham_plugin_fini(engine->plugin);
-			ham_logdebugf("ham-engine", "Finished plugin (%p)", engine->plugin);
-
-			engine->status = 1;
-			return 1;
-		}
-	}
-
-	ham_mutex_unlock(engine->mut);
-	ham_logdebugf("ham-engine", "Unlocked engine mutex");
-
-	ham_logdebugf("ham-engine", "Running main loop");
-
-	ham_ticker ticker;
-	ham_ticker_reset(&ticker);
-
-	ham_u32 total_frame_count = 0, frame_count = 0;
-	ham_f64 frame_dt_accum = 0.0;
-
-	const auto loop_fn = engine_vt->loop;
-
-	while(engine->running){
-		const auto req_min_dt = engine->min_dt;
-
-		ham_f64 dt = ham_ticker_tick(&ticker, req_min_dt);
-		while(dt < req_min_dt){
-			dt += ham_ticker_tick(&ticker, req_min_dt - dt);
-		}
-
-		loop_fn(engine, dt);
-
-		++frame_count;
-		frame_dt_accum += dt;
-
-		if(frame_dt_accum >= 1.0){
-			const auto fps = (ham_f64)frame_count / frame_dt_accum;
-
-			ham_logdebugf("ham-engine", "FPS: %f", fps);
-
-			total_frame_count += frame_count;
-			frame_count = 0;
-			frame_dt_accum = 0.0;
-		}
-	}
-
-	ham_sem_wait(engine->sem);
-
-	engine_vt->fini(engine);
-	ham_logdebugf("ham-engine", "Finished engine object '%s' (%p)", engine_name, engine);
-
-	vtable->dtor(ham_super(engine));
-	ham_logdebugf("ham-engine", "Destroyed engine object '%s' (%p)", engine_name, engine);
-
-	ham_plugin_fini(engine->plugin);
-	ham_logdebugf("ham-engine", "Finished plugin (%p)", engine->plugin);
-
-	return 0;
+	return ham_impl_gengine->app.id;
 }
 
 ham_nothrow ham_version ham_engine_version(){ return HAM_ENGINE_VERSION; }
@@ -208,500 +41,416 @@ ham_nothrow ham_version ham_engine_version(){ return HAM_ENGINE_VERSION; }
 
 ham_nothrow const char *ham_engine_version_line(){ return HAM_ENGINE_VERSION_LINE; }
 
-[[noreturn]]
-static inline void ham_impl_show_version(){
-	printf(HAM_ENGINE_VERSION_LINE);
-	exit(EXIT_SUCCESS);
-}
-
-[[noreturn]]
-static void ham_impl_show_help(const char *argv0){
-	const char *exec_name = argv0;
-
-	const auto argv0_str = ham::str8(argv0);
-	const auto new_beg = argv0_str.rfind("/");
-	if(new_beg != ham::str8::npos){
-		exec_name += new_beg;
-	}
-
-	printf(
-		HAM_ENGINE_VERSION_LINE
-		"\n"
-		"    Usage: %s [OPTIONS...] [-- [SERVER-ARGS...]]\n"
-		"\n"
-		"    Possible options:\n"
-		"        -h|--help:             Print this help message and exit\n"
-		"        -v|--version:          Print the version string and exit\n"
-		"        -V|--verbose:          Print more log messages\n"
-		"        -a|--app-dir DIR:      Set the game directory\n"
-		"\n"
-		,
-		exec_name
-	);
-	exit(EXIT_SUCCESS);
-}
-
-static struct option ham_impl_long_options[] = {
-	{ "help",		no_argument,		0, 0 },
-	{ "version",	no_argument,		0, 0 },
-	{ "verbose",	no_argument,		0, 0 },
-	{ "app-dir",	required_argument,	0, 0 },
-	{ 0,            0,                  0, 0 },
-};
-
-// TODO: not get app info from a JSON file
-static inline bool ham_app_info_init(ham::str8 json_path, ham_app_info *ret){
-	const auto json_doc = ham::json_document::open(json_path);
-	if(!json_doc){
-		ham_logapierrorf("Failed to open app JSON: %.*s", (int)json_path.len(), json_path.ptr());
+ham_nothrow bool ham_engine_app_load_json(ham_engine_app *ret, const ham_json_value *json_root){
+	if(
+		!ham_check(ret != NULL) ||
+		!ham_check(json_root != NULL) ||
+		!ham_check(ham_json_is_object(json_root))
+	){
 		return false;
 	}
 
-	const auto json_root = json_doc.root();
+	ham::json_value_view json(json_root);
 
-	const auto appinfo = json_root.object_get("app-info");
-	if(!appinfo){
-		ham_logapierrorf("Failed to get \"app-info\" object from app JSON");
-		return false;
-	}
+	ham::json_value_view<false>
+		app_info, app_id, app_name, app_display, app_author, app_version, app_license, app_desc;
 
-	const auto appinfo_get = [appinfo](ham::json_value_view<false> *ret, const char *elem) -> bool{
-		*ret = appinfo.object_get(elem);
+	const auto load_json_value = [](ham::json_value_view<false> *ret, const ham::json_value_view<false> &root, const char *key){
+		*ret = root[key];
 		if(!*ret){
-			ham_logapierrorf("Failed to get \"app-info.%s\" from app JSON", elem);
+			ham::logerror("ham_engine_app_load_json", "Invalid application JSON: failed to get value for key '{}'", key);
+			return false;
+		}
+		return true;
+	};
+
+	if(!load_json_value(&app_info, json, "app-info")){
+		return false;
+	}
+	else if(!app_info.is_object()){
+		ham::logapierror("Invalid application JSON: 'app-info' is not an object");
+		return false;
+	}
+
+	if(
+		!load_json_value(&app_id,      app_info, "id") ||
+		!load_json_value(&app_name,    app_info, "name") ||
+		!load_json_value(&app_display, app_info, "display-name") ||
+		!load_json_value(&app_author,  app_info, "author") ||
+		!load_json_value(&app_version, app_info, "version") ||
+		!load_json_value(&app_license, app_info, "license") ||
+		!load_json_value(&app_desc,    app_info, "description")
+	){
+		return false;
+	}
+
+	if(!app_id.is_nat()){
+		ham::logapierror("Invalid application JSON: 'app-info.id' is not a natural number");
+		return false;
+	}
+
+	if(!app_name.is_str()){
+		ham::logapierror("Invalid application JSON: 'app-info.name' is not a string");
+		return false;
+	}
+
+	if(!app_display.is_str()){
+		ham::logapierror("Invalid application JSON: 'app-info.display-name' is not a string");
+		return false;
+	}
+
+	if(!app_author.is_str()){
+		ham::logapierror("Invalid application JSON: 'app-info.author' is not a string");
+	}
+
+	if(!app_version.is_array() || app_version.array_len() != 3){
+		ham::logapierror("Invalid application JSON: 'app-info.version' is not a 3 element array");
+		return false;
+	}
+
+	const usize iterate_res = app_version.array_iterate([](usize idx, const ham::json_value_view<false> &val) -> bool{
+		if(!val.is_nat()){
+			ham::logerror("ham_engine_app_load_json", "Invalid application JSON: 'app-info.version[{}]' is not a natural number", idx);
 			return false;
 		}
 
 		return true;
-	};
+	});
 
-	ham::json_value_view<false>
-		appinfo_id,
-		appinfo_name,
-		appinfo_display_name,
-		appinfo_author,
-		appinfo_version,
-		appinfo_license,
-		appinfo_desc
-	;
-	if(
-		!appinfo_get(&appinfo_id,           "id") ||
-		!appinfo_get(&appinfo_name,         "name") ||
-		!appinfo_get(&appinfo_display_name, "display-name") ||
-		!appinfo_get(&appinfo_author,       "author") ||
-		!appinfo_get(&appinfo_version,       "version") ||
-		!appinfo_get(&appinfo_license,      "license") ||
-		!appinfo_get(&appinfo_desc,         "desc")
-	){
+	if(iterate_res != 3){
 		return false;
 	}
 
-	// Value checking
-
-	if(!appinfo_id.is_nat()){
-		ham_logapierrorf("Invalid type for \"app-info.id\": expected uint");
+	if(!app_license.is_str()){
+		ham::logapierror("Invalid application JSON: 'app-info.license' is not a string");
 		return false;
 	}
 
-	const auto version_len = appinfo_version.array_len();
-	if(version_len != 3){
-		ham_logapierrorf("Invalid version array: bad length (expected 3)");
+	if(!app_desc.is_str()){
+		ham::logapierror("Invalid application JSON: 'app-info.description' is not a string");
 		return false;
 	}
 
-	const auto appinfo_ver_major = appinfo_version.array_get(0);
-	const auto appinfo_ver_minor = appinfo_version.array_get(1);
-	const auto appinfo_ver_patch = appinfo_version.array_get(2);
+	ret->id = app_id.get_nat();
+	ret->name = app_name.get_str();
+	ret->display_name = app_display.get_str();
+	ret->author = app_author.get_str();
+	ret->license = app_license.get_str();
+	ret->description = app_desc.get_str();
 
-	if(
-	   !appinfo_ver_major.is_nat() ||
-	   !appinfo_ver_minor.is_nat() ||
-	   !appinfo_ver_patch.is_nat()
-	){
-		ham_logapierrorf("Invalid version array: bad element type (expected uint)");
-		return false;
-	}
-
-	// TODO: check if strings overflow or mayber use str_buffer_utf8
-
-	// Write good values
-
-	ret->appid = appinfo_id.get_nat();
-
-	ret->version.major = appinfo_ver_major.get_nat();
-	ret->version.minor = appinfo_ver_minor.get_nat();
-	ret->version.patch = appinfo_ver_patch.get_nat();
-
-	const auto name = appinfo_name.get_str();
-	memcpy(ret->name, name.ptr(), name.len());
-	ret->name[name.len()] = '\0';
-
-	const auto display_name = appinfo_display_name.get_str();
-	memcpy(ret->display_name, display_name.ptr(), display_name.len());
-	ret->display_name[display_name.len()] = '\0';
-
-	const auto author = appinfo_author.get_str();
-	memcpy(ret->author, author.ptr(), author.len());
-	ret->author[author.len()] = '\0';
+	ret->version.major = app_version[0].get_nat();
+	ret->version.minor = app_version[1].get_nat();
+	ret->version.patch = app_version[2].get_nat();
 
 	return true;
 }
 
-ham_engine *ham_engine_create(const char *vtable_id, const char *obj_id, int argc, char **argv){
-	ham_path_buffer path_buf;
+ham_engine *ham_engine_create(const ham_engine_app *app){
+	ham::scoped_lock lock(ham_impl_gengine_mut);
 
-	const char *app_dir = getcwd(path_buf, HAM_PATH_BUFFER_SIZE);
-
-	while(1){
-		int option_index = 0;
-		const int getopt_res = getopt_long(argc, argv, "hvVa:", ham_impl_long_options, &option_index);
-
-		if(getopt_res == -1){
-			break;
-		}
-
-		switch(getopt_res){
-			case 0:{
-				switch(option_index){
-					case 0: ham_impl_show_help(argv[0]);
-					case 1: ham_impl_show_version();
-
-					case 2:{
-						ham_log_set_verbose(true);
-						break;
-					}
-
-					case 3:{
-						app_dir = optarg;
-						break;
-					}
-
-					default:{
-						fprintf(stderr, "Error in getopt_long: unexpected long option at index %d\n", option_index);
-						exit(1);
-					}
-				}
-
-				break;
-			}
-
-			case 'h': ham_impl_show_help(argv[0]);
-			case 'v': ham_impl_show_version();
-
-			case 'V':{
-				ham_log_set_verbose(true);
-				break;
-			}
-
-			case 'a':{
-				app_dir = optarg;
-				break;
-			}
-
-			case '?':{
-				fprintf(stderr, "Unexpected argument: %s\n", optarg);
-				exit(1);
-			}
-
-			default:{
-				fprintf(stderr, "Error in getopt_long: returned character 0x%o\n", getopt_res);
-				exit(1);
-			}
-		}
-	}
-
-	if(optind < argc){
-		fprintf(stderr, "Unexpected arguments:");
-		while(optind < argc){
-			fprintf(stderr, " %s", argv[optind++]);
-		}
-		fprintf(stderr, "\n");
-	}
-
-	const ham::str8 app_path_str = { app_dir, strlen(app_dir) };
-
-	if(!ham_path_exists_utf8(app_path_str)){
-		fprintf(stderr, "App directory does not exist: %s\n", app_dir);
-		exit(1);
-	}
-
-	constexpr ham::str8 plugin_subdir = "/plugins/";
-	constexpr ham::str8 plugin_min_name = "libx" HAM_PLATFORM_DSO_EXT;
-
-	ham_logapiinfof("App directory: %s", app_dir);
-
-	constexpr ham::str8 app_json_name = "ham.json";
-	const ham_usize app_json_path_len = (app_path_str.len() + app_json_name.len() + 1);
-
-	if(app_json_path_len >= HAM_PATH_BUFFER_SIZE){
-		ham_logapierrorf("App JSON path too long (%zu, max %d): %s/%s", app_json_path_len, HAM_PATH_BUFFER_SIZE, app_dir, app_json_name.ptr());
+	if(
+		!ham_check(app != NULL) ||
+		!ham_check(app->init != NULL) ||
+		!ham_check(app->fini != NULL) ||
+		!ham_check(app->loop != NULL) ||
+		!ham_check(ham_gengine() == NULL)
+	){
 		return nullptr;
 	}
 
-	ham_path_buffer_utf8 app_json_path;
-	memcpy(app_json_path, app_path_str.ptr(), app_path_str.len());
-	app_json_path[app_path_str.len()] = '/';
-	memcpy(app_json_path + app_path_str.len() + 1, app_json_name.ptr(), app_json_name.len());
-	app_json_path[app_json_path_len] = '\0';
+	const ham::str8 app_dir = app->dir;
 
-	if(!ham_path_exists_utf8(ham::str8(app_json_path, app_json_path_len))){
-		ham_logapierrorf("App JSON does not exist: %s", app_json_path);
+	if(!ham::path_exists(app_dir)){
+		ham::logapierror("App directory does not exist: {}", app_dir);
 		return nullptr;
 	}
-
-	ham_impl_engine_data data{};
-
-	if(!ham_app_info_init({ app_json_path, app_json_path_len }, &data.app_info)){
-		ham_logapierrorf("Failed to initialize app info from JSON");
-		return nullptr;
-	}
-
-	data.vtable_id = ham::str8(vtable_id);
-
-	if((app_path_str.len() + plugin_subdir.len() + plugin_min_name.len()) >= HAM_PATH_BUFFER_SIZE){
-		ham_logapierrorf("App directory too long: %zu, max %zu", app_path_str.len(), HAM_PATH_BUFFER_SIZE - (plugin_subdir.len() + plugin_min_name.len() + 1));
-		return nullptr;
-	}
-	else{
-		ham_path_buffer_utf8 app_plugin_path;
-		memcpy(app_plugin_path, app_path_str.ptr(), app_path_str.len());
-		memcpy(app_plugin_path + app_path_str.len(), plugin_subdir.ptr(), plugin_subdir.len());
-		app_plugin_path[app_path_str.len() + plugin_subdir.len()] = '\0';
-
-		if(ham_path_exists_utf8(ham::str8((const char*)app_plugin_path))){
-			if(ham_plugin_find(vtable_id, ham::str8((const char*)app_plugin_path), &data.plugin, &data.dso_handle)){
-				data.vtable = (const ham_engine_vtable*)ham_plugin_object(data.plugin, ham::str8(obj_id));
-				if(!data.vtable){
-					ham_plugin_unload(data.plugin);
-					ham_dso_close(data.dso_handle);
-					data.plugin = nullptr;
-					data.dso_handle = nullptr;
-				}
-			}
-		}
-	}
-
-	if(!data.vtable){
-		const auto self_dso = ham_dso_open_c(nullptr, 0);
-		if(!self_dso){
-			ham_logapierrorf("Failed to open main executable as shared object");
-			return nullptr;
-		}
-
-		const auto self_plugin = ham_plugin_load(self_dso, vtable_id);
-		if(!self_plugin){
-			ham_logapierrorf("Failed to load main executable as requested plugin: %s", vtable_id);
-			ham_dso_close(self_dso);
-			return nullptr;
-		}
-
-		const auto obj_vtable = (const ham_engine_vtable*)ham_plugin_object(self_plugin, ham::str8(obj_id));
-		if(!obj_vtable){
-			ham_logapierrorf("Failed to find engine object by id: %s", obj_id);
-			ham_plugin_unload(self_plugin);
-			ham_dso_close(self_dso);
-			return nullptr;
-		}
-
-		data.dso_handle = self_dso;
-		data.plugin = self_plugin;
-		data.vtable = obj_vtable;
-	}
-
-	const auto plugin_display_name = ham_plugin_display_name(data.plugin);
-	const auto plugin_version      = ham_plugin_version(data.plugin);
-
-	ham_logapiinfof("Engine plugin: %s v%d.%d.%d", plugin_display_name.ptr, plugin_version.major, plugin_version.minor, plugin_version.patch);
-
-	const auto engine_info = ham_super(data.vtable)->info();
-	//const auto engine_name = engine_info->type_id;
 
 	const auto allocator = ham_current_allocator();
 
-	const auto obj = (ham_object*)ham_allocator_alloc(allocator, engine_info->alignment, engine_info->size);
-	if(!obj){
-		ham_logapierrorf("Failed to allocate memory for engine");
-		ham_plugin_unload(data.plugin);
-		ham_dso_close(data.dso_handle);
+	const auto engine = ham_allocator_new(allocator, ham_engine);
+	if(!engine) return nullptr;
+
+	engine->allocator = allocator;
+	engine->app = *app;
+
+	engine->num_subsystems.store(0, std::memory_order_relaxed);
+	memset(engine->subsystems, 0, sizeof(engine->subsystems));
+
+	engine->running.store(false, std::memory_order_relaxed);
+
+	engine->min_dt.store(1.0/60.0, std::memory_order_relaxed);
+
+	if(!app->init(engine, app->user)){
+		ham::logapierror("Failed to initialize app '{}'", app->name);
+		ham_allocator_delete(allocator, engine);
 		return nullptr;
 	}
 
-	memset(obj, 0, engine_info->size);
-
-	obj->vtable = ham_super(data.vtable);
-
-	const auto engine = (ham_engine*)obj;
-
-	engine->allocator  = allocator;
-	engine->plugin     = data.plugin;
-	engine->dso_handle = data.dso_handle;
-	engine->status     = 0;
-	engine->min_dt     = 1.0/60.0;
-	engine->mut        = ham_mutex_create(HAM_MUTEX_NORMAL);
-	engine->sem        = ham_sem_create(0);
-	engine->cond       = ham_cond_create();
-	engine->subsys_mut = ham_mutex_create(HAM_MUTEX_NORMAL);
-
-	if(!engine->mut || !engine->sem || !engine->cond || !engine->subsys_mut){
-		if(!engine->mut){
-			ham_logapierrorf("Error creating engine mutex");
-		}
-		else{
-			ham_mutex_destroy(engine->mut);
-		}
-
-		if(!engine->sem){
-			ham_logapierrorf("Error creating engine semaphore");
-		}
-		else{
-			ham_sem_destroy(engine->sem);
-		}
-
-		if(!engine->cond){
-			ham_logapierrorf("Error creating engine condition variable");
-		}
-		else{
-			ham_cond_destroy(engine->cond);
-		}
-
-		if(!engine->subsys_mut){
-			ham_logapierrorf("Error creating engine subsystem mutex");
-		}
-		else{
-			ham_mutex_destroy(engine->subsys_mut);
-		}
-
-		ham_allocator_free(allocator, obj);
-
-		ham_plugin_unload(data.plugin);
-		ham_dso_close(data.dso_handle);
-		return nullptr;
-	}
-
-	memcpy(&engine->app_info, &data.app_info, sizeof(ham_app_info));
-
-	memcpy(engine->game_dir, app_path_str.ptr(), app_path_str.len());
-	engine->game_dir[app_path_str.len()] = '\0';
-
-	engine->thd = ham_thread_create(ham_impl_engine_thread_main, engine);
-	if(!engine->thd){
-		ham_logapierrorf("Error creating engine thread");
-
-		ham_mutex_destroy(engine->mut);
-		ham_sem_destroy(engine->sem);
-		ham_cond_destroy(engine->cond);
-		ham_mutex_destroy(engine->subsys_mut);
-
-		ham_allocator_free(allocator, obj);
-
-		ham_plugin_unload(data.plugin);
-		ham_dso_close(data.dso_handle);
-		return nullptr;
-	}
-
-	ham_sem_wait(engine->sem);
+	ham_impl_gengine = engine;
 
 	return engine;
 }
 
 ham_nothrow void ham_engine_destroy(ham_engine *engine){
-	if(ham_unlikely(engine == NULL)) return;
+	if(ham_unlikely(!engine)) return;
+
+	ham::scoped_lock lock(ham_impl_gengine_mut);
+
+	int exit_status = 0;
+
+	if(engine->running.exchange(false)){
+		ham::logapiwarn("Running engine destroyed");
+		engine->status.compare_exchange_strong(exit_status, 3);
+	}
+
+	if(exit_status != 0){
+		ham::logapiwarn("Engine exited with error code {}", exit_status);
+	}
+
+	const auto allocator = engine->allocator;
+
+	const auto app = &engine->app;
+
+	app->fini(engine, app->user);
 
 	for(int i = 0; i < engine->num_subsystems; i++){
 		const auto subsys = engine->subsystems[i];
 		ham_impl_engine_subsys_destroy(subsys);
 	}
 
-	ham_thread_destroy(engine->thd);
-	ham_mutex_destroy(engine->mut);
-	ham_sem_destroy(engine->sem);
-	ham_cond_destroy(engine->cond);
-	ham_mutex_destroy(engine->subsys_mut);
+	ham_allocator_delete(allocator, engine);
 
-	ham_plugin_unload(engine->plugin);
-	ham_dso_close(engine->dso_handle);
+	ham_impl_gengine = nullptr;
+}
 
-	ham_allocator_free(engine->allocator, engine);
+ham_nothrow const ham_engine_app *ham_engine_get_app(const ham_engine *engine){
+	if(!ham_check(engine != NULL)) return nullptr;
+
+	return &engine->app;
+}
+
+ham_nothrow ham_usize ham_engine_num_subsystems(const ham_engine *engine){
+	if(!ham_check(engine != NULL)) return (ham_usize)-1;
+
+	return engine->num_subsystems;
+}
+
+ham_nothrow ham_engine_subsys *ham_engine_get_subsystem(ham_engine *engine, ham_usize idx){
+	if(!ham_check(engine != NULL) || !ham_check(idx < engine->num_subsystems)){
+		return nullptr;
+	}
+
+	return engine->subsystems[idx];
 }
 
 ham_nothrow bool ham_engine_request_exit(ham_engine *engine){
 	if(!ham_check(engine != NULL)) return false;
-	engine->running = false;
 
+	engine->running.store(false, std::memory_order_relaxed);
 	return true;
 }
 
 int ham_engine_exec(ham_engine *engine){
-	if(!engine) return -1;
+	engine->running.store(true, std::memory_order::relaxed);
+	engine->status.store(0, std::memory_order_relaxed);
 
-	ham_impl_gengine = engine;
-
-	if(engine->status != 0){
-		ham_engine_destroy(engine);
-		return engine->status;
-	}
-
-	if(!ham_mutex_lock(engine->mut)){
-		ham_logapierrorf("Error locking engine mutex");
-		ham_engine_destroy(engine);
-		return 1;
-	}
-	else if(!ham_cond_broadcast(engine->cond)){
-		ham_logapierrorf("Error signaling engine thread");
-		ham_mutex_unlock(engine->mut);
-		ham_engine_destroy(engine);
-		return 1;
-	}
-	else{
-		ham::scoped_lock lock(engine->subsys_mut);
-		for(int i = 0; i < engine->num_subsystems; i++){
-			const auto subsys = engine->subsystems[i];
-			if(!ham_engine_subsys_launch(subsys)){
-				ham_logapierrorf("Failed to launch subsystem %d", i);
-				ham_mutex_unlock(engine->mut);
-				ham_engine_destroy(engine);
-				return 2;
-			}
+	for(ham_usize i = 0; i < engine->num_subsystems; i++){
+		const auto subsys = engine->subsystems[i];
+		if(!ham_engine_subsys_running(subsys) && !ham_engine_subsys_launch(subsys)){
+			ham::logapierror("Error launching subsystem '{}'", ham_engine_subsys_name(subsys));
+			engine->running.store(false, std::memory_order::relaxed);
+			engine->status.store(2, std::memory_order_relaxed);
+			break;
 		}
 	}
 
-	engine->running = true;
-	ham_mutex_unlock(engine->mut);
+	const auto app = &engine->app;
 
 	ham_ticker ticker;
 	ham_ticker_reset(&ticker);
 
-	while(engine->running){
-		const ham_f64 dt = ham_ticker_tick(&ticker, engine->min_dt);
-		(void)dt;
+	f64 dt = 0.0;
 
-		// TODO
+	while(engine->running.load(std::memory_order::relaxed)){
+		const f64 min_dt = engine->min_dt.load(std::memory_order_relaxed);
+
+		dt = 0.0;
+		do{
+			dt += ham_ticker_tick(&ticker, min_dt - dt);
+		} while(dt < min_dt);
+
+		app->loop(engine, dt, app->user);
 	}
 
-	for(int i = 0; i < engine->num_subsystems; i++){
-		const auto subsys = engine->subsystems[i];
-		ham_impl_engine_subsys_request_exit(subsys);
+	return engine->status.load();
+}
+
+//
+// Subsystems
+//
+
+struct ham_engine_subsys{
+	ham_engine *engine;
+	ham::str_buffer_utf8 name;
+
+	ham_engine_subsys_init_fn init_fn;
+	ham_engine_subsys_fini_fn fini_fn;
+	ham_engine_subsys_loop_fn loop_fn;
+	void *user;
+
+	std::atomic_bool running;
+	std::atomic<f64> min_dt;
+
+	ham::thread thread;
+	ham::mutex mut;
+	ham::cond cond;
+};
+
+uptr ham_impl_engine_subsys_routine(void *user){
+	const auto subsys = reinterpret_cast<ham_engine_subsys*>(user);
+
+	{
+		ham::unique_lock lock(subsys->mut);
+		if(!subsys->cond.wait(lock, [subsys]{ return subsys->running.load(std::memory_order_relaxed); })){
+			ham::logapierror("Error waiting on subsystem mutex");
+			return -1;
+		}
 	}
 
-	ham_sem_post(engine->sem);
-
-	ham_uptr engine_ret;
-	if(!ham_thread_join(engine->thd, &engine_ret)){
-		ham_logapierrorf("Error joining engine thread");
-		engine_ret = (ham_uptr)-1;
-	}
-	else if(engine_ret != 0){
-		ham_logapierrorf("Error in running engine thread");
-		if(engine->status == 0) engine->status = 1;
+	if(!subsys->init_fn(subsys->engine, subsys->user)){
+		ham::logapierror("Error initializing subsystem '{}'", subsys->name);
+		return 1;
 	}
 
-	const int result = engine->status;
+	ham_ticker ticker;
+	ham_ticker_reset(&ticker);
 
-	ham_impl_gengine = nullptr;
+	ham_f64 dt;
 
-	ham_engine_destroy(engine);
+	while(subsys->running.load(std::memory_order_relaxed)){
+		const f64 target_dt = subsys->min_dt.load(std::memory_order_relaxed);
 
-	return result;
+		dt = 0.0;
+		do{
+			dt += ham_ticker_tick(&ticker, target_dt - dt);
+		} while(dt < target_dt);
+
+		subsys->loop_fn(subsys->engine, dt, subsys->user);
+	}
+
+	subsys->fini_fn(subsys->engine, subsys->user);
+
+	return 0;
+}
+
+ham_engine_subsys *ham_engine_subsys_create(
+	ham_engine *engine,
+	ham_str8 name,
+	ham_engine_subsys_init_fn init_fn,
+	ham_engine_subsys_fini_fn fini_fn,
+	ham_engine_subsys_loop_fn loop_fn,
+	void *user
+){
+	if(
+		!ham_check(engine != NULL) ||
+		!ham_check(name.ptr && name.len) ||
+		!ham_check(init_fn != NULL) ||
+		!ham_check(fini_fn != NULL) ||
+		!ham_check(loop_fn != NULL)
+	){
+		return nullptr;
+	}
+
+	const auto allocator = engine->allocator;
+
+	const auto subsys = ham_allocator_new(allocator, ham_engine_subsys);
+	if(!subsys){
+		return nullptr;
+	}
+
+	const auto subsys_idx = engine->num_subsystems.fetch_add(1, std::memory_order_relaxed);
+	if(subsys_idx >= HAM_ENGINE_MAX_SUBSYSTEMS){
+		ham::logapierror("Maximum number of subsystems created ({})", HAM_ENGINE_MAX_SUBSYSTEMS);
+		ham_allocator_delete(allocator, subsys);
+		return nullptr;
+	}
+
+	engine->subsystems[subsys_idx] = subsys;
+
+	subsys->engine = engine;
+	subsys->name   = name;
+
+	subsys->init_fn = init_fn;
+	subsys->fini_fn = fini_fn;
+	subsys->loop_fn = loop_fn;
+	subsys->user    = user;
+
+	subsys->running.store(false, std::memory_order_relaxed);
+	subsys->min_dt.store(engine->min_dt);
+
+	subsys->thread = ham::thread(ham_impl_engine_subsys_routine, subsys);
+
+	return subsys;
+}
+
+ham_nothrow void ham_impl_engine_subsys_destroy(ham_engine_subsys *subsys){
+	if(ham_unlikely(!subsys)) return;
+
+	if(subsys->running.exchange(false)){
+		ham::logapiwarn("Running subsystem destroyed '{}'", subsys->name);
+	}
+
+	uptr ret;
+	if(!subsys->thread.join(&ret)){
+		ham::logapiwarn("Failed to join thread for subsystem '{}'", subsys->name);
+		ret = (uptr)-1;
+	}
+
+	if(ret != 0){
+		ham::logapiwarn("Subsystem '{}' returned with exit code {}", subsys->name, ret);
+	}
+
+	const auto allocator = subsys->engine->allocator;
+
+	ham_allocator_delete(allocator, subsys);
+}
+
+ham_nothrow ham_engine *ham_engine_subsys_owner(ham_engine_subsys *subsys){
+	if(!ham_check(subsys != NULL)) return nullptr;
+	return subsys->engine;
+}
+
+ham_nothrow ham_str8 ham_engine_subsys_name(const ham_engine_subsys *subsys){
+	if(!ham_check(subsys != NULL)) return HAM_EMPTY_STR8;
+	return subsys->name.get();
+}
+
+ham_nothrow bool ham_engine_subsys_running(const ham_engine_subsys *subsys){
+	if(!ham_check(subsys != NULL)) return false;
+	return subsys->running.load(std::memory_order_relaxed);
+}
+
+ham_nothrow bool ham_engine_subsys_set_min_dt(ham_engine_subsys *subsys, ham_f64 min_dt){
+	if(!ham_check(subsys != NULL)) return false;
+	subsys->min_dt.store(ham_max(0.0, min_dt), std::memory_order_relaxed);
+	return true;
+}
+
+ham_nothrow bool ham_engine_subsys_launch(ham_engine_subsys *subsys){
+	if(!ham_check(subsys != NULL)) return false;
+
+	{
+		ham::scoped_lock lock(subsys->mut);
+		if(subsys->running.exchange(true)) return true;
+	}
+
+	if(!subsys->cond.signal()){
+		ham::logapierror("Error signaling subsystem thread");
+		subsys->running.store(false);
+		return false;
+	}
+
+	return true;
 }
 
 HAM_C_API_END

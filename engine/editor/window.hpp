@@ -26,54 +26,76 @@ class QLabel;
 namespace ham::engine::editor{
 	class window;
 
-	class window: public QWidget{
+	class window_resize_handle: public QWidget{
 		Q_OBJECT
 
+		public:
+			~window_resize_handle();
+
+		protected:
+			void enterEvent(QEnterEvent *event) override;
+			void leaveEvent(QEvent *event) override;
+
+			void mousePressEvent(QMouseEvent *event) override;
+
 		private:
-			class resize_handle: public QWidget{
-				public:
-					explicit resize_handle(Qt::Corner corner, class window *win, QWidget *parent = nullptr);
+			explicit window_resize_handle(Qt::Corner corner, class window *win, QWidget *parent = nullptr);
 
-					explicit resize_handle(class window *win, QWidget *parent = nullptr)
-						: resize_handle(Qt::TopLeftCorner, win){}
+			explicit window_resize_handle(class window *win, QWidget *parent = nullptr)
+				: window_resize_handle(Qt::TopLeftCorner, win){}
 
-					~resize_handle();
+			class window *m_win;
+			Qt::Edges m_edges;
 
-				protected:
-					void enterEvent(QEnterEvent *event) override;
-					void leaveEvent(QEvent *event) override;
+			friend class window;
+			friend class window_header;
+			friend class window_footer;
+	};
 
-					void mousePressEvent(QMouseEvent *event) override;
+	class window_header: public QWidget{
+		Q_OBJECT
 
-				private:
-					class window *m_win;
-					Qt::Edges m_edges;
+		public:
+			enum class gap{
+				left, right, bottom
 			};
 
-			class header: public QWidget{
-				public:
-					explicit header(class window *parent);
-					~header();
+			~window_header();
 
-				protected:
-					void mousePressEvent(QMouseEvent *event) override;
-					void mouseReleaseEvent(QMouseEvent *event) override;
+			void setGapWidget(enum gap gap, QWidget *w);
+			void setGapLayout(enum gap gap, QLayout *l);
 
-				private:
-					QLabel *m_title_icn;
-					QLabel *m_title_lbl;
-			};
+		protected:
+			void mousePressEvent(QMouseEvent *event) override;
+			void mouseReleaseEvent(QMouseEvent *event) override;
 
-			class footer: public QWidget{
-				public:
-					explicit footer(class window *parent);
-					~footer();
+		private:
+			explicit window_header(class window *parent);
 
-					void set_status_widget(QWidget *widget);
+			QLabel *m_title_icn;
+			QLabel *m_title_lbl;
 
-				private:
-					QWidget *m_status_line;
-			};
+			friend class window;
+	};
+
+	class window_footer: public QWidget{
+		Q_OBJECT
+
+		public:
+			~window_footer();
+
+			void set_status_widget(QWidget *widget);
+
+		private:
+			explicit window_footer(class window *parent);
+
+			QWidget *m_status_line;
+
+			friend class window;
+	};
+
+	class window: public QWidget{
+		Q_OBJECT
 
 		public:
 			explicit window(QWidget *parent = nullptr);
@@ -82,8 +104,8 @@ namespace ham::engine::editor{
 			void set_central_widget(QWidget *widget);
 			QWidget *central_widget();
 
-			class header *header() noexcept{ return m_header; }
-			class footer *footer() noexcept{ return m_footer; }
+			class window_header *header() noexcept{ return m_header; }
+			class window_footer *footer() noexcept{ return m_footer; }
 
 		Q_SIGNALS:
 			void maximized();
@@ -95,9 +117,9 @@ namespace ham::engine::editor{
 
 		private:
 			QLayout *m_lay;
-			class header *m_header;
+			window_header *m_header;
 			QWidget *m_inner;
-			class footer *m_footer;
+			window_footer *m_footer;
 	};
 }
 

@@ -26,9 +26,14 @@
  */
 
 layout(std140, binding = 0) uniform RenderData{
-	float time;
 	mat4 view_proj;
+	float time;
 } globals;
+
+#ifdef GL_SPIRV
+layout(location = 0)
+#endif
+uniform vec2 uv_scale;
 
 uniform sampler2D depth_tex;
 uniform sampler2D diffuse_tex;
@@ -47,7 +52,14 @@ vec3 hsv_to_rgb(in vec3 c){
 }
 
 void main(){
-	const vec2 hxy = uv_f * (vec2(sin(globals.time), cos(globals.time)) * 0.5 + 1.0);
-	const float hue = ((hxy.x + hxy.y) * 0.5);
-	out_color = vec4(hsv_to_rgb(vec3(hue, 1.0, 1.0)), 1.0);
+//	const float t = globals.time;
+
+//	const vec2 hxy = uv_f * (vec2(sin(t), cos(t)) * 0.5 + 1.0);
+//	const float hue = ((hxy.x + hxy.y) * 0.5);
+
+//	const vec3 hsv_color = hsv_to_rgb(vec3(hue, 1.0, 1.0));
+
+//	const float d = texture(depth_tex, uv_f).r;
+
+	out_color = vec4(texture(diffuse_tex, uv_f * uv_scale).rgb, 1.0);
 }

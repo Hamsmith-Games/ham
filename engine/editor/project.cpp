@@ -281,7 +281,7 @@ static bool ham_impl_write_project_template_path(const QDir &tmpl_dir, const QDi
 			continue;
 		}
 
-		const auto proj_file_path = QString("%1/%2").arg(proj_dir.path(), tmpl_file_path.first(tmpl_file_path.size()-3)); // filename.size()-3 == without .in ext
+		const auto proj_file_path = QString("%1/%2").arg(proj_dir.path(), tmpl_file_path.mid(0, tmpl_file_path.size()-3)); // filename.size()-3 == without .in ext
 
 		QFile out_file(proj_file_path);
 		if(!out_file.open(QFile::WriteOnly)){

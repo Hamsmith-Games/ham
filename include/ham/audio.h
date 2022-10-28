@@ -25,7 +25,7 @@
  * @{
  */
 
-#include "typedefs.h"
+#include "math.h"
 
 HAM_C_API_BEGIN
 

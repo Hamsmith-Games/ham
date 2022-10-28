@@ -261,6 +261,16 @@ namespace ham{
 			constexpr const fmt::string_view &fmt_str() const noexcept{ return m_fmt_str; }
 			constexpr const detail::source_location &loc() const noexcept{ return m_loc; }
 
+			constexpr str8 api() const noexcept{
+				const std::string_view fn_name = m_loc.function_name();
+
+				const auto from = fn_name.find(' ') + 1;
+				const auto to   = fn_name.find('(', from);
+				const auto ret  = fn_name.substr(from, to - from);
+
+				return str8(ret.data(), ret.size());
+			}
+
 			constexpr operator fmt::string_view() const noexcept{ return m_fmt_str; }
 
 		private:

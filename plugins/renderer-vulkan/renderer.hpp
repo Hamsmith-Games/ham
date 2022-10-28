@@ -100,21 +100,12 @@ struct ham_draw_group_vulkan{
 	// TODO: group uniform buffer
 	// TODO: instance attribute buffer
 
-	VkBuffer vbo, ibo, cbo;
-	VmaAllocation vbo_alloc, ibo_alloc, cbo_alloc;
+	ham_u32 instance_capacity;
+	VkBuffer vbo, ibo, cbo, instance_bo;
+	VmaAllocation vbo_alloc, ibo_alloc, cbo_alloc, instance_alloc;
+
+	void *instance_mapping;
 };
-
-ham_private ham_draw_group_vulkan *ham_draw_group_vulkan_ctor(ham_draw_group_vulkan *mem, ham_u32 nargs, va_list va);
-
-ham_private void ham_draw_group_vulkan_dtor(ham_draw_group_vulkan *group);
-
-ham_private bool ham_draw_group_vulkan_init(
-	ham_draw_group_vulkan *group,
-	ham_renderer_vulkan *r,
-	ham_usize num_shapes, const ham_shape *const *shapes
-);
-
-ham_private void ham_draw_group_vulkan_fini(ham_draw_group_vulkan *group);
 
 HAM_C_API_END
 

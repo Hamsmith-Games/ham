@@ -42,6 +42,7 @@ typedef enum ham_draw_buffer_gl_data{
 	HAM_DRAW_BUFFER_GL_POINTS,
 	HAM_DRAW_BUFFER_GL_INDICES,
 	HAM_DRAW_BUFFER_GL_COMMANDS,
+	HAM_DRAW_BUFFER_GL_INSTANCE_DATA,
 
 	HAM_DRAW_BUFFER_GL_DATA_COUNT
 } ham_draw_buffer_gl_data;
@@ -49,8 +50,8 @@ typedef enum ham_draw_buffer_gl_data{
 typedef struct ham_draw_group_gl ham_draw_group_gl;
 
 typedef struct ham_renderer_gl_global_ubo_data{
-	ham_f32 time; ham_f32 _pad0[3];
 	ham_mat4 view_proj;
+	ham_f32 time;
 } ham_renderer_gl_global_ubo_data;
 
 typedef struct ham_renderer_gl_api ham_renderer_gl{
@@ -66,11 +67,15 @@ typedef struct ham_renderer_gl_api ham_renderer_gl{
 	ham_u32 scene_info_vert, scene_info_frag, scene_info_pipeline;
 	ham_u32 screen_post_vert, screen_post_frag, screen_post_pipeline;
 
+	ham_i32 screen_post_frag_depth_loc;
+	ham_i32 screen_post_frag_diffuse_loc;
+	ham_i32 screen_post_frag_normal_loc;
+
 	ham_draw_group_gl *screen_group;
+	ham_i32 screen_post_uv_scale_loc;
 
 	ham_u32 global_ubo;
 	void *global_ubo_writep;
-	ham_uptr global_time_offset, global_view_proj_offset;
 
 	ham_f64 total_time;
 } ham_renderer_gl;
@@ -81,9 +86,12 @@ ham_renderer_gl_api ham_u32 ham_renderer_gl_create_pipeline(ham_renderer_gl *r, 
 struct ham_renderer_gl_api ham_draw_group_gl{
 	ham_derive(ham_draw_group)
 
-	ham_u32 num_instances;
+	ham_u32 mode;
 	ham_u32 vao;
 	ham_u32 bufs[HAM_DRAW_BUFFER_GL_DATA_COUNT];
+
+	ham_u32 instance_capacity;
+	void *instance_mapping;
 };
 
 HAM_C_API_END

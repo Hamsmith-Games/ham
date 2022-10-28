@@ -22,43 +22,59 @@
 #include <QWidget>
 #include <QMetaType>
 
-#include "ham/renderer-object.h"
+#include "ham/renderer.h"
 #include "ham/time.h"
+#include "ham/functional.h"
 
 class QVulkanInstance;
 
-Q_DECLARE_METATYPE(ham_renderer*)
+Q_DECLARE_METATYPE(ham::renderer_view)
+Q_DECLARE_METATYPE(ham::const_renderer_view)
+//Q_DECLARE_METATYPE(ham::renderer)
+
+Q_DECLARE_METATYPE(ham::draw_group_view)
+Q_DECLARE_METATYPE(ham::const_draw_group_view)
+//Q_DECLARE_METATYPE(ham::draw_group)
+
+Q_DECLARE_METATYPE(ham_renderer_frame_data);
 
 namespace ham::engine::editor{
 	class renderer_widget: public QWidget{
 		Q_OBJECT
-		Q_PROPERTY(ham_renderer* renderer READ renderer CONSTANT)
+		Q_PROPERTY(ham::renderer_view renderer READ renderer CONSTANT)
 		Q_PROPERTY(ham_renderer_frame_data frame_data READ frame_data CONSTANT)
 
 		public:
 			virtual ~renderer_widget();
 
-			ham_renderer *renderer() const noexcept{ return m_r; }
+			ham::renderer_view renderer() noexcept{ return m_r; }
 
 			ham_renderer_frame_data &frame_data() noexcept{ return m_frame_data; }
 			const ham_renderer_frame_data &frame_data() const noexcept{ return m_frame_data; }
+
+			bool do_work(ham::indirect_function<void()> fn){ return m_work.push(std::move(fn)); }
+
+		Q_SIGNALS:
+			void onFrame(ham_f64 dt, const ham_renderer_frame_data_common *data);
 
 		public Q_SLOTS:
 			bool initialize_renderer(const char *plugin_id, const char *obj_id, const ham_renderer_create_args *args);
 			void finalize_renderer();
 
-			void resize_renderer(u32 w, u32 h);
+			void resize_renderer(ham_u32 w, ham_u32 h);
 
 			void paint_renderer();
 
 		protected:
-			explicit renderer_widget(ham_renderer *r = nullptr, QWidget *parent = nullptr);
-			explicit renderer_widget(QWidget *parent = nullptr): renderer_widget(nullptr, parent){}
+			explicit renderer_widget(QWidget *parent = nullptr);
+
+			void resizeEvent(QResizeEvent *ev) override;
 
 		private:
-			ham_renderer *m_r;
-			ham_ticker m_ticker;
+			ham::renderer m_r;
+			ham::ticker m_ticker;
 			ham_renderer_frame_data m_frame_data;
+			ham::workgroup m_work;
 	};
 
 	class renderer_widget_gl: public renderer_widget{
@@ -84,6 +100,8 @@ namespace ham::engine::editor{
 		private:
 			QVulkanInstance *m_inst;
 			QWindow *m_win;
+			QWidget *m_win_container;
+
 	};
 }
 

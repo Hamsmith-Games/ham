@@ -19,6 +19,7 @@
 #include "welcome_wizard.hpp"
 #include "main_window.hpp"
 
+#include <QDebug>
 #include <QSettings>
 
 #include <QVBoxLayout>
@@ -117,7 +118,9 @@ bool editor::project_wizard::initial_page::validatePage(){
 	const auto name_str = field("name").toString();
 	const auto name_utf8 = name_str.toUtf8();
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 	if(!name_utf8.isValidUtf8()) return false;
+#endif
 
 	const auto name_str_beg = name_utf8.begin();
 	const auto name_str_end = name_utf8.end();

@@ -121,30 +121,34 @@ set(HAM_VERSION ${ham_VERSION})
 
 # CPU detection
 
-check_target_arch(HAM_TARGET_ARCH)
-
-message(STATUS "Ham target arch: ${HAM_TARGET_ARCH}")
-
-if(HAM_TARGET_ARCH MATCHES "x86-64|x86-64-v2")
-	set(HAM_CPU_LIBS cpu::x86-64-v2)
-	set(HAM_CPU_FLAGS ${CPU_FEATURES_X86_64_V2_CFLAGS})
-elseif(HAM_TARGET_ARCH STREQUAL "x86-64-v3")
-	set(HAM_CPU_LIBS cpu::x86-64-v3)
-	set(HAM_CPU_FLAGS ${CPU_FEATURES_X86_64_V3_CFLAGS})
-elseif(HAM_TARGET_ARCH STREQUAL "x86-64-v4")
-	set(HAM_CPU_LIBS cpu::x86-64-v4)
-	set(HAM_CPU_FLAGS ${CPU_FEATURES_X86_64_V4_CFLAGS})
-elseif(HAM_TARGET_ARCH STREQUAL "armv8-a")
-	set(HAM_CPU_LIBS cpu::armv8-a)
-	set(HAM_CPU_FLAGS ${CPU_FEATURES_ARMV8_A_CFLAGS})
-elseif(HAM_TARGET_ARCH STREQUAL "armv8.1-a")
-	set(HAM_CPU_LIBS cpu::armv8.1-a)
-	set(HAM_CPU_FLAGS ${CPU_FEATURES_ARMV8_1_A_CFLAGS})
+if(NOT HAM_TARGET_ARCH)
+	set(HAM_TARGET_ARCH ${CPU_NATIVE_ARCH})
+	set(HAM_CPU_LIBS ${CPU_NATIVE_LIBRARIES})
+	set(HAM_CPU_FLAGS ${CPU_NATIVE_CFLAGS})
 else()
-	set(HAM_CPU_LIBS)
-	set(HAM_CPU_FLAGS)
+	if(HAM_TARGET_ARCH MATCHES "x86-64-v2")
+		set(HAM_CPU_LIBS cpu::x86-64-v2)
+		set(HAM_CPU_FLAGS ${CPU_FEATURES_X86_64_V2_CFLAGS})
+	elseif(HAM_TARGET_ARCH STREQUAL "x86-64-v3")
+		set(HAM_CPU_LIBS cpu::x86-64-v3)
+		set(HAM_CPU_FLAGS ${CPU_FEATURES_X86_64_V3_CFLAGS})
+	elseif(HAM_TARGET_ARCH STREQUAL "x86-64-v4")
+		set(HAM_CPU_LIBS cpu::x86-64-v4)
+		set(HAM_CPU_FLAGS ${CPU_FEATURES_X86_64_V4_CFLAGS})
+	elseif(HAM_TARGET_ARCH STREQUAL "armv8-a")
+		set(HAM_CPU_LIBS cpu::armv8-a)
+		set(HAM_CPU_FLAGS ${CPU_FEATURES_ARMV8_A_CFLAGS})
+	elseif(HAM_TARGET_ARCH STREQUAL "armv8.1-a")
+		set(HAM_CPU_LIBS cpu::armv8.1-a)
+		set(HAM_CPU_FLAGS ${CPU_FEATURES_ARMV8_1_A_CFLAGS})
+	else()
+		message(WARNING "Unrecognized HAM_TARGET_ARCH value: ${HAM_TARGET_ARCH}")
+		set(HAM_CPU_LIBS)
+		set(HAM_CPU_FLAGS)
+	endif()
 endif()
 
+message(STATUS "Ham target arch:      ${HAM_TARGET_ARCH}")
 message(STATUS "Ham target CPU flags: ${HAM_CPU_FLAGS}")
 
 # Build info
@@ -158,14 +162,7 @@ set(HAM_SOURCE_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 set(HAM_BINARY_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 if(NOT HAM_TARGET_TRIPLE)
-	execute_process(
-		COMMAND
-		    gcc -dumpmachine
-
-		OUTPUT_STRIP_TRAILING_WHITESPACE
-		OUTPUT_VARIABLE
-		    HAM_TARGET_TRIPLE
-	)
+	set(HAM_TARGET_TRIPLE ${CPU_NATIVE_TRIPLE})
 endif()
 
 set(HAM_UUID_NAMESPACE "94d6f295-4e71-4b60-a7e5-a9fdc8bef7d2")
@@ -238,15 +235,17 @@ set(
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/pp.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/typedefs.h
-	${HAM_SOURCE_INCLUDE_DIR}/ham/typesys.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/simd.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/math.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/log.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/check.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/memory.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/time.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/async.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/functional.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/noise.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/typesys.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/object.h
-	${HAM_SOURCE_INCLUDE_DIR}/ham/math.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/hash.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/fs.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/dso.h
@@ -260,6 +259,7 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/lex.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/parse.h
 
+	${HAM_SOURCE_INCLUDE_DIR}/ham/transform.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/shape.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/camera.h
 
@@ -270,6 +270,8 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/net-object.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/renderer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/renderer-object.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/audio.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/audio-object.h
 
 	# C++ only headers
 	${HAM_SOURCE_INCLUDE_DIR}/ham/meta.hpp
@@ -361,7 +363,11 @@ endif()
 
 find_file(
 	STEAMWORKS_SDK_PATH
-	NAMES steamworks_sdk_155.zip
+	NAMES
+	    steamworks_sdk_156.zip
+		steamworks_sdk_155.zip
+		steamworks_sdk_154.zip
+
 	PATHS ${CMAKE_CURRENT_LIST_DIR}/third_party
 )
 
@@ -391,6 +397,8 @@ macro(ham_add_executable TGT)
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 		target_link_options(${TGT} PRIVATE "-Wl,--enable-new-dtags")
+	elseif(MSVC)
+		target_compile_options(${TGT} PRIVATE "/nologo")
 	endif()
 endmacro()
 
@@ -408,6 +416,10 @@ macro(ham_add_library TGT)
 		CXX_VISIBILITY_PRESET hidden
 		VISIBILITY_INLINES_HIDDEN ON
 	)
+
+    if(MSVC)
+		target_compile_options(${TGT} PRIVATE "/nologo")
+	endif()
 endmacro()
 
 ##
@@ -435,7 +447,12 @@ if(HAM_BUILD_ENGINE)
 
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine-object.h
+		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/argparse.h
+		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/input.h
+		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/entity.h
+		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/entity/transform-component.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/world.h
+		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/vm.h
 	)
 
     list(APPEND HAM_ALL_HEADERS ${HAM_ENGINE_HEADERS})

@@ -56,8 +56,8 @@ ham_define_object(
 );
 
 bool ham_test_object(){
-	const auto obj_vtable = ham_impl_obj_vtable_ham_object_test();
-	const auto obj_info = obj_vtable->info();
+	const auto obj_vtable = ham_impl_vptr_ham_object_test();
+	const auto obj_info = obj_vtable->info;
 
 	if(
 	   !ham_check(obj_info->size == sizeof(ham_object_test)) ||
@@ -88,7 +88,7 @@ bool ham_test_object(){
 			ham_object_manager_destroy(obj_man);
 			return false;
 		}
-		else if(obj->vtable != obj_vtable){
+		else if(obj->vptr != obj_vtable){
 			std::cerr << i << "'th object has bad vtable.\n";
 			ham_object_manager_destroy(obj_man);
 			return false;
@@ -99,7 +99,7 @@ bool ham_test_object(){
 
 	for(ham_usize i = 0; i < std::size(objs); i++){
 		const auto test_obj = (ham_object_test*)objs[i];
-		const auto test_vt  = (ham_object_test_vtable*)objs[i]->vtable;
+		const auto test_vt  = (ham_object_test_vtable*)objs[i]->vptr;
 		if(test_vt->foo(test_obj) != i + 3){
 			std::cerr << "Function call bad result from object " << i << " `foo(obj)`\n"
 						 "    Given:    " << test_obj->test_val << "\n"

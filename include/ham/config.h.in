@@ -129,6 +129,7 @@
 #	define ham_constexpr constexpr
 #	define ham_thread_local thread_local
 #	define ham_typeof(...) decltype(__VA_ARGS__)
+#	define ham_mutable mutable
 
 	namespace ham::detail{
 		template<typename T, typename U> struct is_same      { enum{ value = false }; };
@@ -145,7 +146,9 @@
 #	define ham_extern_c
 #	define ham_null NULL
 #	define ham_constexpr
+#	define ham_mutable
 #	define ham_is_same(type1, type2) (_Generic((type1*)NULL, type2: true, default: false))
+
 #endif
 
 //
@@ -328,13 +331,27 @@
 
 #	include <signal.h>
 
-#	if defined(HAM_DEBUG) && !defined(ham_breakpoint)
-#		define ham_breakpoint() (raise(SIGTRAP))
+// Got most of the info for this from https://github.com/scottt/debugbreak
+__attribute__((nothrow, always_inline))
+static inline void ham_breakpoint(){
+#if defined(HAM_DEBUG)
+#	if __has_builtin(__builtin_debugtrap)
+		__builtin_debugtrap();
+#	elif __has_builtin(__debugbreak)
+		__debugbreak();
+#	elif defined(__x86_64__) || defined(__i386__)
+		__asm__ volatile("int3");
+#	elif defined(__aarch64__)
+		__asm__ volatile(".inst 0xd4200000");
+#	elif defined(__powerpc__)
+		__asm__ volatile(".4byte 0x7d821008");
+#	elif defined(__riscv)
+		__asm__ volatile(".4byte 0x00100073");
+#	else
+		raise(SIGTRAP);
 #	endif
-
-#	define ham_lam(result_, args, body) \
-		({	result_ ham_impl_lam__(HAM_EAT args) body \
-			ham_impl_lam__; })
+#endif
+}
 
 #	define HAM_DIAGNOSTIC_PUSH() _Pragma("GCC diagnostic push")
 #	define HAM_DIAGNOSTIC_POP() _Pragma("GCC diagnostic pop")
@@ -393,6 +410,16 @@
 		({	const ham_auto a_ = (a); const ham_auto b_ = (b); \
 			a_ < b_ ? b_ : a_; })
 
+#	ifdef __cplusplus
+#		define ham_bit_cast(to, x) (__builtin_bit_cast(to, (x)))
+#	else
+#		define ham_bit_cast(to, x_) \
+			({	const ham_auto x__ = (x_); \
+				to result__; \
+				memcpy(&result__, &x__, sizeof(to)); \
+				result__; })
+#	endif
+
 #else // __cplusplus
 
 #	define ham_public
@@ -410,6 +437,10 @@
 		([](const auto a_; const auto b_) constexpr{ \
 			return a_ < b_ ? b_ : a_; \
 		}((a), (b)))
+
+#	include <bit>
+
+#	define ham_bit_cast(to, x) (std::bit_cast<to>(x))
 
 #endif // __GNUC__
 

@@ -37,7 +37,7 @@ int main(int argc, char *argv[]){
 	QApplication::setApplicationDisplayName("Ham World Editor");
 	QApplication::setApplicationName("ham-engine-editor");
 	QApplication::setApplicationVersion(HAM_ENGINE_VERSION_STR);
-	QApplication::setOrganizationName("Hamsmith Ltd.");
+	QApplication::setOrganizationName("Hamsmith");
 	QApplication::setOrganizationDomain("https://hamsmith.dev/");
 
 //	QSurfaceFormat surfaceFmt;

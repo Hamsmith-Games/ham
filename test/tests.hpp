@@ -19,15 +19,97 @@
 #ifndef HAM_TEST_TESTS_HPP
 #define HAM_TEST_TESTS_HPP 1
 
-#include <stdio.h>
+#include "ham/check.h"
+#include "ham/math.h"
 
-bool ham_test_meta();
-bool ham_test_utf();
-bool ham_test_lex();
-bool ham_test_parse();
-bool ham_test_object();
-bool ham_test_buffer();
-bool ham_test_octree();
+#define ham_impl_eat(...) __VA_ARGS__
+
+#define ham_declare_test(name) \
+	bool ham_test_##name();
+
+#define ham_define_test(name, body) \
+	bool ham_test_##name(){ ham_impl_eat body }
+
+#define ham_test_assert_msg(cond, fmt_str, ...) \
+	if(!ham_check_msg(cond, fmt_str __VA_OPT__(,) __VA_ARGS__)) return false
+
+#define ham_test_assert(cond) ham_test_assert_msg((cond), "Test condition failed: %s", #cond)
+
+ham_declare_test(meta)
+ham_declare_test(utf)
+ham_declare_test(lex)
+ham_declare_test(parse)
+ham_declare_test(object)
+ham_declare_test(buffer)
+ham_declare_test(octree)
+ham_declare_test(mat)
+ham_declare_test(quat)
+ham_declare_test(transform)
+ham_declare_test(camera)
+
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_LEFT_HANDED
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_QUAT_DATA_XYZW
+#include "glm/gtc/type_ptr.hpp"
+
+static inline bool operator==(const glm::mat4 &a, const ham::mat4 &b) noexcept{
+	return std::memcmp(glm::value_ptr(a), b.data(), sizeof(ham_f32) * 16) == 0;
+}
+
+static inline bool operator==(const ham::mat4 &a, const glm::mat4 &b) noexcept{
+	return std::memcmp(a.data(), glm::value_ptr(b), sizeof(ham_f32) * 16) == 0;
+}
+
+static inline bool operator!=(const glm::mat4 &a, const ham::mat4 &b) noexcept{
+	return std::memcmp(glm::value_ptr(a), b.data(), sizeof(ham_f32) * 16) != 0;
+}
+
+static inline bool operator!=(const ham::mat4 &a, const glm::mat4 &b) noexcept{
+	return std::memcmp(a.data(), glm::value_ptr(b), sizeof(ham_f32) * 16) != 0;
+}
+
+#define DEFAULT_EPSILON 0.000125f
+
+static inline bool roughly_equal(float a, float b, float epsilon = DEFAULT_EPSILON) noexcept{
+	return std::abs(a - b) <= epsilon;
+}
+
+static inline int roughly_equal(const ham::quat &a, const glm::quat &b, float epsilon = DEFAULT_EPSILON) noexcept{
+	for(int i = 0; i < 4; i++){
+		if(!roughly_equal(a.data()[i], glm::value_ptr(b)[i], epsilon)){
+			return i + 1;
+		}
+	}
+
+	return 0;
+}
+
+static inline int roughly_equal(const ham::mat4 &a, const ham::mat4 &b, float epsilon = DEFAULT_EPSILON) noexcept{
+	for(int i = 0; i < 4; i++){
+		for(int j = 0; j < 4; j++){
+			const auto idx = (i * 4) + j;
+			if(!roughly_equal(a.data()[idx], b.data()[idx], epsilon)){
+				return idx + 1;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static inline int roughly_equal(const ham::mat4 &a, const glm::mat4 &b, float epsilon = DEFAULT_EPSILON) noexcept{
+	for(int i = 0; i < 4; i++){
+		for(int j = 0; j < 4; j++){
+			const auto idx = (i * 4) + j;
+			if(!roughly_equal(a.data()[idx], glm::value_ptr(b)[idx], epsilon)){
+				return idx + 1;
+			}
+		}
+	}
+
+	return 0;
+}
 
 #include "ham/str_buffer.h"
 #include "ham/functional.h"
@@ -56,7 +138,7 @@ namespace ham{
 
 			template<typename ... UArgs>
 			bool run(UArgs &&... args) const{
-				fmt::print("Test: {:<8} ", m_name);
+				fmt::print("Test: {:<12} ", m_name);
 				std::fflush(stdout);
 
 				std::stringstream cerr_buf;

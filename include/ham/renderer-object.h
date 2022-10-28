@@ -50,7 +50,7 @@ struct ham_renderer{
 
 	ham_object_manager *draw_groups;
 
-	ham_mutex *draw_mut;
+	ham_mutex draw_mut;
 	ham_buffer draw_list, tmp_list;
 };
 
@@ -69,13 +69,19 @@ struct ham_draw_group{
 	ham_derive(ham_object)
 
 	ham_renderer *r;
+	ham_mutex mut;
 	ham_usize num_shapes;
 	ham_usize *num_shape_points;
 	ham_usize *num_shape_indices;
+
+	ham_u32 num_instances;
 };
 
 struct ham_draw_group_vtable{
 	ham_derive(ham_object_vtable)
+
+	bool(*set_num_instances)(ham_draw_group *self, ham_u32 n);
+	ham_draw_group_instance_data*(*instance_data)(ham_draw_group *self);
 };
 
 //! @cond ignore
@@ -94,7 +100,8 @@ static inline void frame_name(ham_renderer *r, ham_f64 dt, const ham_renderer_fr
 ham_define_object_x( \
 	2, derived_renderer, 1, ham_renderer_vtable, \
 	ctor_fn, dtor_fn, \
-	(	.draw_group_vtable = ham_impl_draw_group_vtable_##derived_renderer, \
+	( \
+		.draw_group_vtable = ham_impl_draw_group_vtable_##derived_renderer, \
 		.resize = resize_name, \
 		.frame = frame_name, \
 	) \
@@ -104,10 +111,19 @@ ham_define_object_x( \
 	derived, \
 	ctor_fn, dtor_fn \
 ) \
+static inline bool ham_impl_set_num_instances_##derived(ham_draw_group *self, ham_u32 n){ \
+	return (derived##_set_num_instances)((derived*)self, n); \
+} \
+static inline ham_draw_group_instance_data *ham_impl_instance_data_##derived(ham_draw_group *self){ \
+	return (derived##_instance_data)((derived*)self); \
+} \
 ham_define_object_x( \
 	2, derived, 1, ham_draw_group_vtable, \
 	ctor_fn, dtor_fn, \
-	() \
+	( \
+		.set_num_instances = ham_impl_set_num_instances_##derived,\
+		.instance_data = ham_impl_instance_data_##derived,\
+	) \
 )
 
 //! @endcond

@@ -57,11 +57,11 @@ bool ham_test_meta(){
 	static_assert(ham::meta::type_name_v<f128> == "f128");
 #endif
 
-	static_assert(ham::meta::type_name_v<ham_str8>  == "str8");
-	static_assert(ham::meta::type_name_v<ham_str16> == "str16");
-	static_assert(ham::meta::type_name_v<ham_str32> == "str32");
+	static_assert(ham::meta::type_name_v<ham_str8>  == "ham_str8");
+	static_assert(ham::meta::type_name_v<ham_str16> == "ham_str16");
+	static_assert(ham::meta::type_name_v<ham_str32> == "ham_str32");
 
-	static_assert(ham::meta::type_name_v<ham_uuid> == "uuid");
+	static_assert(ham::meta::type_name_v<ham_uuid> == "ham_uuid");
 
 	static_assert(ham::meta::type_name_v<ham::basic_str<char8>>  == "ham::basic_str<char>");
 	static_assert(ham::meta::type_name_v<ham::basic_str<char16>> == "ham::basic_str<char16_t>");

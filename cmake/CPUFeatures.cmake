@@ -67,7 +67,7 @@ unknown
 #endif
 ")
 
-function(check_target_arch out)
+function(get_native_arch out)
 	if("${ANDROID_ABI}" STREQUAL "armeabi-v7a")
 		set(${out} armv7 PARENT_SCOPE)
 	elseif("${ANDROID_ABI}" STREQUAL "arm64-v8a")
@@ -77,16 +77,18 @@ function(check_target_arch out)
 	elseif("${ANDROID_ABI}" STREQUAL "x86_64")
 		set(${out} x86-64 PARENT_SCOPE)
 	else()
-		file(WRITE "${CMAKE_BINARY_DIR}/cpu_features-archdetect.h" "${cpu_archdetect_c_code}")
+		file(WRITE "${CMAKE_BINARY_DIR}/cpu-features-archdetect.h" "${cpu_archdetect_c_code}")
 
 		if(MSVC)
 			set(CPU_FEATURES_PREPROCESS "${CMAKE_C_COMPILER}) /EP /nologo")
 		else()
-			set(CPU_FEATURES_PREPROCESS ${CMAKE_C_COMPILER} -E -P)
+			set(CPU_FEATURES_PREPROCESS ${CMAKE_C_COMPILER} -march=native -E -P)
 		endif()
 
 		execute_process(
-			COMMAND ${CPU_FEATURES_PREPROCESS} "${CMAKE_BINARY_DIR}/cpu_features-archdetect.h"
+			COMMAND
+			    ${CPU_FEATURES_PREPROCESS} "${CMAKE_BINARY_DIR}/cpu-features-archdetect.h"
+
 			OUTPUT_VARIABLE CPU_FEATURES_PROCESSOR
 			OUTPUT_STRIP_TRAILING_WHITESPACE
 		)
@@ -94,6 +96,24 @@ function(check_target_arch out)
 		string(STRIP "${CPU_FEATURES_PROCESSOR}" CPU_FEATURES_PROCESSOR)
 		set(${out} "${CPU_FEATURES_PROCESSOR}" PARENT_SCOPE)
 	endif()
+endfunction()
+
+function(get_native_triple out)
+	if(MSVC)
+		if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+			set(${out} "x86_64-pc-windows-msvc")
+		else()
+			set(${out} "i686-pc-windows-msvc")
+		endif()
+	else()
+		execute_process(
+			COMMAND
+			    ${CMAKE_C_COMPILER} -dumpmachine
+
+			OUTPUT_VARIABLE ${out}
+			OUTPUT_STRIP_TRAILING_WHITESPACE
+		)
+    endif()
 endfunction()
 
 macro(add_cpu_feature_lib name gnuc-flags msvc-flags)
@@ -138,27 +158,28 @@ add_cpu_feature_lib(
 	"/arch:AVX512"
 )
 
-check_target_arch(CPU_FEATURES_NATIVE_ARCH)
+get_native_arch(CPU_NATIVE_ARCH)
+get_native_triple(CPU_NATIVE_TRIPLE)
 
-if(CPU_FEATURES_NATIVE_ARCH STREQUAL "x86-64-v4")
-	set(CPU_FEATURES_NATIVE_LIBS cpu::x86-64-v4)
-	set(CPU_FEATURES_NATIVE_CFLAGS ${CPU_FEATURES_X86_64_V4_CFLAGS})
-elseif(CPU_FEATURES_NATIVE_ARCH STREQUAL "x86-64-v3")
-	set(CPU_FEATURES_NATIVE_LIBS cpu::x86-64-v3)
-	set(CPU_FEATURES_NATIVE_CFLAGS ${CPU_FEATURES_X86_64_V3_CFLAGS})
-elseif(CPU_FEATURES_NATIVE_ARCH STREQUAL "x86-64-v2")
-	set(CPU_FEATURES_NATIVE_LIBS cpu::x86-64-v2)
-	set(CPU_FEATURES_NATIVE_CFLAGS ${CPU_FEATURES_X86_64_V2_CFLAGS})
-elseif(CPU_FEATURES_NATIVE_ARCH STREQUAL "x86-64")
-	set(CPU_FEATURES_NATIVE_LIBS cpu::x86-64)
-	set(CPU_FEATURES_NATIVE_CFLAGS ${CPU_FEATURES_X86_64_CFLAGS})
-elseif(CPU_FEATURES_NATIVE_ARCH STREQUAL "armv8.1-a")
-	set(CPU_FEATURES_NATIVE_LIBS cpu::armv8.1-a)
-	set(CPU_FEATURES_NATIVE_CFLAGS ${CPU_FEATURES_ARMV8_1_A_CFLAGS})
-elseif(CPU_FEATURES_NATIVE_ARCH STREQUAL "armv8-a")
-	set(CPU_FEATURES_NATIVE_LIBS cpu::armv8-a)
-	set(CPU_FEATURES_NATIVE_CFLAGS ${CPU_FEATURES_ARMV8_A_CFLAGS})
+if(CPU_NATIVE_ARCH STREQUAL "x86-64-v4")
+	set(CPU_NATIVE_LIBRARIES cpu::x86-64-v4)
+	set(CPU_NATIVE_CFLAGS ${CPU_FEATURES_X86_64_V4_CFLAGS})
+elseif(CPU_NATIVE_ARCH STREQUAL "x86-64-v3")
+	set(CPU_NATIVE_LIBRARIES cpu::x86-64-v3)
+	set(CPU_NATIVE_CFLAGS ${CPU_FEATURES_X86_64_V3_CFLAGS})
+elseif(CPU_NATIVE_ARCH STREQUAL "x86-64-v2")
+	set(CPU_NATIVE_LIBRARIES cpu::x86-64-v2)
+	set(CPU_NATIVE_CFLAGS ${CPU_FEATURES_X86_64_V2_CFLAGS})
+elseif(CPU_NATIVE_ARCH STREQUAL "x86-64")
+	set(CPU_NATIVE_LIBRARIES cpu::x86-64)
+	set(CPU_NATIVE_CFLAGS ${CPU_FEATURES_X86_64_CFLAGS})
+elseif(CPU_NATIVE_ARCH STREQUAL "armv8.1-a")
+	set(CPU_NATIVE_LIBRARIES cpu::armv8.1-a)
+	set(CPU_NATIVE_CFLAGS ${CPU_FEATURES_ARMV8_1_A_CFLAGS})
+elseif(CPU_NATIVE_ARCH STREQUAL "armv8-a")
+	set(CPU_NATIVE_LIBRARIES cpu::armv8-a)
+	set(CPU_NATIVE_CFLAGS ${CPU_FEATURES_ARMV8_A_CFLAGS})
 else()
-	set(CPU_FEATURES_NATIVE_LIBS )
-	set(CPU_FEATURES_NATIVE_CFLAGS )
+	set(CPU_NATIVE_LIBRARIES )
+	set(CPU_NATIVE_CFLAGS )
 endif()

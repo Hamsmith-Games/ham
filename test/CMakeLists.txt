@@ -16,6 +16,19 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+FetchContent_Declare(
+	glm_content
+	GIT_REPOSITORY https://github.com/g-truc/glm.git
+	GIT_TAG        cc98465e3508535ba8c7f6208df934c156a018dc
+)
+
+FetchContent_GetProperties(glm_content)
+if(NOT glm_content_POPULATED)
+	FetchContent_Populate(glm_content)
+
+	add_subdirectory(${glm_content_SOURCE_DIR} ${glm_content_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
 ham_add_executable(
 	ham-test
 	tests.hpp
@@ -26,5 +39,11 @@ ham_add_executable(
 	test-parse.cpp
 	test-buffer.cpp
 	test-octree.cpp
+	test-mat.cpp
+	test-quat.cpp
+	test-transform.cpp
+	test-camera.cpp
 	main.cpp
 )
+
+target_link_libraries(ham-test PRIVATE glm::glm)

@@ -47,12 +47,14 @@ editor::renderer_widget_vulkan::renderer_widget_vulkan(QWidget *parent)
 		qFatal("Failed to create QVulkanInstance: %s", ham_vk_result_str(m_inst->errorCode()));
 	}
 
+	m_win->setFlags(Qt::WindowTransparentForInput);
 	m_win->setSurfaceType(QSurface::VulkanSurface);
 	m_win->setVulkanInstance(m_inst);
 	//m_win->show();
 
 	const auto container = QWidget::createWindowContainer(m_win);
 
+	container->setAttribute(Qt::WA_TransparentForMouseEvents);
 	container->show();
 
 	const auto surface = m_inst->surfaceForWindow(m_win);

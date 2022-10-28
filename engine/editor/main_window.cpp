@@ -18,7 +18,12 @@
 
 #include "main_window.hpp"
 
+#include <QSettings>
+#include <QResizeEvent>
+
 #include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QPushButton>
 
 namespace editor = ham::engine::editor;
 
@@ -32,16 +37,62 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 
 	project_->setParent(this);
 
-	const auto inner = new QWidget;
-	inner->setContentsMargins(0, 0, 0, 0);
+	set_central_widget(m_world_view);
 
-	const auto layout = new QVBoxLayout;
-	layout->setContentsMargins(0, 0, 0, 0);
-	layout->addWidget(m_world_view, 1);
+	const auto settings_img = QImage("://images/cog.png").scaledToWidth(32, Qt::SmoothTransformation);
+	const auto settings_pix = QPixmap::fromImage(settings_img);
 
-	inner->setLayout(layout);
+	const auto settings_btn = new QPushButton(this);
+	settings_btn->setFixedSize(32, 32);
+	settings_btn->setContentsMargins(0, 0, 0, 0);
+	settings_btn->setIcon(QIcon(settings_pix));
+	settings_btn->setIconSize(QSize(32, 32));
 
-	set_central_widget(inner);
+	const auto header_btn_lay = new QHBoxLayout;
+	header_btn_lay->setContentsMargins(0, 0, 0, 0);
+	header_btn_lay->addWidget(settings_btn, 1, Qt::AlignLeft | Qt::AlignVCenter);
+
+	header()->setGapLayout(window_header::gap::left, header_btn_lay);
+
+	QSettings settings;
+
+	const auto sizeVar = settings.value("editor/size");
+	const auto maximizedVar = settings.value("editor/maximized");
+
+	if(sizeVar.isValid()){
+		resize(sizeVar.value<QSize>());
+	}
+
+	if(maximizedVar.isValid() && maximizedVar.value<bool>()){
+		showMaximized();
+	}
 }
 
 editor::main_window::~main_window(){}
+
+void editor::main_window::changeEvent(QEvent *event){
+	window::changeEvent(event);
+
+	if(event->type() != QEvent::WindowStateChange) return;
+
+	QSettings settings;
+
+	switch(windowState()){
+		case Qt::WindowState::WindowMaximized:{
+			settings.setValue("editor/maximized", true);
+			break;
+		}
+
+		default:{
+			settings.setValue("editor/maximized", false);
+			break;
+		}
+	}
+}
+
+void editor::main_window::resizeEvent(QResizeEvent *ev){
+	window::resizeEvent(ev);
+
+	QSettings settings;
+	settings.setValue("editor/size", ev->size());
+}

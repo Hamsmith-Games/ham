@@ -45,8 +45,9 @@ set(
 ham_add_plugin(
 	ham-renderer-vulkan
 	${HAM_RENDERER_VULKAN_SHADERS}
-	draw_group.cpp
+	renderer.hpp
 	renderer.cpp
+	draw_group.cpp
 )
 
 target_link_libraries(ham-renderer-vulkan PRIVATE VulkanMemoryAllocator)

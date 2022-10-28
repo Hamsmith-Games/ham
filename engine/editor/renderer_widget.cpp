@@ -18,17 +18,21 @@
 
 #include "renderer_widget.hpp"
 
+#include <QDebug>
 #include <QResizeEvent>
 
 using namespace ham::typedefs;
 
 namespace editor = ham::engine::editor;
 
-editor::renderer_widget::renderer_widget(ham_renderer *r, QWidget *parent)
+editor::renderer_widget::renderer_widget(QWidget *parent)
 	: QWidget(parent)
-	, m_r(r)
 {
 	setContentsMargins(0, 0, 0, 0);
+}
+
+void editor::renderer_widget::resizeEvent(QResizeEvent *ev){
+	resize_renderer(ev->size().width(), ev->size().height());
 }
 
 bool editor::renderer_widget::initialize_renderer(const char *plugin_id, const char *obj_id, const ham_renderer_create_args *args){
@@ -37,21 +41,20 @@ bool editor::renderer_widget::initialize_renderer(const char *plugin_id, const c
 		return false;
 	}
 
-	m_r = ham_renderer_create(plugin_id, obj_id, args);
+	m_r = ham::renderer(plugin_id, obj_id, args);
 	if(!m_r){
-		qWarning() << "Error in ham_renderer_create";
+		qWarning() << "Error creating ham::renderer";
 		return false;
 	}
 
-	ham_ticker_reset(&m_ticker);
+	m_ticker.reset();
 	m_frame_data.common.current_frame = 0;
 	return true;
 }
 
 void editor::renderer_widget::finalize_renderer(){
 	if(!m_r) return;
-	ham_renderer_destroy(m_r);
-	m_r = nullptr;
+	m_r = ham::renderer();
 }
 
 editor::renderer_widget::~renderer_widget(){
@@ -59,15 +62,19 @@ editor::renderer_widget::~renderer_widget(){
 }
 
 void editor::renderer_widget::resize_renderer(u32 w, u32 h){
-	if(m_r && !ham_renderer_resize(m_r, w, h)){
+	if(m_r && !m_r.resize(w, h)){
 		qWarning() << "Error in ham_renderer_resize";
 	}
 }
 
 void editor::renderer_widget::paint_renderer(){
-	const f64 dt = ham_ticker_tick(&m_ticker, 0.0);
+	m_work.pop_all();
 
-	ham_renderer_frame(m_r, dt, &m_frame_data);
+	const f64 dt = m_ticker.tick();
+
+	Q_EMIT onFrame(dt, &m_frame_data.common);
+
+	m_r.frame(dt, &m_frame_data);
 
 	++m_frame_data.common.current_frame;
 }

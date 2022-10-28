@@ -1,5 +1,6 @@
 #version 450 core
 #extension GL_ARB_separate_shader_objects : require
+//#extension GL_ARB_fragment_coord_conventions : require
 
 /*
  * Ham Renderer OpenGL Shaders
@@ -19,19 +20,23 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+//layout(origin_upper_left) in vec4 gl_FragCoord;
+
 layout(std140, binding = 0) uniform RenderData{
-	float time;
 	mat4 view_proj;
+	float time;
 } globals;
 
 layout(location = 0) in vec3 vert_f;
 layout(location = 1) in vec3 norm_f;
 layout(location = 2) in vec2 uv_f;
+layout(location = 3) in vec4 color_f;
 
 layout(location = 0) out vec4 out_diffuse;
 layout(location = 1) out vec3 out_normal;
 
 void main(){
-	out_diffuse = vec4(uv_f, 1.0, 1.0);
+	// TODO: texture mapping
+	out_diffuse = color_f;
 	out_normal  = norm_f;
 }

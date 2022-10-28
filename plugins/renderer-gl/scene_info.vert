@@ -25,23 +25,28 @@ out gl_PerVertex {
 };
 
 layout(std140, binding = 0) uniform RenderData{
-	float time;
 	mat4 view_proj;
+	float time;
 } globals;
 
 layout(location = 0) in vec3 vert;
 layout(location = 1) in vec3 norm;
 layout(location = 2) in vec2 uv;
+layout(location = 3) in vec4 color;
+layout(location = 4) in mat4 trans;
 
 layout(location = 0) out vec3 vert_f;
 layout(location = 1) out vec3 norm_f;
 layout(location = 2) out vec2 uv_f;
+layout(location = 3) out vec4 color_f;
 
 void main(){
-	vert_f = vert;
-	norm_f = norm;
-	uv_f   = uv;
+	vert_f  = vert;
+	norm_f  = norm;
+	uv_f    = uv;
+	color_f = color;
 
-	// TODO: use globals.view_proj
-	gl_Position = vec4(vert, 1.0);
+	const mat4 mvp = globals.view_proj * trans;
+
+	gl_Position = mvp * vec4(vert, 1.0);
 }

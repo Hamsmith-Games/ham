@@ -77,7 +77,7 @@ int main(int argc, char *argv[]){
 	app_info.loop = ham_engine_server_loop;
 	app_info.user = nullptr;
 
-	const auto engine = ham_engine_create2(&app_info);
+	const auto engine = ham_engine_create(&app_info);
 	if(!engine){
 		ham::logerror(HAM_ENGINE_SERVER_API_NAME, "Error in ham_engine_create");
 		return -4;

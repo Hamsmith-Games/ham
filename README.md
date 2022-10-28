@@ -109,7 +109,9 @@ cmake --build . -j $(nproc)
 <p align="center"><a href="https://invisible-island.net/ncurses/">Ncurses</a></p>
 <p align="center"><a href="https://github.com/martinus/robin-hood-hashing">robin_hood unordered map & set</a></p>
 <p align="center"><a href="https://www.vulkan.org/">Vulkan</a></p>
+<p align="center"><a href="https://www.opengl.org/">OpenGL</a></p>
 <p align="center"><a href="https://openal-soft.org/">OpenAL Soft</a></p>
+<p align="center"><a href="https://www.pcg-random.org/">PCG, A Better Random Number Generator</a></p>
 
 <br/>
 <br/>

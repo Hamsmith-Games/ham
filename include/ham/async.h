@@ -25,7 +25,10 @@
  * @{
  */
 
-#include "typedefs.h"
+#include "log.h"
+
+// TODO: check for win32 and use *their* primitives
+#include <semaphore.h>
 
 HAM_C_API_BEGIN
 
@@ -36,20 +39,70 @@ HAM_C_API_BEGIN
 
 typedef struct ham_sem ham_sem;
 
-ham_api ham_sem *ham_sem_create(ham_u32 initial_val);
+typedef struct ham_sem{
+	//! @cond ignore
+	sem_t _impl_sem;
+	//! @endcond
+} ham_sem;
 
-ham_api ham_nothrow void ham_sem_destroy(ham_sem *sem);
+ham_nonnull_args(1)
+ham_nothrow static inline bool ham_sem_init(ham_sem *sem, ham_u32 initial_val){
+	const int res = sem_init(&sem->_impl_sem, 0, initial_val);
+	if(res != 0){
+		ham_logapierrorf("Error in sem_init: %s", strerror(errno));
+		return false;
+	}
 
-ham_api ham_nothrow bool ham_sem_post(ham_sem *sem);
+	return true;
+}
 
-ham_api ham_nothrow bool ham_sem_wait(ham_sem *sem);
+ham_nonnull_args(1)
+ham_nothrow static inline void ham_sem_finish(ham_sem *sem){
+	const int res = sem_destroy(&sem->_impl_sem);
+	if(res != 0){
+		ham_logapierrorf("Error in sem_close: %s", strerror(errno));
+	}
+}
+
+ham_nonnull_args(1)
+ham_nothrow static inline bool ham_sem_post(ham_sem *sem){
+	const int res = sem_post(&sem->_impl_sem);
+	if(res != 0){
+		ham_logapierrorf("Error in sem_post: %s", strerror(errno));
+		return false;
+	}
+
+	return true;
+}
+
+ham_nonnull_args(1)
+ham_nothrow static inline bool ham_sem_wait(ham_sem *sem){
+	const int res = sem_wait(&sem->_impl_sem);
+	if(res != 0){
+		ham_logapierrorf("Error in sem_wait: %s", strerror(errno));
+		return false;
+	}
+
+	return true;
+}
 
 /**
  * Try to wait for a semaphore to post.
  * @param sem semaphore to try to wait on
  * @returns `1` if the semphore would block, `0` if the semaphore was decremented or `-1` on error
  */
-ham_api ham_nothrow ham_i32 ham_sem_try_wait(ham_sem *sem);
+ham_nonnull_args(1)
+ham_nothrow static inline ham_i32 ham_sem_try_wait(ham_sem *sem){
+	const int res = sem_trywait(&sem->_impl_sem);
+	if(res != 0){
+		if(errno == EAGAIN) return 1;
+
+		ham_logapierrorf("Error in sem_trywait: %s", strerror(errno));
+		return -1;
+	}
+
+	return 0;
+}
 
 /**
  * @}
@@ -68,22 +121,115 @@ typedef enum ham_mutex_kind{
 	HAM_MUTEX_KIND_COUNT,
 } ham_mutex_kind;
 
-typedef struct ham_mutex ham_mutex;
+typedef struct ham_mutex{
+	//! @cond ignore
+	pthread_mutex_t _impl_mut;
+	//! @endcond
+} ham_mutex;
 
-ham_api ham_mutex *ham_mutex_create(ham_mutex_kind kind);
+ham_nonnull_args(1)
+ham_nothrow static inline bool ham_mutex_init(ham_mutex *mut, ham_mutex_kind kind){
+	pthread_mutexattr_t mut_attr;
+	int res = pthread_mutexattr_init(&mut_attr);
+	if(res != 0){
+		ham_logapierrorf("Error in pthread_mutexattr_init: %s", strerror(res));
+		return false;
+	}
 
-ham_api ham_nothrow void ham_mutex_destroy(ham_mutex *mut);
+	switch (kind) {
+		case HAM_MUTEX_RECURSIVE:{
+			mut->_impl_mut = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+			pthread_mutexattr_settype(&mut_attr, PTHREAD_MUTEX_RECURSIVE_NP);
+			break;
+		}
 
-ham_api ham_nothrow bool ham_mutex_lock(ham_mutex *mut);
+		case HAM_MUTEX_ERRORCHECK:{
+			mut->_impl_mut = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
+			pthread_mutexattr_settype(&mut_attr, PTHREAD_MUTEX_ERRORCHECK_NP);
+			break;
+		}
+
+		default:{
+			ham_logapiwarnf("Unrecognized ham_mutex_kind (0x%x) using HAM_MUTEX_NORMAL", kind);
+		}
+
+		case HAM_MUTEX_NORMAL:{
+			mut->_impl_mut = PTHREAD_MUTEX_INITIALIZER;
+			pthread_mutexattr_settype(&mut_attr, PTHREAD_MUTEX_NORMAL);
+			break;
+		}
+	}
+
+	res = pthread_mutex_init(&mut->_impl_mut, &mut_attr);
+	if(res != 0){
+		ham_logapierrorf("Error in pthread_mutex_init: %s", strerror(res));
+
+		res = pthread_mutexattr_destroy(&mut_attr);
+		if(res != 0){
+			ham_logapiwarnf("Error in pthread_mutexattr_destroy: %s", strerror(res));
+		}
+
+		return false;
+	}
+
+	res = pthread_mutexattr_destroy(&mut_attr);
+	if(res != 0){
+		ham_logapiwarnf("Error in pthread_mutexattr_destroy: %s", strerror(res));
+	}
+
+	return true;
+}
+
+ham_nothrow static inline void ham_mutex_finish(ham_mutex *mut){
+	if(ham_unlikely(!mut)) return;
+
+	const int res = pthread_mutex_destroy(&mut->_impl_mut);
+	if(res != 0){
+		ham_logapiwarnf("Error in pthread_mutex_destroy: %s", strerror(res));
+	}
+}
+
+ham_nonnull_args(1)
+ham_nothrow static inline bool ham_mutex_lock(ham_mutex *mut){
+	const int res = pthread_mutex_lock(&mut->_impl_mut);
+	if(res != 0){
+		ham_logapierrorf("Error in pthread_mutex_lock: %s", strerror(res));
+		return false;
+	}
+
+	return true;
+}
 
 /**
  * Try to lock a mutex.
  * @param mut mutex to try lock
  * @returns `1` if the mutex would block, `0` if the mutex was locked or `-1` on error
  */
-ham_api ham_nothrow ham_i32 ham_mutex_try_lock(ham_mutex *mut);
+ham_nonnull_args(1)
+ham_nothrow static inline ham_i32 ham_mutex_try_lock(ham_mutex *mut){
+	const int res = pthread_mutex_trylock(&mut->_impl_mut);
 
-ham_api ham_nothrow bool ham_mutex_unlock(ham_mutex *mut);
+	switch(res){
+		case 0: return 0;
+		case EBUSY: return 1;
+
+		default:{
+			ham_logapierrorf("Error in pthread_mutex_trylock: %s", strerror(res));
+			return -1;
+		}
+	}
+}
+
+ham_nonnull_args(1)
+ham_nothrow static inline bool ham_mutex_unlock(ham_mutex *mut){
+	const int res = pthread_mutex_unlock(&mut->_impl_mut);
+	if(res != 0){
+		ham_logapierrorf("Error in pthread_mutex_unlock: %s", strerror(res));
+		return false;
+	}
+
+	return true;
+}
 
 /**
  * @}
@@ -94,16 +240,65 @@ ham_api ham_nothrow bool ham_mutex_unlock(ham_mutex *mut);
  * @{
  */
 
-typedef struct ham_cond ham_cond;
+typedef struct ham_cond{
+	//! @cond ignore
+	pthread_cond_t _impl_cond;
+	//! @endcond
+} ham_cond;
 
-ham_api ham_cond *ham_cond_create();
+ham_nonnull_args(1)
+ham_nothrow static inline bool ham_cond_init(ham_cond *cond){
+	cond->_impl_cond = PTHREAD_COND_INITIALIZER;
 
-ham_api ham_nothrow void ham_cond_destroy(ham_cond *cond);
+	const int res = pthread_cond_init(&cond->_impl_cond, nullptr);
+	if(res != 0){
+		ham_logapierrorf("Error in pthread_cond_init: %s", strerror(res));
+		return false;
+	}
 
-ham_api ham_nothrow bool ham_cond_signal(ham_cond *cond);
-ham_api ham_nothrow bool ham_cond_broadcast(ham_cond *cond);
+	return true;
+}
 
-ham_api ham_nothrow bool ham_cond_wait(ham_cond *cond, ham_mutex *mut);
+ham_nonnull_args(1)
+ham_nothrow static inline void ham_cond_finish(ham_cond *cond){
+	const int res = pthread_cond_destroy(&cond->_impl_cond);
+	if(res != 0){
+		ham_logapierrorf("Error in pthread_cond_destroy: %s", strerror(res));
+	}
+}
+
+ham_nonnull_args(1)
+ham_nothrow static inline bool ham_cond_signal(ham_cond *cond){
+	const int res = pthread_cond_signal(&cond->_impl_cond);
+	if(res != 0){
+		ham_logapierrorf("Error in pthread_cond_signal: %s", strerror(res));
+		return false;
+	}
+
+	return true;
+}
+
+ham_nonnull_args(1)
+ham_nothrow static inline bool ham_cond_broadcast(ham_cond *cond){
+	const int res = pthread_cond_broadcast(&cond->_impl_cond);
+	if(res != 0){
+		ham_logapierrorf("Error in pthread_cond_broadcast: %s", strerror(res));
+		return false;
+	}
+
+	return true;
+}
+
+ham_nonnull_args(1)
+ham_nothrow static inline bool ham_cond_wait(ham_cond *cond, ham_mutex *mut){
+	const int res = pthread_cond_wait(&cond->_impl_cond, &mut->_impl_mut);
+	if(res != 0){
+		ham_logapierrorf("Error in pthread_cond_wait: %s", strerror(res));
+		return false;
+	}
+
+	return true;
+}
 
 /**
  * @}
@@ -140,20 +335,56 @@ HAM_C_API_END
 #include <functional>
 
 namespace ham{
+	class sem_exception: public exception{};
+
+	class sem_init_error: public sem_exception{
+		public:
+			const char *api() const noexcept override{ return "sem::sem"; }
+			const char *what() const noexcept override{ return "error in ham_sem_init"; }
+	};
+
 	class sem{
 		public:
-			sem(u32 initial_value = 0)
-				: m_handle(ham_sem_create(initial_value)){}
+			sem(u32 initial_value = 0){
+				if(!ham_sem_init(&m_sem, initial_value)){
+					throw sem_init_error();
+				}
+			}
 
-			sem(sem&&) noexcept = default;
+			sem(sem &&other) noexcept
+				: m_sem(other.m_sem)
+			{
+				std::memset(&other.m_sem, 0, sizeof(ham_sem));
+			}
 
-			sem &operator=(sem&&) noexcept = default;
+			~sem(){
+				ham_sem_finish(&m_sem);
+			}
 
-			bool post() noexcept{ return ham_sem_post(m_handle.get()); }
-			bool wait() noexcept{ return ham_sem_wait(m_handle.get()); }
+			sem &operator=(sem &&other) noexcept{
+				if(this != &other){
+					ham_sem_finish(&m_sem);
+
+					m_sem = other.m_sem;
+					std::memset(&other.m_sem, 0, sizeof(ham_sem));
+				}
+
+				return *this;
+			}
+
+			bool post() noexcept{ return ham_sem_post(&m_sem); }
+			bool wait() noexcept{ return ham_sem_wait(&m_sem); }
 
 		private:
-			unique_handle<ham_sem*, ham_sem_destroy> m_handle;
+			ham_sem m_sem;
+	};
+
+	class mutex_exception: public exception{};
+
+	class mutex_init_error: public mutex_exception{
+		public:
+			const char *api() const noexcept override{ return "basic_mutex::basic_mutex"; }
+			const char *what() const noexcept override{ return "error in ham_mutex_init"; }
 	};
 
 	enum class mutex_kind{
@@ -165,18 +396,39 @@ namespace ham{
 	template<mutex_kind Kind>
 	class basic_mutex{
 		public:
-			basic_mutex(): m_handle(ham_mutex_create(static_cast<ham_mutex_kind>(Kind))){}
+			basic_mutex(){
+				if(!ham_mutex_init(&m_mut, static_cast<ham_mutex_kind>(Kind))){
+					throw mutex_init_error();
+				}
+			}
 
-			basic_mutex(basic_mutex&&) noexcept = default;
+			basic_mutex(basic_mutex &&other) noexcept
+				: m_mut(other.m_mut)
+			{
+				std::memset(&other.m_mut, 0, sizeof(ham_mutex));
+			}
 
-			basic_mutex &operator=(basic_mutex&&) noexcept = default;
+			~basic_mutex(){
+				ham_mutex_finish(&m_mut);
+			}
 
-			bool lock() noexcept{ return ham_mutex_lock(m_handle.get()); }
-			bool unlock() noexcept{ return ham_mutex_unlock(m_handle.get()); }
-			bool try_lock() noexcept{ return ham_mutex_try_lock(m_handle.get()) == 0; }
+			basic_mutex &operator=(basic_mutex &&other) noexcept{
+				if(this != &other){
+					ham_mutex_finish(&m_mut);
+
+					m_mut = other.m_mut;
+					std::memset(&other.m_mut, 0, sizeof(ham_mutex));
+				}
+
+				return *this;
+			}
+
+			bool lock() noexcept{ return ham_mutex_lock(&m_mut); }
+			bool unlock() noexcept{ return ham_mutex_unlock(&m_mut); }
+			bool try_lock() noexcept{ return ham_mutex_try_lock(&m_mut) == 0; }
 
 		private:
-			unique_handle<ham_mutex*, ham_mutex_destroy> m_handle;
+			ham_mutex m_mut;
 
 			friend class cond;
 	};
@@ -320,20 +572,49 @@ namespace ham{
 	// Condition variables
 	//
 
+	class cond_exception: public exception{};
+
+	class cond_init_error: public cond_exception{
+		public:
+			const char *api() const noexcept override{ return "cond::cond"; }
+			const char *what() const noexcept override{ return "Error in ham_cond_init"; }
+	};
+
 	class cond{
 		public:
-			cond(): m_handle(ham_cond_create()){}
+			cond(){
+				if(!ham_cond_init(&m_cond)){
+					throw cond_init_error();
+				}
+			}
 
-			cond(cond&&) noexcept = default;
+			cond(cond &&other) noexcept
+				: m_cond(other.m_cond)
+			{
+				std::memset(&other.m_cond, 0, sizeof(ham_cond));
+			}
 
-			cond &operator=(cond&&) noexcept = default;
+			~cond(){
+				ham_cond_finish(&m_cond);
+			}
 
-			bool signal() noexcept{ return ham_cond_signal(m_handle.get()); }
-			bool broadcast() noexcept{ return ham_cond_broadcast(m_handle.get()); }
+			cond &operator=(cond &&other) noexcept{
+				if(this != &other){
+					ham_cond_finish(&m_cond);
+
+					m_cond = other.m_cond;
+					std::memset(&other.m_cond, 0, sizeof(ham_cond));
+				}
+
+				return *this;
+			}
+
+			bool signal() noexcept{ return ham_cond_signal(&m_cond); }
+			bool broadcast() noexcept{ return ham_cond_broadcast(&m_cond); }
 
 			template<mutex_kind Kind>
 			bool wait(unique_lock<basic_mutex<Kind>> &lock) noexcept{
-				return ham_cond_wait(m_handle.get(), lock.m_mut->m_handle.get());
+				return ham_cond_wait(&m_cond, &lock.m_mut->m_mut);
 			}
 
 			template<mutex_kind Kind, typename CheckFn>
@@ -344,7 +625,7 @@ namespace ham{
 			}
 
 		private:
-			unique_handle<ham_cond*, ham_cond_destroy> m_handle;
+			ham_cond m_cond;
 	};
 
 	//

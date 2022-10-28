@@ -21,7 +21,7 @@ include(CMakePackageConfigHelpers)
 ham_add_library(
 	ham-engine SHARED
 	${HAM_ENGINE_HEADERS}
-	engine2.cpp
+	engine.cpp
 	argparse.cpp
 	sys.cpp
 	world.cpp

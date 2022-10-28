@@ -1,6 +1,10 @@
 # TODO
 
-List of stuff that needs to be done. Should probably be GitHub issues ¯\\\_(ツ)\_/¯
+List of stuff that needs to be done. Most of these should probably be GitHub "issues" ¯\\\_(ツ)\_/¯
+
+## General
+
+- [ ] Write better commit messages
 
 ## Runtime
 

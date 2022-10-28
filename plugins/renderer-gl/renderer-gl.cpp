@@ -47,7 +47,7 @@ HAM_PLUGIN(
 
 constexpr static inline GLenum ham_renderer_gl_fbo_attachment_format(ham_renderer_gl_fbo_attachment attachment) noexcept{
 	switch(attachment){
-		case HAM_RENDERER_GL_FBO_DEPTH_STENCIL: return GL_DEPTH24_STENCIL8;
+		case HAM_RENDERER_GL_FBO_DEPTH_STENCIL: return GL_DEPTH32F_STENCIL8;
 		case HAM_RENDERER_GL_FBO_DIFFUSE:       return GL_RGBA8;
 		case HAM_RENDERER_GL_FBO_NORMAL:        return GL_RGB16F;
 		case HAM_RENDERER_GL_FBO_SCENE:         return GL_R11F_G11F_B10F;
@@ -169,6 +169,7 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		"GL_KHR_debug",
 		"GL_ARB_direct_state_access",
 		"GL_ARB_separate_shader_objects",
+		"GL_ARB_clip_control",
 		//"GL_ARB_gl_spirv",
 		//"GL_ARB_spirv_extensions",
 		"GL_ARB_shading_language_include",
@@ -204,15 +205,23 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	GLuint global_ubo;
 	glCreateBuffers(1, &global_ubo);
 
-	GLbitfield access_flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+	GLbitfield access_flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT;
 
 	glNamedBufferStorage(global_ubo, sizeof(ham_renderer_gl_global_ubo_data), nullptr, access_flags);
 
-	void *global_ubo_map = glMapNamedBufferRange(global_ubo, 0, sizeof(ham_renderer_gl_global_ubo_data), access_flags);
+	void *global_ubo_map = glMapNamedBufferRange(global_ubo, 0, sizeof(ham_renderer_gl_global_ubo_data), access_flags | GL_MAP_FLUSH_EXPLICIT_BIT);
 	if(!global_ubo_map){
 		ham::logapierror("Error in glMapNamedBufferRange");
 		return nullptr;
 	}
+
+	constexpr ham_renderer_gl_global_ubo_data default_ubo_data = {
+		.view_proj = ham_mat4_identity(),
+		.time      = 0.f,
+	};
+
+	memcpy(global_ubo_map, &default_ubo_data, sizeof(default_ubo_data));
+	glFlushMappedNamedBufferRange(global_ubo, 0, (GLsizeiptr)sizeof(default_ubo_data));
 
 	const auto scene_info_vert = ham_renderer_gl_load_shader(r, GL_VERTEX_SHADER, HAM_LIT("shaders-gl/scene_info.vert"));
 	if(scene_info_vert == (u32)-1){
@@ -258,6 +267,16 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		glDeleteBuffers(1, &global_ubo);
 		return nullptr;
 	}
+
+	r->screen_post_frag_depth_loc = glGetUniformLocation(screen_frag, "depth_tex");
+	r->screen_post_frag_diffuse_loc = glGetUniformLocation(screen_frag, "diffuse_tex");
+	r->screen_post_frag_normal_loc = glGetUniformLocation(screen_frag, "normal_tex");
+	r->screen_post_uv_scale_loc = glGetUniformLocation(screen_frag, "uv_scale");
+
+	glProgramUniform1i(screen_frag, r->screen_post_frag_depth_loc, 0);
+	glProgramUniform1i(screen_frag, r->screen_post_frag_diffuse_loc, 1);
+	glProgramUniform1i(screen_frag, r->screen_post_frag_normal_loc, 2);
+	glProgramUniform2f(screen_frag, r->screen_post_uv_scale_loc, 1.f, 1.f);
 
 	const auto screen_pipeline = ham_renderer_gl_create_pipeline(r, screen_vert, screen_frag);
 	if(screen_pipeline == (u32)-1){
@@ -324,6 +343,7 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 		if(old_w >= w && old_h >= h){
 			r->render_w = w;
 			r->render_h = h;
+			glProgramUniform2f(r->screen_post_frag, r->screen_post_uv_scale_loc, f64(w)/f64(old_w), f64(h)/f64(old_h));
 			return true;
 		}
 	}
@@ -370,14 +390,23 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 	r->render_w = w;
 	r->render_h = h;
 
+	glProgramUniform2f(r->screen_post_frag, r->screen_post_uv_scale_loc, 1.f, 1.f);
+
 	return true;
 }
 
 static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const ham_renderer_frame_data *data){
 	(void)data;
 
-	const f32 t = (f32)r->total_time;
-	memcpy((char*)r->global_ubo_writep + offsetof(ham_renderer_gl_global_ubo_data, time), &t, sizeof(f32));
+	const ham::const_camera_view cam = data->common.cam;
+
+	const ham_renderer_gl_global_ubo_data global_data = {
+		.view_proj = cam.projection_matrix() * cam.view_matrix(),
+		.time      = (f32)r->total_time,
+	};
+
+	memcpy(r->global_ubo_writep, &global_data, sizeof(global_data));
+	glFlushMappedNamedBufferRange(r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));
 
 	GLint screen_fbo, screen_viewport[4];
 	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &screen_fbo);
@@ -386,26 +415,49 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, r->fbo);
 	glViewport(0, 0, r->render_w, r->render_h);
 
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	//glEnable(GL_DEPTH_CLAMP);
+	glDepthMask(GL_TRUE);
+
+	glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+	glFrontFace(GL_CCW);
+	//glDepthRange(1.0, 0.0);
+	//glDepthFunc(GL_LESS);
+	glDepthFunc(GL_GEQUAL);
+
 	glClearColor(0.f, 0.f, 0.f, 0.f);
+	glClearDepth(0.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-//	glBindProgramPipeline(r->scene_info_pipeline);
-//	glBindBufferBase(GL_UNIFORM_BUFFER, 0, r->global_ubo);
+	glBindProgramPipeline(r->scene_info_pipeline);
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));
 
-//	ham_object_manager_iterate(
-//		ham_super(r)->draw_groups, [](ham_object *obj, void *user) -> bool{
-//			const auto group = (const ham_draw_group_gl*)obj;
-//			if(!group->num_instances) return true;
+	ham_object_manager_iterate(
+		ham_super(r)->draw_groups, [](ham_object *obj, void *user) -> bool{
+			const auto group = (const ham_draw_group_gl*)obj;
+			if(!ham_super(group)->num_instances) return true;
 
-//			glBindVertexArray(group->vao);
-//			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, group->bufs[HAM_DRAW_BUFFER_GL_COMMANDS]);
-//			glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr, ham_super(group)->num_shapes, sizeof(ham_gl_draw_elements_indirect_command));
-//			return true;
-//		},
-//		nullptr
-//	);
+			const auto r = (const ham_renderer_gl*)ham_super(group)->r;
+
+			glBindVertexArray(group->vao);
+			glBindBufferRange(GL_UNIFORM_BUFFER, 0, r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, group->bufs[HAM_DRAW_BUFFER_GL_COMMANDS]);
+			glMultiDrawElementsIndirect(group->mode, GL_UNSIGNED_INT, nullptr, ham_super(group)->num_shapes, sizeof(ham_gl_draw_elements_indirect_command));
+			return true;
+		},
+		nullptr
+	);
+
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	glDepthMask(GL_FALSE);
 
 	// TODO: do lighting pass
+
+	glBindTextureUnit(0, r->fbo_attachments[0]);
+	glBindTextureUnit(1, r->fbo_attachments[1]);
+	glBindTextureUnit(2, r->fbo_attachments[2]);
 
 	//const ham_mat4 *const view_mat = ham_camera_view_matrix(data->common.cam);
 	//const ham_mat4 *const proj_mat = ham_camera_proj_matrix(data->common.cam);
@@ -413,14 +465,13 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)screen_fbo);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, r->fbo);
 
+	glViewport(0, 0, r->render_w, r->render_h);
+
 	glClearColor(0.f, 0.f, 0.f, 0.f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	glBindProgramPipeline(r->screen_post_pipeline);
-
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, r->global_ubo);
-
-	static const GLuint indices[] = { 0, 1, 2, 3 };
 
 	glBindVertexArray(r->screen_group->vao);
 

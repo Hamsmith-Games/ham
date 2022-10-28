@@ -30,12 +30,16 @@ int main(int argc, char *argv[]){
 	constexpr auto check_true = +[](bool result){ return result; };
 
 	ham::test_bool<> tests[] = {
-		{"meta",   ham_test_meta,   check_true},
-		{"object", ham_test_object, check_true},
-		{"utf",    ham_test_utf,    check_true},
-		{"lex",    ham_test_lex,    check_true},
-		{"buffer", ham_test_buffer, check_true},
-		{"octree", ham_test_octree, check_true},
+		{"meta",       ham_test_meta,      check_true},
+		{"object",     ham_test_object,    check_true},
+		{"utf",        ham_test_utf,       check_true},
+		{"lex",        ham_test_lex,       check_true},
+		{"buffer",     ham_test_buffer,    check_true},
+		{"octree",     ham_test_octree,    check_true},
+		{"mat",        ham_test_mat,       check_true},
+		{"quaternion", ham_test_quat,      check_true},
+		{"transform",  ham_test_transform, check_true},
+		{"camera",     ham_test_camera,    check_true},
 	};
 
 	constexpr usize num_tests = std::size(tests);

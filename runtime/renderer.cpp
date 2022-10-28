@@ -19,6 +19,8 @@
 #include "ham/renderer-object.h"
 #include "ham/check.h"
 
+using namespace ham::typedefs;
+
 HAM_C_API_BEGIN
 
 static inline ham_renderer *ham_impl_renderer_construct(const ham_object_vtable *vtable, ham_object *obj, ...){
@@ -70,9 +72,9 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 
 	const auto r = (ham_renderer*)obj;
 
-	const auto draw_mut = ham_mutex_create(HAM_MUTEX_NORMAL);
-	if(!draw_mut){
-		ham::logapierror("Error in ham_mutex_create");
+	ham_mutex draw_mut;
+	if(!ham_mutex_init(&draw_mut, HAM_MUTEX_NORMAL)){
+		ham::logapierror("Error in ham_mutex_init");
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
@@ -84,7 +86,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 	const auto draw_group_manager = ham_object_manager_create(draw_group_vtable);
 	if(!draw_group_manager){
 		ham::logapierror("Failed to create object manager for draw groups");
-		ham_mutex_destroy(draw_mut);
+		ham_mutex_finish(&draw_mut);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
@@ -95,7 +97,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 	if(!ham_buffer_init_allocator(&draw_list, allocator, alignof(ham_draw_group*), 0)){
 		ham::logapierror("Failed to initialize draw list: error in ham_buffer_init");
 		ham_object_manager_destroy(draw_group_manager);
-		ham_mutex_destroy(draw_mut);
+		ham_mutex_finish(&draw_mut);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
@@ -106,7 +108,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 		ham::logapierror("Failed to initialize draw temp list: error in ham_buffer_init");
 		ham_buffer_finish(&draw_list);
 		ham_object_manager_destroy(draw_group_manager);
-		ham_mutex_destroy(draw_mut);
+		ham_mutex_finish(&draw_mut);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
@@ -128,7 +130,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 		ham_buffer_finish(&draw_list);
 		ham_buffer_finish(&tmp_list);
 		ham_object_manager_destroy(draw_group_manager);
-		ham_mutex_destroy(draw_mut);
+		ham_mutex_finish(&draw_mut);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
 		ham_dso_close(dso);
@@ -183,7 +185,7 @@ void ham_renderer_destroy(ham_renderer *r){
 
 	ham_object_manager_destroy(r->draw_groups);
 
-	ham_mutex_destroy(r->draw_mut);
+	ham_mutex_finish(&r->draw_mut);
 
 	obj_vt->dtor(ham_super(r));
 
@@ -232,11 +234,18 @@ ham_draw_group *ham_draw_group_create(
 		return nullptr;
 	}
 
+	ham_mutex mut;
+	if(!ham_mutex_init(&mut, HAM_MUTEX_NORMAL)){
+		ham::logapierror("Error in ham_mutex_init");
+		return nullptr;
+	}
+
 	const auto allocator = r->allocator;
 
 	const auto num_shape_points_arr = (ham_usize*)ham_allocator_alloc(allocator, alignof(ham_usize), sizeof(ham_usize) * num_shapes);
 	if(!num_shape_points_arr){
 		ham::logapierror("Failed to allocate memory for draw group point count data");
+		ham_mutex_finish(&mut);
 		return nullptr;
 	}
 
@@ -244,6 +253,7 @@ ham_draw_group *ham_draw_group_create(
 	if(!num_shape_indices_arr){
 		ham::logapierror("Failed to allocate memory for draw group index count data");
 		ham_allocator_free(allocator, num_shape_points_arr);
+		ham_mutex_finish(&mut);
 		return nullptr;
 	}
 
@@ -282,12 +292,14 @@ ham_draw_group *ham_draw_group_create(
 		ham::logapierror("Failed to construct new draw group");
 		ham_allocator_free(allocator, num_shape_indices_arr);
 		ham_allocator_free(allocator, num_shape_points_arr);
+		ham_mutex_finish(&mut);
 		return nullptr;
 	}
 
 	const auto ptr = (ham_draw_group*)obj;
 
 	ptr->r = r;
+	ptr->mut = mut;
 	ptr->num_shapes = num_shapes;
 	ptr->num_shape_points = num_shape_points_arr;
 	ptr->num_shape_indices = num_shape_indices_arr;
@@ -303,7 +315,94 @@ void ham_draw_group_destroy(ham_draw_group *group){
 	ham_allocator_free(allocator, group->num_shape_indices);
 	ham_allocator_free(allocator, group->num_shape_points);
 
+	ham_mutex_finish(&group->mut);
+
 	ham_object_delete(group->r->draw_groups, ham_super(group));
+}
+
+bool ham_draw_group_set_num_instances(ham_draw_group *group, ham_u32 n){
+	if(!ham_check(group != NULL)) return false;
+
+	if(!ham_mutex_lock(&group->mut)){
+		ham::logapierror("Error in ham_mutex_lock");
+		return false;
+	}
+
+	const auto vptr = (const ham_draw_group_vtable*)ham_super(group)->vptr;
+	const bool result = vptr->set_num_instances(group, n);
+	if(result){
+		group->num_instances = n;
+	}
+
+	if(!ham_mutex_unlock(&group->mut)){
+		ham::logapiwarn("Error in ham_mutex_unlock");
+	}
+
+	return result;
+}
+
+ham_u32 ham_draw_group_num_instances(const ham_draw_group *group){
+	if(!ham_check(group != NULL)) return (ham_u32)-1;
+	return group->num_instances;
+}
+
+ham_u32 ham_draw_group_instance_iterate(
+	ham_draw_group *group,
+	ham_draw_group_instance_iterate_fn fn,
+	void *user
+){
+	if(!ham_check(group != NULL)) return (ham_u32)-1;
+
+	if(!ham_mutex_lock(&group->mut)){
+		ham::logapierror("Error in ham_mutex_lock");
+		return (ham_u32)-1;
+	}
+
+	u32 result = group->num_instances;
+
+	if(fn){
+		const auto vptr = (const ham_draw_group_vtable*)ham_super(group)->vptr;
+		const auto data = vptr->instance_data(group);
+
+		const auto n = group->num_instances;
+
+		for(result = 0; result < n; result++){
+			const auto inst = data + result;
+			if(!fn(inst, data)) break;
+		}
+	}
+
+	if(!ham_mutex_unlock(&group->mut)){
+		ham::logapiwarn("Error in ham_mutex_unlock");
+	}
+
+	return result;
+}
+
+bool ham_draw_group_instance_visit(
+	ham_draw_group *group, ham_u32 idx,
+	ham_draw_group_instance_iterate_fn fn,
+	void *user
+){
+	if(!ham_check(group != NULL)) return false;
+
+	if(!ham_mutex_lock(&group->mut)){
+		ham::logapierror("Error in ham_mutex_lock");
+		return false;
+	}
+
+	bool result = ham_check(idx < group->num_instances);
+	if(result){
+		const auto vptr = (const ham_draw_group_vtable*)ham_super(group)->vptr;
+		const auto data = vptr->instance_data(group);
+		result = fn(data + idx, user);
+	}
+
+	if(!ham_mutex_unlock(&group->mut)){
+		ham::logapiwarn("Error in ham_mutex_unlock");
+	}
+
+	return result;
 }
 
 HAM_C_API_END

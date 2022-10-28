@@ -1,6 +1,6 @@
 /*
  * Ham Runtime
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Hamsmith Ltd.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -127,6 +127,26 @@ ham_nothrow static inline ham_f64 ham_ticker_tick(ham_ticker *ticker, ham_f64 ta
 	ticker->loop = ticker->end;
 	return dt;
 }
+
+#ifdef __cplusplus
+
+namespace ham{
+	class ticker{
+		public:
+			ticker(){
+				ham_ticker_reset(&m_ticker);
+			}
+
+			void reset() noexcept{ ham_ticker_reset(&m_ticker); }
+
+			f64 tick(f64 target_dt = 0.0) noexcept{ return ham_ticker_tick(&m_ticker, target_dt); }
+
+		private:
+			ham_ticker m_ticker;
+	};
+}
+
+#endif // __cplusplus
 
 /**
  * @}
