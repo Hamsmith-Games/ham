@@ -232,11 +232,11 @@ void editor::world_view::keyPressEvent(QKeyEvent *ev){
 			break;
 
 		case Qt::Key_Control:
-			m_cam_dir.z() -= 1.f;
+			m_cam_dir.y() -= 1.f;
 			break;
 
 		case Qt::Key_Space:
-			m_cam_dir.z() += 1.f;
+			m_cam_dir.y() += 1.f;
 			break;
 
 		default:
@@ -268,11 +268,11 @@ void editor::world_view::keyReleaseEvent(QKeyEvent *ev){
 			break;
 
 		case Qt::Key_Control:
-			m_cam_dir.z() += 1.f;
+			m_cam_dir.y() += 1.f;
 			break;
 
 		case Qt::Key_Space:
-			m_cam_dir.z() -= 1.f;
+			m_cam_dir.y() -= 1.f;
 			break;
 
 		default:
