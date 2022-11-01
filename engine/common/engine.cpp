@@ -3,7 +3,6 @@
 #include "ham/check.h"
 #include "ham/fs.h"
 #include "ham/async.h"
-#include "ham/plugin.h"
 
 #include "ham/std_vector.hpp"
 
@@ -14,6 +13,7 @@ HAM_C_API_BEGIN
 struct ham_engine{
 	const ham_allocator *allocator;
 	ham_engine_app app;
+	ham_image *default_tex;
 
 	std::atomic<usize> num_subsystems;
 	ham_engine_subsys *subsystems[HAM_ENGINE_MAX_SUBSYSTEMS];
@@ -21,6 +21,8 @@ struct ham_engine{
 	std::atomic_bool running;
 	std::atomic<int> status;
 	std::atomic<f64> min_dt;
+
+	ham::std_vector<ham::str_buffer_utf8> interned;
 };
 
 ham::mutex ham_impl_gengine_mut;
@@ -145,6 +147,58 @@ ham_nothrow bool ham_engine_app_load_json(ham_engine_app *ret, const ham_json_va
 	return true;
 }
 
+static inline void ham_image_buf_fill_rgba8(
+	ham_u8 *buf, ham_u32 buf_w, ham_u32 buf_h,
+	ham_color_u8 color,
+	ham_u32 off_x, ham_u32 off_y,
+	ham_u32 fill_w, ham_u32 fill_h
+){
+
+#ifdef __AVX__
+	alignas(32) const ham_u32 color8[8] = {
+		color.bits, color.bits, color.bits, color.bits,
+		color.bits, color.bits, color.bits, color.bits,
+	};
+	const __m256i pix8 = _mm256_load_si256((const __m256i*)color8);
+	const ham_u32 fill_w_step = 8;
+#elif defined(__x86_64__)
+	alignas(16) const ham_u32 color4[4] = { color.bits, color.bits, color.bits, color.bits };
+	const __m128i pix4 = _mm_load_si128((const __m128i*)color4);
+	const ham_u32 fill_w_step = 4;
+#else
+	ham_v4u32 pix4 = { color.bits, color.bits, color.bits, color.bits };
+	const ham_u32 fill_w_step = 4;
+#endif
+
+	const ham_u32 fill_w_div = fill_w / fill_w_step;
+	const ham_u32 rem_w = fill_w % fill_w_step;
+
+	for(ham_u32 y = 0; y < fill_h; y++){
+		const auto y_idx = (off_y + y) * buf_w;
+
+		for(ham_u32 x = 0; x < fill_w_div; x++){
+			const auto x_idx = off_x + (x * fill_w_step); // 'fill_w_step' color stride
+
+			const auto buf_idx = (y_idx + x_idx) * 4; // 4 component colors
+
+		#ifdef __AVX__
+			_mm256_storeu_si256((__m256i*)(buf + buf_idx), pix8);
+		#elif defined(__x86_64__)
+			_mm_storeu_si128((__m128i*)(buf + buf_idx), pix4);
+		#else
+			memcpy(buf + buf_idx, &pix4, sizeof(pix4));
+		#endif
+		}
+
+		for(ham_u32 x = 0; x < rem_w; x++){
+			const auto x_idx = off_x + (fill_w_div * fill_w_step) + x;
+			const auto buf_idx = (y_idx + x_idx) * 4;
+
+			memcpy(buf + buf_idx, &color, sizeof(color));
+		}
+	}
+}
+
 ham_engine *ham_engine_create(const ham_engine_app *app){
 	ham::scoped_lock lock(ham_impl_gengine_mut);
 
@@ -165,13 +219,52 @@ ham_engine *ham_engine_create(const ham_engine_app *app){
 		return nullptr;
 	}
 
+	ham_u8 default_tex_pixels[512*512*4];
+	constexpr ham_color_u8 pixel_color = { .data = { 0xff, 0x78, 0x0, 0xff } };
+	constexpr ham_color_u8 pixel_color_grey = { .data = { 0x69, 0x69, 0x69, 0xff } };
+
+	ham_image_buf_fill_rgba8(default_tex_pixels, 512, 512, pixel_color, 0, 0, 256, 256);
+	ham_image_buf_fill_rgba8(default_tex_pixels, 512, 512, pixel_color, 256, 256, 256, 256);
+
+	ham_image_buf_fill_rgba8(default_tex_pixels, 512, 512, pixel_color_grey, 256, 0, 256, 256);
+	ham_image_buf_fill_rgba8(default_tex_pixels, 512, 512, pixel_color_grey, 0, 256, 256, 256);
+
+	const auto default_tex = ham_image_create(HAM_RGBA8U, 512, 512, default_tex_pixels);
+	if(!default_tex){
+		ham::logapierror("Could not create default texture");
+		return nullptr;
+	}
+
 	const auto allocator = ham_current_allocator();
 
 	const auto engine = ham_allocator_new(allocator, ham_engine);
-	if(!engine) return nullptr;
+	if(!engine){
+		ham_image_destroy(default_tex);
+		return nullptr;
+	}
+
+	const auto dir_str = engine->interned.emplace_back(app->dir).c_str();
+	const auto name_str = engine->interned.emplace_back(app->name).c_str();
+	const auto display_str = engine->interned.emplace_back(app->display_name).c_str();
+	const auto author_str = engine->interned.emplace_back(app->author).c_str();
+	const auto license_str = engine->interned.emplace_back(app->license).c_str();
+	const auto desc_str = engine->interned.emplace_back(app->description).c_str();
+
+	engine->app.id = app->id;
+	engine->app.dir = ham::str8(dir_str);
+	engine->app.name = ham::str8(name_str);
+	engine->app.display_name = ham::str8(display_str);
+	engine->app.author = ham::str8(author_str);
+	engine->app.license = ham::str8(license_str);
+	engine->app.description = ham::str8(desc_str);
+	engine->app.version = app->version;
+	engine->app.init = app->init;
+	engine->app.fini = app->fini;
+	engine->app.loop = app->loop;
+	engine->app.user = app->user;
 
 	engine->allocator = allocator;
-	engine->app = *app;
+	engine->default_tex = default_tex;
 
 	engine->num_subsystems.store(0, std::memory_order_relaxed);
 	memset(engine->subsystems, 0, sizeof(engine->subsystems));
@@ -218,6 +311,8 @@ ham_nothrow void ham_engine_destroy(ham_engine *engine){
 		ham_impl_engine_subsys_destroy(subsys);
 	}
 
+	ham_image_destroy(engine->default_tex);
+
 	ham_allocator_delete(allocator, engine);
 
 	ham_impl_gengine = nullptr;
@@ -241,6 +336,11 @@ ham_nothrow ham_engine_subsys *ham_engine_get_subsystem(ham_engine *engine, ham_
 	}
 
 	return engine->subsystems[idx];
+}
+
+ham_nothrow const ham_image *ham_engine_get_default_tex_image(const ham_engine *engine){
+	if(!ham_check(engine != NULL)) return nullptr;
+	return engine->default_tex;
 }
 
 ham_nothrow bool ham_engine_request_exit(ham_engine *engine){

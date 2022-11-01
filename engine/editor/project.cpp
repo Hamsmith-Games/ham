@@ -84,6 +84,12 @@ editor::project::project(const QDir &dir, QObject *parent)
 		throw project_json_error{};
 	}
 
+	const auto proj_id_json = proj_root["id"];
+	if(!proj_id_json){
+		qWarning() << "Invalid project JSON file" << json_path << "no \"project.id\" key";
+		throw project_json_error();
+	}
+
 	const auto proj_name_json = proj_root["name"];
 	if(!proj_name_json){
 		qWarning() << "Invalid project JSON file" << json_path << "no \"project.name\" key";
@@ -102,20 +108,40 @@ editor::project::project(const QDir &dir, QObject *parent)
 		throw project_json_error{};
 	}
 
+	const auto proj_version_json = proj_root["version"];
+	if(!proj_version_json){
+		qWarning() << "Invalid template JSON file" << json_path << "no \"project.version\" key";
+		throw project_json_error{};
+	}
+
+	const auto proj_license_json = proj_root["license"];
+	if(!proj_license_json){
+		qWarning() << "Invalid template JSON file" << json_path << "no \"project.license\" key";
+		throw project_json_error{};
+	}
+
 	const auto proj_desc_json = proj_root["desc"];
 	if(!proj_desc_json){
 		qWarning() << "Invalid template JSON file" << json_path << "no \"project.desc\" key";
 		throw project_json_error{};
 	}
 
+	const auto proj_ver_maj = proj_version_json[0].get_nat();
+	const auto proj_ver_min = proj_version_json[1].get_nat();
+	const auto proj_ver_rev = proj_version_json[2].get_nat();
+
 	const auto proj_name    = proj_name_json.get_str();
 	const auto proj_display = proj_display_json.get_str();
 	const auto proj_author  = proj_author_json.get_str();
+	const auto proj_license = proj_license_json.get_str();
 	const auto proj_desc    = proj_desc_json.get_str();
 
+	m_id = proj_id_json.get_nat();
+	m_ver = QVersionNumber(proj_ver_maj, proj_ver_min, proj_ver_rev);
 	m_name = QString::fromUtf8(proj_name.ptr());
 	m_display_name = QString::fromUtf8(proj_display.ptr());
 	m_author = QString::fromUtf8(proj_author.ptr());
+	m_license = QString::fromUtf8(proj_license.ptr());
 	m_desc = QString::fromUtf8(proj_desc.ptr());
 }
 

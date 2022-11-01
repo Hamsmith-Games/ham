@@ -18,12 +18,31 @@
 
 include(CMakePackageConfigHelpers)
 
+FetchContent_Declare(
+	assimp_content
+	GIT_REPOSITORY https://github.com/assimp/assimp.git
+	GIT_TAG        c2967cf79acdc4cd48ecb0729e2733bf45b38a6f
+)
+
+FetchContent_GetProperties(assimp_content)
+if(NOT assimp_content_POPULATED)
+	FetchContent_Populate(assimp_content)
+
+	set(ASSIMP_BUILD_TESTS FALSE CACHE BOOL "" FORCE)
+	set(ASSIMP_INSTALL FALSE CACHE BOOL "" FORCE)
+	set(ASSIMP_INJECT_DEBUG_POSTFIX FALSE CACHE BOOL "" FORCE)
+	set(ASSIMP_BUILD_ZLIB ON CACHE BOOL "" FORCE)
+
+	add_subdirectory(${assimp_content_SOURCE_DIR} ${assimp_content_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
 ham_add_library(
 	ham-engine SHARED
 	${HAM_ENGINE_HEADERS}
 	engine.cpp
 	argparse.cpp
 	sys.cpp
+	model.cpp
 	world.cpp
 )
 
@@ -41,6 +60,7 @@ target_include_directories(
 target_link_libraries(
 	ham-engine PRIVATE
 	robin_hood::robin_hood
+	assimp::assimp
 )
 
 configure_package_config_file(

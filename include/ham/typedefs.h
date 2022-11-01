@@ -192,9 +192,98 @@ typedef enum ham_color_format{
 	HAM_COLOR_FORMAT_COUNT
 } ham_color_format;
 
+ham_constexpr ham_nothrow static inline ham_u32 ham_color_format_component_size(ham_color_format format){
+	switch(format){
+		case HAM_R8U:
+		case HAM_RG8U:
+		case HAM_RGB8U:
+		case HAM_RGBA8U:
+		case HAM_R8I:
+		case HAM_RG8I:
+		case HAM_RGB8I:
+		case HAM_RGBA8I:
+		default:
+			return 1;
+
+		case HAM_R16U:
+		case HAM_RG16U:
+		case HAM_RGB16U:
+		case HAM_RGBA16U:
+		case HAM_R16I:
+		case HAM_RG16I:
+		case HAM_RGB16I:
+		case HAM_RGBA16I:
+		case HAM_DEPTH16:
+			 return 2;
+
+		case HAM_R32U:
+		case HAM_RG32U:
+		case HAM_RGB32U:
+		case HAM_RGBA32U:
+		case HAM_R32I:
+		case HAM_RG32I:
+		case HAM_RGB32I:
+		case HAM_RGBA32I:
+		case HAM_R32F:
+		case HAM_RG32F:
+		case HAM_RGB32F:
+		case HAM_RGBA32F:
+		case HAM_DEPTH32:
+		case HAM_DEPTH32F:
+		case HAM_DEPTH24_STENCIL8:
+			return 4;
+	}
+}
+
+ham_constexpr ham_nothrow static inline ham_u32 ham_color_format_num_components(ham_color_format format){
+	switch(format){
+		case HAM_R8U:
+		case HAM_R8I:
+		case HAM_R16U:
+		case HAM_R16I:
+		case HAM_R32U:
+		case HAM_R32I:
+		case HAM_R32F:
+		case HAM_DEPTH16:
+		case HAM_DEPTH32:
+		case HAM_DEPTH32F:
+		case HAM_DEPTH24_STENCIL8: // combined into single pixel
+			return 1;
+
+		case HAM_RG8I:
+		case HAM_RG8U:
+		case HAM_RG16U:
+		case HAM_RG16I:
+		case HAM_RG32U:
+		case HAM_RG32I:
+		case HAM_RG32F:
+			return 2;
+
+		case HAM_RGB8U:
+		case HAM_RGB8I:
+		case HAM_RGB16U:
+		case HAM_RGB16I:
+		case HAM_RGB32U:
+		case HAM_RGB32I:
+		case HAM_RGB32F:
+			return 3;
+
+		case HAM_RGBA8U:
+		case HAM_RGBA8I:
+		case HAM_RGBA16U:
+		case HAM_RGBA16I:
+		case HAM_RGBA32U:
+		case HAM_RGBA32I:
+		case HAM_RGBA32F:
+		default:
+			return 4;
+	}
+}
+
 typedef union alignas(ham_u32) ham_color_u8{
 	struct { ham_u8 r, g, b, a; };
 	ham_u8 data[4];
+	ham_u32 bits;
 } ham_color_u8;
 
 typedef union alignas(ham_u32) ham_color_i8{
@@ -205,6 +294,7 @@ typedef union alignas(ham_u32) ham_color_i8{
 typedef union alignas(ham_u64) ham_color_u16{
 	struct { ham_u16 r, g, b, a; };
 	ham_u16 data[4];
+	ham_u64 bits;
 } ham_color_u16;
 
 typedef union alignas(ham_u64) ham_color_i16{

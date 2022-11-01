@@ -48,6 +48,8 @@ struct ham_renderer{
 	ham_dso_handle dso;
 	ham_plugin *plugin;
 
+	ham_image *default_img;
+
 	ham_object_manager *draw_groups;
 
 	ham_mutex draw_mut;
@@ -73,6 +75,7 @@ struct ham_draw_group{
 	ham_usize num_shapes;
 	ham_usize *num_shape_points;
 	ham_usize *num_shape_indices;
+	const ham_image **images;
 
 	ham_u32 num_instances;
 };

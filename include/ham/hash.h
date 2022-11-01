@@ -208,6 +208,11 @@ namespace ham{
 		constexpr ham_uptr operator()(const char *s) const noexcept{ return ham_str_hash_utf8(str8(s)); }
 	};
 
+	template<usize N>
+	struct hash_functor<char[N]>{
+		constexpr ham_uptr operator()(const char(&s)[N]) const noexcept{ return ham_str_hash_utf8(str8(s)); }
+	};
+
 	template<>
 	struct hash_functor<str8>{
 		constexpr ham_uptr operator()(const str8 &s) const noexcept{ return ham_str_hash_utf8(s); }

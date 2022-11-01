@@ -29,6 +29,17 @@
 
 HAM_C_API_BEGIN
 
+enum {
+	HAM_GBO_DEPTH_TEXTURE_UNIT,
+	HAM_GBO_DIFFUSE_TEXTURE_UNIT,
+	HAM_GBO_NORMAL_TEXTURE_UNIT,
+	HAM_GBO_SCENE_TEXTURE_UNIT,
+
+	HAM_DIFFUSE_TEXTURE_UNIT,
+	HAM_NORMAL_TEXTURE_UNIT,
+	HAM_SPECULAR_TEXTURE_UNIT,
+};
+
 typedef enum ham_renderer_gl_fbo_attachment{
 	HAM_RENDERER_GL_FBO_DEPTH_STENCIL,
 	HAM_RENDERER_GL_FBO_DIFFUSE,
@@ -67,6 +78,7 @@ typedef struct ham_renderer_gl_api ham_renderer_gl{
 	ham_u32 scene_info_vert, scene_info_frag, scene_info_pipeline;
 	ham_u32 screen_post_vert, screen_post_frag, screen_post_pipeline;
 
+	ham_i32 scene_info_frag_diffuse_tex_loc;
 	ham_i32 screen_post_frag_depth_loc;
 	ham_i32 screen_post_frag_diffuse_loc;
 	ham_i32 screen_post_frag_normal_loc;
@@ -89,6 +101,7 @@ struct ham_renderer_gl_api ham_draw_group_gl{
 	ham_u32 mode;
 	ham_u32 vao;
 	ham_u32 bufs[HAM_DRAW_BUFFER_GL_DATA_COUNT];
+	ham_u32 diffuse_tex_arr;
 
 	ham_u32 instance_capacity;
 	void *instance_mapping;

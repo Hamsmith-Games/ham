@@ -20,10 +20,11 @@ include(CMakePackageConfigHelpers)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
+find_package(Threads REQUIRED)
+find_package(Magic REQUIRED)
 find_package(GMP REQUIRED)
 find_package(MPFR REQUIRED)
-find_package(Magic REQUIRED)
-find_package(Threads REQUIRED)
+find_package(FreeImage REQUIRED)
 
 set(
 	HAM_SOURCES
@@ -41,6 +42,7 @@ set(
 	parse.cpp
 	json.cpp
 	shape.cpp
+	image.cpp
 	net.cpp
 	renderer.cpp
 	ham.cpp
@@ -110,7 +112,6 @@ target_link_libraries(
 		Threads::Threads
 	    gmp::gmp
 		mpfr::mpfr
-		magic::magic
 		fmt::fmt
 )
 
@@ -120,6 +121,8 @@ target_link_libraries(
 	    ${CMAKE_DL_LIBS}
 	    ${HAM_CPU_LIBS}
 		bfd
+		magic::magic
+		FreeImage::FreeImage
 		robin_hood::robin_hood
 		yyjson
 )

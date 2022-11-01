@@ -19,6 +19,8 @@
 #ifndef HAM_ENGINE_EDITOR_WORLD_VIEW_HPP
 #define HAM_ENGINE_EDITOR_WORLD_VIEW_HPP 1
 
+#include "ham/engine.h"
+
 #include <QWidget>
 #include <QMenu>
 
@@ -49,7 +51,7 @@ namespace ham::engine::editor{
 		Q_PROPERTY(ham::engine::editor::renderer_widget* renderer READ renderer CONSTANT)
 
 		public:
-			explicit world_view(QWidget *parent = nullptr);
+			explicit world_view(ham_engine *engine, QWidget *parent = nullptr);
 			~world_view();
 
 			renderer_widget *renderer() const noexcept{ return m_r_widget; }
@@ -69,8 +71,9 @@ namespace ham::engine::editor{
 			void resizeEvent(QResizeEvent *ev) override;
 
 		private:
+			ham_engine *m_engine;
 			renderer_widget *m_r_widget;
-			draw_group m_gizmo_group;
+			draw_group m_gizmo_group, m_test_group;
 
 			ham::camera m_cam;
 			Qt::MouseButton m_cam_btn = Qt::MiddleButton;

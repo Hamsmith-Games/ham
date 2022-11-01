@@ -136,6 +136,17 @@ const ham_shape *ham_shape_unit_square(){
 	return &ret;
 }
 
+ham_shape *ham_shape_create_triangle_mesh(
+	ham_usize num_points,
+	const ham_vec3 *verts,
+	const ham_vec3 *norms,
+	const ham_vec2 *uvs,
+	ham_usize num_indices,
+	const ham_u32 *indices
+){
+	return ham_shape_create(HAM_SHAPE_TRIANGLE_MESH, HAM_VERTEX_TRIANGLES, num_points, verts, norms, uvs, num_indices, indices);
+}
+
 ham_shape *ham_shape_create_quad(const ham_vec2 *points){
 	const ham_vec3 verts[] = {
 		ham_vec3{ .data = { points[0].x, points[0].y, 0.f } },

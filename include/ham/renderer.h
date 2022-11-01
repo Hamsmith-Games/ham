@@ -27,6 +27,7 @@
 
 #include "shape.h"
 #include "camera.h"
+#include "image.h"
 #include "vk.h" // IWYU pragma: keep
 
 #include <stdarg.h>
@@ -86,6 +87,8 @@ ham_api bool ham_renderer_resize(ham_renderer *renderer, ham_u32 w, ham_u32 h);
 
 ham_api void ham_renderer_frame(ham_renderer *renderer, ham_f64 dt, const ham_renderer_frame_data *data);
 
+ham_api const ham_image *ham_renderer_default_image(const ham_renderer *renderer);
+
 /**
  * @defgroup HAM_RENDERER_TEXTURE Textures
  * @{
@@ -113,7 +116,9 @@ typedef struct ham_draw_group_instance_data{
 
 ham_api ham_draw_group *ham_draw_group_create(
 	ham_renderer *r,
-	ham_usize num_shapes, const ham_shape *const *shapes
+	ham_usize num_shapes,
+	const ham_shape *const *shapes,
+	const ham_image *const *images
 );
 
 ham_api void ham_draw_group_destroy(ham_draw_group *group);
@@ -135,6 +140,8 @@ ham_api bool ham_draw_group_instance_visit(
 );
 
 ham_api ham_u32 ham_draw_group_num_instances(const ham_draw_group *group);
+
+ham_api const ham_image *ham_draw_group_image(const ham_draw_group *group, ham_usize idx);
 
 /**
  * @}
@@ -292,8 +299,11 @@ namespace ham{
 		public:
 			draw_group() noexcept = default;
 
-			draw_group(renderer_view r, usize num_shapes, const ham_shape *const *shapes)
-				: m_handle(ham_draw_group_create(r, num_shapes, shapes))
+			draw_group(
+				renderer_view r,
+				usize num_shapes, const ham_shape *const *shapes, const ham_image *const *images
+			)
+				: m_handle(ham_draw_group_create(r, num_shapes, shapes, images))
 			{
 				if(!m_handle){
 					throw draw_group_ctor_error();

@@ -268,14 +268,18 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		return nullptr;
 	}
 
+	r->scene_info_frag_diffuse_tex_loc = glGetUniformLocation(scene_info_frag, "diffuse_tex");
+
 	r->screen_post_frag_depth_loc = glGetUniformLocation(screen_frag, "depth_tex");
 	r->screen_post_frag_diffuse_loc = glGetUniformLocation(screen_frag, "diffuse_tex");
 	r->screen_post_frag_normal_loc = glGetUniformLocation(screen_frag, "normal_tex");
 	r->screen_post_uv_scale_loc = glGetUniformLocation(screen_frag, "uv_scale");
 
-	glProgramUniform1i(screen_frag, r->screen_post_frag_depth_loc, 0);
-	glProgramUniform1i(screen_frag, r->screen_post_frag_diffuse_loc, 1);
-	glProgramUniform1i(screen_frag, r->screen_post_frag_normal_loc, 2);
+	glProgramUniform1i(scene_info_frag, r->scene_info_frag_diffuse_tex_loc, HAM_DIFFUSE_TEXTURE_UNIT);
+
+	glProgramUniform1i(screen_frag, r->screen_post_frag_depth_loc, HAM_GBO_DEPTH_TEXTURE_UNIT);
+	glProgramUniform1i(screen_frag, r->screen_post_frag_diffuse_loc, HAM_GBO_DIFFUSE_TEXTURE_UNIT);
+	glProgramUniform1i(screen_frag, r->screen_post_frag_normal_loc, HAM_GBO_NORMAL_TEXTURE_UNIT);
 	glProgramUniform2f(screen_frag, r->screen_post_uv_scale_loc, 1.f, 1.f);
 
 	const auto screen_pipeline = ham_renderer_gl_create_pipeline(r, screen_vert, screen_frag);
@@ -307,7 +311,8 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	ret->scene_info_pipeline = scene_info_pipeline;
 
 	const auto unit_sq = ham_shape_unit_square();
-	ret->screen_group = (ham_draw_group_gl*)ham_draw_group_create(ham_super(ret), 1, &unit_sq); // TODO: check this
+	const ham_image *const null_img = ham_super(ret)->default_img;
+	ret->screen_group = (ham_draw_group_gl*)ham_draw_group_create(ham_super(ret), 1, &unit_sq, &null_img); // TODO: check this
 
 	ret->global_ubo = global_ubo;
 	ret->global_ubo_writep = global_ubo_map;
@@ -440,6 +445,8 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 
 			const auto r = (const ham_renderer_gl*)ham_super(group)->r;
 
+			glBindTextureUnit(HAM_DIFFUSE_TEXTURE_UNIT, group->diffuse_tex_arr);
+
 			glBindVertexArray(group->vao);
 			glBindBufferRange(GL_UNIFORM_BUFFER, 0, r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));
 			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, group->bufs[HAM_DRAW_BUFFER_GL_COMMANDS]);
@@ -455,9 +462,9 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 
 	// TODO: do lighting pass
 
-	glBindTextureUnit(0, r->fbo_attachments[0]);
-	glBindTextureUnit(1, r->fbo_attachments[1]);
-	glBindTextureUnit(2, r->fbo_attachments[2]);
+	glBindTextureUnit(HAM_GBO_DEPTH_TEXTURE_UNIT, r->fbo_attachments[0]);
+	glBindTextureUnit(HAM_GBO_DIFFUSE_TEXTURE_UNIT, r->fbo_attachments[1]);
+	glBindTextureUnit(HAM_GBO_NORMAL_TEXTURE_UNIT, r->fbo_attachments[2]);
 
 	//const ham_mat4 *const view_mat = ham_camera_view_matrix(data->common.cam);
 	//const ham_mat4 *const proj_mat = ham_camera_proj_matrix(data->common.cam);

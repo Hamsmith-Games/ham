@@ -81,11 +81,32 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 		return nullptr;
 	}
 
+	ham_u8 default_tex_pixels[512*512*4];
+	constexpr ham_color_u8 pixel_color = { .data = { 255, 120, 0, 255 } };
+
+	for(ham_u32 y = 0; y < 512; y++){
+		for(ham_u32 x = 0; x < 512; x++){
+			const auto idx = ((y * 512) + x) * 4;
+			memcpy(default_tex_pixels + idx, &pixel_color, sizeof(ham_color_u8));
+		}
+	}
+
+	const auto default_img = ham_image_create(HAM_RGBA8U, 512, 512, default_tex_pixels);
+	if(!default_img){
+		ham::logapierror("Could not create default texture");
+		ham_mutex_finish(&draw_mut);
+		ham_allocator_free(allocator, obj);
+		ham_plugin_unload(plugin);
+		ham_dso_close(dso);
+		return nullptr;
+	}
+
 	const auto draw_group_vtable = (const ham_object_vtable*)((const ham_renderer_vtable*)obj_vtable)->draw_group_vtable();
 
 	const auto draw_group_manager = ham_object_manager_create(draw_group_vtable);
 	if(!draw_group_manager){
 		ham::logapierror("Failed to create object manager for draw groups");
+		ham_image_destroy(default_img);
 		ham_mutex_finish(&draw_mut);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
@@ -97,6 +118,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 	if(!ham_buffer_init_allocator(&draw_list, allocator, alignof(ham_draw_group*), 0)){
 		ham::logapierror("Failed to initialize draw list: error in ham_buffer_init");
 		ham_object_manager_destroy(draw_group_manager);
+		ham_image_destroy(default_img);
 		ham_mutex_finish(&draw_mut);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
@@ -108,6 +130,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 		ham::logapierror("Failed to initialize draw temp list: error in ham_buffer_init");
 		ham_buffer_finish(&draw_list);
 		ham_object_manager_destroy(draw_group_manager);
+		ham_image_destroy(default_img);
 		ham_mutex_finish(&draw_mut);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
@@ -119,6 +142,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 	r->allocator   = allocator;
 	r->dso         = dso;
 	r->plugin      = plugin;
+	r->default_img = default_img;
 	r->draw_mut    = draw_mut;
 	r->draw_groups = draw_group_manager;
 	r->draw_list   = draw_list;
@@ -130,6 +154,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 		ham_buffer_finish(&draw_list);
 		ham_buffer_finish(&tmp_list);
 		ham_object_manager_destroy(draw_group_manager);
+		ham_image_destroy(default_img);
 		ham_mutex_finish(&draw_mut);
 		ham_allocator_free(allocator, obj);
 		ham_plugin_unload(plugin);
@@ -142,6 +167,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 	obj->vptr      = obj_vtable;
 	ret->allocator   = allocator;
 	ret->dso         = dso;
+	ret->default_img = default_img;
 	ret->plugin      = plugin;
 	ret->draw_mut    = draw_mut;
 	ret->draw_groups = draw_group_manager;
@@ -173,6 +199,7 @@ void ham_renderer_destroy(ham_renderer *r){
 	ham_buffer_finish(&r->draw_list);
 	ham_buffer_finish(&r->tmp_list);
 
+
 	ham_object_manager_iterate(
 		r->draw_groups,
 		[](ham_object *obj, void*){
@@ -184,6 +211,8 @@ void ham_renderer_destroy(ham_renderer *r){
 	);
 
 	ham_object_manager_destroy(r->draw_groups);
+
+	ham_image_destroy(r->default_img);
 
 	ham_mutex_finish(&r->draw_mut);
 
@@ -218,18 +247,24 @@ void ham_renderer_frame(ham_renderer *renderer, ham_f64 dt, const ham_renderer_f
 	renderer_vt->frame(renderer, dt, data);
 }
 
+const ham_image *ham_renderer_default_image(const ham_renderer *renderer){
+	if(!ham_check(renderer != NULL)) return nullptr;
+	return renderer->default_img;
+}
+
 //
 // Draw groups
 //
 
 ham_draw_group *ham_draw_group_create(
 	ham_renderer *r,
-	ham_usize num_shapes, const ham_shape *const *shapes
+	ham_usize num_shapes, const ham_shape *const *shapes, const ham_image *const *images
 ){
 	if(
 	   !ham_check(r != NULL) ||
 	   !ham_check(num_shapes > 0) ||
-	   !ham_check(shapes != NULL)
+	   !ham_check(shapes != NULL) ||
+	   !ham_check(images != NULL)
 	){
 		return nullptr;
 	}
@@ -257,9 +292,19 @@ ham_draw_group *ham_draw_group_create(
 		return nullptr;
 	}
 
+	const auto images_arr = (const ham_image**)ham_allocator_alloc(allocator, alignof(void*), sizeof(void*) * num_shapes);
+	if(!images_arr){
+		ham::logapierror("Failed to allocate memory for draw group image array");
+		ham_allocator_free(allocator, num_shape_points_arr);
+		ham_allocator_free(allocator, num_shape_indices_arr);
+		ham_mutex_finish(&mut);
+		return nullptr;
+	}
+
 	for(ham_usize i = 0; i < num_shapes; i++){
 		num_shape_points_arr[i]  = ham_shape_num_points(shapes[i]);
 		num_shape_indices_arr[i] = ham_shape_num_indices(shapes[i]);
+		images_arr[i] = images[i];
 	}
 
 	struct draw_group_data{
@@ -268,9 +313,10 @@ ham_draw_group *ham_draw_group_create(
 		const ham_shape *const *shapes;
 		ham_usize *num_shape_points_arr;
 		ham_usize *num_shape_indices_arr;
+		const ham_image **images;
 	};
 
-	draw_group_data data{r, num_shapes, shapes, num_shape_points_arr, num_shape_indices_arr};
+	draw_group_data data{r, num_shapes, shapes, num_shape_points_arr, num_shape_indices_arr, images_arr};
 
 	const auto obj = ham_object_new_init(
 		r->draw_groups,
@@ -282,16 +328,18 @@ ham_draw_group *ham_draw_group_create(
 			group->num_shapes = data->num_shapes;
 			group->num_shape_points = data->num_shape_points_arr;
 			group->num_shape_indices = data->num_shape_indices_arr;
+			group->images = data->images;
 
 			return true;
 		},
 		&data,
-		num_shapes, shapes
+		num_shapes, shapes, images_arr
 	);
 	if(!obj){
 		ham::logapierror("Failed to construct new draw group");
 		ham_allocator_free(allocator, num_shape_indices_arr);
 		ham_allocator_free(allocator, num_shape_points_arr);
+		ham_allocator_free(allocator, images_arr);
 		ham_mutex_finish(&mut);
 		return nullptr;
 	}
@@ -303,6 +351,7 @@ ham_draw_group *ham_draw_group_create(
 	ptr->num_shapes = num_shapes;
 	ptr->num_shape_points = num_shape_points_arr;
 	ptr->num_shape_indices = num_shape_indices_arr;
+	ptr->images = images_arr;
 
 	return ptr;
 }
@@ -314,6 +363,7 @@ void ham_draw_group_destroy(ham_draw_group *group){
 
 	ham_allocator_free(allocator, group->num_shape_indices);
 	ham_allocator_free(allocator, group->num_shape_points);
+	ham_allocator_free(allocator, group->images);
 
 	ham_mutex_finish(&group->mut);
 
@@ -344,6 +394,14 @@ bool ham_draw_group_set_num_instances(ham_draw_group *group, ham_u32 n){
 ham_u32 ham_draw_group_num_instances(const ham_draw_group *group){
 	if(!ham_check(group != NULL)) return (ham_u32)-1;
 	return group->num_instances;
+}
+
+const ham_image *ham_draw_group_image(const ham_draw_group *group, ham_usize idx){
+	if(!ham_check(group != NULL) || !ham_check(idx <= group->num_shapes)){
+		return nullptr;
+	}
+
+	return group->images[idx];
 }
 
 ham_u32 ham_draw_group_instance_iterate(

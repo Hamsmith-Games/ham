@@ -27,16 +27,21 @@ layout(std140, binding = 0) uniform RenderData{
 	float time;
 } globals;
 
+uniform sampler2DArray diffuse_tex;
+
 layout(location = 0) in vec3 vert_f;
 layout(location = 1) in vec3 norm_f;
 layout(location = 2) in vec2 uv_f;
 layout(location = 3) in vec4 color_f;
+layout(location = 4) flat in int draw_id_f;
 
 layout(location = 0) out vec4 out_diffuse;
 layout(location = 1) out vec3 out_normal;
 
 void main(){
 	// TODO: texture mapping
-	out_diffuse = color_f;
+	const vec4 color = texture(diffuse_tex, vec3(uv_f, draw_id_f));
+
+	out_diffuse = color_f * color;
 	out_normal  = norm_f;
 }

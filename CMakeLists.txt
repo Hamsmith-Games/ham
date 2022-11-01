@@ -255,6 +255,7 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/str_buffer.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/json.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/image.h
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/lex.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/parse.h
@@ -449,6 +450,7 @@ if(HAM_BUILD_ENGINE)
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine-object.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/argparse.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/input.h
+		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/model.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/entity.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/entity/transform-component.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/world.h

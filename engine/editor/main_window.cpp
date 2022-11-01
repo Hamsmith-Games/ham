@@ -30,10 +30,42 @@ namespace editor = ham::engine::editor;
 editor::main_window::main_window(class project *project_, QWidget *parent)
 	: window(parent)
 	, m_proj(project_)
-	, m_world_view(new editor::world_view(this))
 {
 	setMinimumSize(854, 480);
 	setWindowTitle(QString("%1 - %2").arg(tr("Ham"), project_->name()));
+
+	{
+		const auto dir_u8 = project_->dir().path().toUtf8();
+		const auto author_u8 = project_->author().toUtf8();
+		const auto desc_u8 = project_->description().toUtf8();
+		const auto name_u8 = project_->name().toUtf8();
+		const auto display_u8 = project_->display_name().toUtf8();
+		const auto license_u8 = project_->license().toUtf8();
+		const auto version = project_->version();
+
+		ham_engine_app engine_app{};
+
+		engine_app.init = [](auto...){ return true; };
+		engine_app.fini = [](auto...){};
+		engine_app.loop = [](auto...){};
+
+		engine_app.id = project_->id();
+		engine_app.dir = ham::str8(dir_u8.data());
+		engine_app.name = ham::str8(name_u8.data());
+		engine_app.display_name = ham::str8(display_u8.data());
+		engine_app.author = ham::str8(author_u8.data());
+		engine_app.license = ham::str8(license_u8.data());
+		engine_app.description = ham::str8(desc_u8.data());
+		engine_app.version = { (u16)version.majorVersion(), (u16)version.minorVersion(), (u16)version.microVersion() };
+
+		m_engine = ham_engine_create(&engine_app);
+		if(!m_engine){
+			ham_logerrorf("ham::engine::editor::main_window::main_window", "Error in ham_engine_create");
+			throw std::runtime_error("Could not create main window");
+		}
+	}
+
+	m_world_view = new editor::world_view(m_engine, this);
 
 	project_->setParent(this);
 
@@ -68,7 +100,9 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 	}
 }
 
-editor::main_window::~main_window(){}
+editor::main_window::~main_window(){
+	ham_engine_destroy(m_engine);
+}
 
 void editor::main_window::changeEvent(QEvent *event){
 	window::changeEvent(event);

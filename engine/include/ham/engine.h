@@ -27,6 +27,7 @@
 #include "engine/world.h" // IWYU pragma: keep
 
 #include "ham/json.h"
+#include "ham/image.h"
 
 #define HAM_ENGINE_VERSION ((ham_version){HAM_ENGINE_VERSION_MAJOR,HAM_ENGINE_VERSION_MINOR,HAM_ENGINE_VERSION_PATCH})
 
@@ -97,6 +98,8 @@ ham_engine_api ham_nothrow const ham_engine_app *ham_engine_get_app(const ham_en
 ham_engine_api ham_nothrow ham_usize ham_engine_num_subsystems(const ham_engine *engine);
 
 ham_engine_api ham_nothrow ham_engine_subsys *ham_engine_get_subsystem(ham_engine *engine, ham_usize idx);
+
+ham_engine_api ham_nothrow const ham_image *ham_engine_get_default_tex_image(const ham_engine *engine);
 
 /**
  * @brief Request an engine to finish execution.

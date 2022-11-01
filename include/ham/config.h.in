@@ -82,11 +82,6 @@
 #define HAM_RENDERER_DEFAULT_PLUGIN_UUID HAM_RENDERER_GL_PLUGIN_UUID
 #define HAM_RENDERER_DEFAULT_OBJECT_NAME HAM_RENDERER_GL_OBJECT_NAME
 
-#cmakedefine HAM_VK_WAYLAND
-#cmakedefine HAM_VK_XCB
-#cmakedefine HAM_VK_XLIB
-#cmakedefine HAM_VK_WIN32
-
 #define HAM_COLONY_MAX_BUCKETS @HAM_COLONY_MAX_BUCKETS@
 
 #define HAM_OBJECT_INSTANCE_MANAGER_MAX_BLOCKS @HAM_OBJECT_INSTANCE_MANAGER_MAX_BLOCKS@
@@ -191,6 +186,7 @@
 #define HAM_MIME_TYPE_EXE "application/x-msdownload"
 #define HAM_MIME_TYPE_GZ "application/gzip"
 #define HAM_MIME_TYPE_GIF "image/gif"
+#define HAM_MIME_TYPE_GLB "model/gltf-binary"
 #define HAM_MIME_TYPE_HTML "text/html"
 #define HAM_MIME_TYPE_ICO "image/vnd.microsoft.icon"
 #define HAM_MIME_TYPE_ICS "text/calendar"
@@ -214,9 +210,10 @@
 #define HAM_MIME_TYPE_OGX "application/ogg"
 #define HAM_MIME_TYPE_OPUS "audio/opus"
 #define HAM_MIME_TYPE_OTF "font/otf"
-#define HAM_MIME_TYPE_PNG "image/png"
 #define HAM_MIME_TYPE_PDF "application/pdf"
 #define HAM_MIME_TYPE_PHP "application/x-httpd-php"
+#define HAM_MIME_TYPE_PNG "image/png"
+#define HAM_MIME_TYPE_PPM "image/x-portable-pixmap"
 #define HAM_MIME_TYPE_PPT "application/vnd.ms-powerpoint"
 #define HAM_MIME_TYPE_PPTX "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 #define HAM_MIME_TYPE_RAR "application/vnd.rar"
@@ -339,14 +336,14 @@ static inline void ham_breakpoint(){
 		__builtin_debugtrap();
 #	elif __has_builtin(__debugbreak)
 		__debugbreak();
-#	elif defined(__x86_64__) || defined(__i386__)
-		__asm__ volatile("int3");
-#	elif defined(__aarch64__)
-		__asm__ volatile(".inst 0xd4200000");
-#	elif defined(__powerpc__)
-		__asm__ volatile(".4byte 0x7d821008");
-#	elif defined(__riscv)
-		__asm__ volatile(".4byte 0x00100073");
+//#	elif defined(__x86_64__) || defined(__i386__)
+//		__asm__ volatile("int3");
+//#	elif defined(__aarch64__)
+//		__asm__ volatile(".inst 0xd4200000");
+//#	elif defined(__powerpc__)
+//		__asm__ volatile(".4byte 0x7d821008");
+//#	elif defined(__riscv)
+//		__asm__ volatile(".4byte 0x00100073");
 #	else
 		raise(SIGTRAP);
 #	endif
@@ -452,10 +449,6 @@ static inline void ham_breakpoint(){
 
 #define ham_popcnt ham_popcnt32
 #define ham_lzcnt  ham_lzcnt32
-
-#ifndef ham_breakpoint
-#	define ham_breakpoint()
-#endif
 
 #ifndef ham_nonnull_args
 #	define ham_nonnull_args(...)

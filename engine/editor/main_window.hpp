@@ -19,6 +19,8 @@
 #ifndef HAM_ENGINE_EDITOR_MAIN_WINDOW_HPP
 #define HAM_ENGINE_EDITOR_MAIN_WINDOW_HPP 1
 
+#include "ham/engine.h"
+
 #include "window.hpp"
 #include "project.hpp"
 #include "world_view.hpp"
@@ -31,6 +33,7 @@ namespace ham::engine::editor{
 			explicit main_window(class project *project_, QWidget *parent = nullptr);
 			~main_window();
 
+			ham_engine *engine() const noexcept{ return m_engine; }
 			class project *project() const noexcept{ return m_proj; }
 			class world_view *world_view() noexcept{ return m_world_view; }
 
@@ -39,6 +42,7 @@ namespace ham::engine::editor{
 			void resizeEvent(QResizeEvent *ev) override;
 
 		private:
+			ham_engine *m_engine;
 			class project *m_proj;
 			class world_view *m_world_view;
 	};

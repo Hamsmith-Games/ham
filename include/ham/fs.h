@@ -57,6 +57,8 @@ ham_api bool ham_path_exists_utf8 (ham_str8  path);
 ham_api bool ham_path_exists_utf16(ham_str16 path);
 ham_api bool ham_path_exists_utf32(ham_str32 path);
 
+ham_api ham_str8 ham_mime_from_mem(ham_usize len, const void *buf);
+
 ham_api bool ham_path_file_info_utf8 (ham_str8  path, ham_file_info *ret);
 ham_api bool ham_path_file_info_utf16(ham_str16 path, ham_file_info *ret);
 ham_api bool ham_path_file_info_utf32(ham_str32 path, ham_file_info *ret);
@@ -115,9 +117,23 @@ namespace ham{
 		rdwr = HAM_OPEN_RDWR,
 	};
 
+	class file_open_error: public exception{
+		public:
+			const char *api() const noexcept override{ return "ham::file::file"; };
+			const char *what() const noexcept override{ return "Error in ham_file_open_utf8"; }
+	};
+
 	class file{
 		public:
 			file() = default;
+
+			explicit file(const str8 &path, file_open_flags flags = file_open_flags::rdwr)
+				: m_handle(ham_file_open_utf8(path, static_cast<ham_file_open_flags>(flags)))
+			{
+				if(!m_handle){
+					throw file_open_error();
+				}
+			}
 
 			template<typename Char>
 			explicit file(const basic_str<Char> &path, file_open_flags flags = file_open_flags::rdwr)
@@ -128,6 +144,9 @@ namespace ham{
 			file &operator=(file&&) noexcept = default;
 
 			operator bool() const noexcept{ return (bool)m_handle; }
+
+			ham_file *ptr() noexcept{ return m_handle.get(); }
+			const ham_file *ptr() const noexcept{ return m_handle.get(); }
 
 			usize size() const noexcept{
 				ham_file_info info_ret;

@@ -21,19 +21,55 @@ static inline GLenum ham_vertex_order_to_gl(ham_vertex_order order){
 }
 
 static inline ham_draw_group_gl *ham_draw_group_gl_ctor(ham_draw_group_gl *group, u32 nargs, va_list va){
-	if(nargs != 2){
-		ham::logapierror("Wrong number of arguments passed: {}, expected 2 (ham_usize num_shapes, const ham_shape *const *shapes)", nargs);
+	if(nargs != 3){
+		ham::logapierror(
+			"Wrong number of arguments passed: {}, expected 3 (ham_usize num_shapes, const ham_shape **shapes, const ham_image **images)",
+			nargs
+		);
 		return nullptr;
 	}
 
 	const ham_usize num_shapes = va_arg(va, ham_usize);
 	const ham_shape *const *const shapes = va_arg(va, const ham_shape* const*);
+	const ham_image *const *const images = va_arg(va, const ham_image* const*);
 
 	GLuint vao;
 	GLuint bufs[HAM_DRAW_BUFFER_GL_DATA_COUNT];
+	GLuint diffuse_tex_arr;
 
 	glCreateVertexArrays(1, &vao);
 	glCreateBuffers(HAM_DRAW_BUFFER_GL_DATA_COUNT, bufs);
+	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &diffuse_tex_arr);
+
+	ham_u32 max_w = 0, max_h = 0;
+
+	for(ham_usize i = 0; i < num_shapes; i++){
+		const auto img_i = images[i];
+		max_w = ham_max(max_w, ham_image_width(img_i));
+		max_h = ham_max(max_h, ham_image_height(img_i));
+	}
+
+	const GLsizei num_diffuse_levels = 1 + (GLsizei)std::floor(std::log2(ham_max(max_w, max_h)));
+
+	glTextureStorage3D(diffuse_tex_arr, num_diffuse_levels, GL_RGBA8, (GLsizei)max_w, (GLsizei)max_h, (GLsizei)num_shapes);
+
+	for(ham_usize i = 0; i < num_shapes; i++){
+		const auto img_i = ham_super(group)->images[i];
+		const auto img_w = ham_image_width(img_i);
+		const auto img_h = ham_image_height(img_i);
+		const auto img_p = ham_image_pixels(img_i);
+		glTextureSubImage3D(
+			diffuse_tex_arr,
+			0, 0, 0,
+			0,
+			img_w, img_h, 1,
+			GL_RGBA,
+			GL_UNSIGNED_BYTE,
+			img_p
+		);
+	}
+
+	glGenerateTextureMipmap(diffuse_tex_arr);
 
 	constexpr usize interleaved_point_size = (2UL * sizeof(ham_vec3)) + sizeof(ham_vec2);
 	constexpr usize interleaved_vertex_off = 0;
@@ -154,6 +190,8 @@ static inline ham_draw_group_gl *ham_draw_group_gl_ctor(ham_draw_group_gl *group
 	ret->vao = vao;
 	memcpy(ret->bufs, bufs, sizeof(GLuint) * HAM_DRAW_BUFFER_GL_DATA_COUNT);
 
+	ret->diffuse_tex_arr = diffuse_tex_arr;
+
 	ret->instance_capacity = 0;
 	ret->instance_mapping = nullptr;
 
@@ -168,6 +206,8 @@ ham_nothrow static inline void ham_draw_group_gl_dtor(ham_draw_group_gl *group){
 
 	glDeleteVertexArrays(1, &group->vao);
 	glDeleteBuffers(HAM_DRAW_BUFFER_GL_DATA_COUNT, group->bufs);
+
+	glDeleteTextures(1, &group->diffuse_tex_arr);
 
 	std::destroy_at(group);
 }

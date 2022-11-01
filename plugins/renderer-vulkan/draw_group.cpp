@@ -23,13 +23,15 @@ using namespace ham::typedefs;
 HAM_C_API_BEGIN
 
 ham_draw_group_vulkan *ham_draw_group_vulkan_ctor(ham_draw_group_vulkan *mem, ham_u32 nargs, va_list va){
-	if(nargs != 2){
-		ham::logapierror("Wrong number of args {}, expected 2 (ham_usize num_shapes, const ham_shape *const *shapes)");
+	if(nargs != 3){
+		ham::logapierror("Wrong number of args {}, expected 3 (ham_usize num_shapes, const ham_shape **shapes, const ham_image **images)");
 		return nullptr;
 	}
 
 	const ham_usize num_shapes = va_arg(va, ham_usize);
-	const ham_shape *const *const shapes = va_arg(va, const ham_shape* const*);
+	const ham_shape *const *const shapes = va_arg(va, const ham_shape**);
+	const ham_image *const *const images = va_arg(va, const ham_image**);
+	(void)images;
 
 	const auto r = (ham_renderer_vulkan*)ham_super(mem)->r;
 	const auto group = new(mem) ham_draw_group_vulkan;

@@ -8,5 +8,6 @@
         <file>images/folder-open.png</file>
         <file>images/ham.png</file>
         <file>images/cog.png</file>
+        <file>images/default-tex.png</file>
     </qresource>
 </RCC>

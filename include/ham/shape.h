@@ -55,6 +55,15 @@ typedef struct ham_shape ham_shape;
 
 ham_api const ham_shape *ham_shape_unit_square();
 
+ham_api ham_shape *ham_shape_create_triangle_mesh(
+	ham_usize num_points,
+	const ham_vec3 *verts,
+	const ham_vec3 *norms,
+	const ham_vec2 *uvs,
+	ham_usize num_indices,
+	const ham_u32 *indices
+);
+
 /**
  * Create a quadrilateral shape.
  * @param points points given in order top-left, top-right, bottom-left, bottom-right

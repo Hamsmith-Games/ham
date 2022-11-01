@@ -66,6 +66,7 @@ ham_add_executable(
 	images.qrc
 	fonts.qrc
 	templates.qrc
+	models.qrc
 
 	main.cpp
 

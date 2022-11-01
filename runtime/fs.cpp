@@ -185,6 +185,19 @@ static inline bool ham_impl_stat(const char *path, ham_file_info *ret){
 	return true;
 }
 
+ham_str8 ham_mime_from_mem(ham_usize len, const void *buf){
+	if(!ham_check(len > 0) || !ham_check(buf != NULL)){
+		return HAM_EMPTY_STR8;
+	}
+
+	if(!ham_impl_magic_init()){
+		ham_logapiwarnf("Failed to initialize libmagic, no mime info returned.");
+		return HAM_EMPTY_STR8;
+	}
+
+	return ham::str8(magic_buffer(ham_impl_magic_cookie, buf, len));
+}
+
 bool ham_path_file_info_utf8 (ham_str8  path, ham_file_info *ret){
 	if(!path.ptr || !path.len || !ret) return false;
 

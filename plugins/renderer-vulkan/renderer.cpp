@@ -1551,7 +1551,11 @@ static inline ham_renderer_vulkan *ham_renderer_vulkan_ctor(ham_renderer_vulkan 
 		ham_shape_unit_square()
 	};
 
-	r->screen_draw_group = (ham_draw_group_vulkan*)ham_draw_group_create(ham_super(r), 1, shapes);
+	const ham_image *const images[] = {
+		nullptr
+	};
+
+	r->screen_draw_group = (ham_draw_group_vulkan*)ham_draw_group_create(ham_super(r), 1, shapes, images);
 	if(!r->screen_draw_group){
 		ham::logapierror("Error creating screen draw group");
 		cleanup_fn(r);

@@ -90,6 +90,11 @@ static inline void ham_buffer_finish(ham_buffer *buf){
 	buf->capacity  = 0;
 }
 
+ham_nonnull_args(1)
+static inline const ham_allocator *ham_buffer_allocator(const ham_buffer *buf){
+	return buf->allocator;
+}
+
 static inline bool ham_buffer_reserve(ham_buffer *buf, ham_usize req_size){
 	if(!buf || !req_size || req_size == (ham_usize)-1){
 		return false;
@@ -337,6 +342,8 @@ namespace ham{
 
 			reference operator[](usize idx) noexcept{ return data()[idx]; }
 			const_reference operator[](usize idx) const noexcept{ return data()[idx]; }
+
+			const ham_allocator *allocator() const noexcept{ return ham_buffer_allocator(&m_buf); }
 
 			bool resize(usize new_size) noexcept(noexcept(value_type())){
 				if(new_size == size()){

@@ -18,7 +18,10 @@
 
 #include "world_view.hpp"
 
+#include "ham/engine/model.h"
+
 #include <QSettings>
+#include <QFile>
 #include <QMouseEvent>
 #include <QKeyEvent>
 
@@ -53,8 +56,9 @@ editor::world_context_menu::~world_context_menu(){}
 // World editor main view
 //
 
-editor::world_view::world_view(QWidget *parent)
+editor::world_view::world_view(ham_engine *engine, QWidget *parent)
 	: QWidget(parent)
+	, m_engine(engine)
 	, m_cam_dir(0.f)
 {
 	setContentsMargins(0, 0, 0, 0);
@@ -73,9 +77,25 @@ editor::world_view::world_view(QWidget *parent)
 	setLayout(lay);
 
 	m_r_widget->do_work([this]{
-		const auto quad_shape = ham_shape_unit_square();
+		auto test_mdl_file = QFile("://models/xyz_test.glb");
+		if(!test_mdl_file.open(QFile::ReadOnly)){
+			ham::logapierror("Error in QFile(\"{}\")::open", "://models/xyz_test.glb");
+			return;
+		}
 
-		m_gizmo_group = ham::draw_group(m_r_widget->renderer(), 1, &quad_shape);
+		const auto test_mdl_file_bytes = test_mdl_file.readAll();
+
+		auto test_mdl = ham::model(test_mdl_file_bytes.size(), test_mdl_file_bytes.data());
+
+		const auto quad_shape = ham_shape_unit_square();
+		const ham_image *const default_img = ham_engine_get_default_tex_image(m_engine);
+
+		test_mdl.fill_blank_images(default_img);
+
+		m_test_group = ham::draw_group(m_r_widget->renderer(), test_mdl.num_shapes(), test_mdl.shapes(), test_mdl.images());
+		m_test_group.set_num_instances(1);
+
+		m_gizmo_group = ham::draw_group(m_r_widget->renderer(), 1, &quad_shape, &default_img);
 		m_gizmo_group.set_num_instances(2);
 
 		ham::draw_group_instance_visit(m_gizmo_group, 0, [](ham_draw_group_instance_data *data){
@@ -96,8 +116,6 @@ editor::world_view::world_view(QWidget *parent)
 			data->trans = trans.matrix();
 			data->color = ham::vec4(1.f, 1.f, 0.f, 1.f);
 		});
-
-		ham_logerrorf("ham::engine::editor::world_view::world_view", "Added gizmo draw group");
 	});
 
 	m_r_widget->frame_data().common.cam = m_cam.ptr();
