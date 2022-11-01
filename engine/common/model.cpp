@@ -119,7 +119,7 @@ ham_model *ham_model_load_from_mem(ham_usize len, const void *data){
 		ham_image *img = nullptr;
 
 		if(tex->mHeight == 0){
-			const auto img = ham_image_load_from_mem(HAM_RGBA8U, tex->mWidth, tex->pcData);
+			img = ham_image_load_from_mem(HAM_RGBA8U, tex->mWidth, tex->pcData);
 			if(!img){
 				ham_logapiwarnf("Unrecognized compressed embedded texture format");
 				continue;

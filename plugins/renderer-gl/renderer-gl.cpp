@@ -294,6 +294,18 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		return nullptr;
 	}
 
+	GLuint samplers[2];
+	glCreateSamplers(std::size(samplers), samplers);
+
+	// Depth/normal sampler
+	glSamplerParameteri(samplers[0], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glSamplerParameteri(samplers[0], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	// Diffuse sampler
+	glSamplerParameterf(samplers[1], GL_TEXTURE_MAX_ANISOTROPY, 4.f);
+	glSamplerParameteri(samplers[1], GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(samplers[1], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
 	const auto ret = new(r) ham_renderer_gl;
 
 	ret->fbo = 0;
@@ -310,6 +322,8 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	ret->scene_info_frag = scene_info_frag;
 	ret->scene_info_pipeline = scene_info_pipeline;
 
+	memcpy(ret->samplers, samplers, sizeof(samplers));
+
 	const auto unit_sq = ham_shape_unit_square();
 	const ham_image *const null_img = ham_super(ret)->default_img;
 	ret->screen_group = (ham_draw_group_gl*)ham_draw_group_create(ham_super(ret), 1, &unit_sq, &null_img); // TODO: check this
@@ -323,6 +337,8 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 }
 
 static inline void ham_renderer_gl_dtor(ham_renderer_gl *r){
+	glDeleteSamplers(std::size(r->samplers), r->samplers);
+
 	glDeleteProgramPipelines(1, &r->scene_info_pipeline);
 	glDeleteProgram(r->scene_info_vert);
 	glDeleteProgram(r->scene_info_frag);
@@ -446,6 +462,7 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 			const auto r = (const ham_renderer_gl*)ham_super(group)->r;
 
 			glBindTextureUnit(HAM_DIFFUSE_TEXTURE_UNIT, group->diffuse_tex_arr);
+			glBindSampler(HAM_DIFFUSE_TEXTURE_UNIT, r->samplers[1]);
 
 			glBindVertexArray(group->vao);
 			glBindBufferRange(GL_UNIFORM_BUFFER, 0, r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));
@@ -462,9 +479,13 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 
 	// TODO: do lighting pass
 
-	glBindTextureUnit(HAM_GBO_DEPTH_TEXTURE_UNIT, r->fbo_attachments[0]);
+	glBindTextureUnit(HAM_GBO_DEPTH_TEXTURE_UNIT,   r->fbo_attachments[0]);
 	glBindTextureUnit(HAM_GBO_DIFFUSE_TEXTURE_UNIT, r->fbo_attachments[1]);
-	glBindTextureUnit(HAM_GBO_NORMAL_TEXTURE_UNIT, r->fbo_attachments[2]);
+	glBindTextureUnit(HAM_GBO_NORMAL_TEXTURE_UNIT,  r->fbo_attachments[2]);
+
+	glBindSampler(HAM_GBO_DEPTH_TEXTURE_UNIT,   r->samplers[0]);
+	glBindSampler(HAM_GBO_DIFFUSE_TEXTURE_UNIT, r->samplers[0]);
+	glBindSampler(HAM_GBO_NORMAL_TEXTURE_UNIT,  r->samplers[0]);
 
 	//const ham_mat4 *const view_mat = ham_camera_view_matrix(data->common.cam);
 	//const ham_mat4 *const proj_mat = ham_camera_proj_matrix(data->common.cam);

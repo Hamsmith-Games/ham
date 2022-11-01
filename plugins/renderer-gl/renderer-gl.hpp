@@ -78,6 +78,9 @@ typedef struct ham_renderer_gl_api ham_renderer_gl{
 	ham_u32 scene_info_vert, scene_info_frag, scene_info_pipeline;
 	ham_u32 screen_post_vert, screen_post_frag, screen_post_pipeline;
 
+	// gbo, scene diffuse
+	ham_u32 samplers[2];
+
 	ham_i32 scene_info_frag_diffuse_tex_loc;
 	ham_i32 screen_post_frag_depth_loc;
 	ham_i32 screen_post_frag_diffuse_loc;
