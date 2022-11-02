@@ -28,6 +28,8 @@ uniform sampler2D depth_tex;
 uniform sampler2D diffuse_tex;
 uniform sampler2D normal_tex;
 
+uniform sampler2D noise_tex;
+
 vec3 reconstruct_world_pos(in vec2 uv, in float z){
 	const vec4 xyzw = vec4(uv * 2.0 - 1.0, z, 1.0);
 	const vec4 projected = globals.inv_view_proj * xyzw;
@@ -58,5 +60,9 @@ void main(){
 
 	const vec3 albedo = texture(diffuse_tex, uv_f).rgb;
 
-	out_scene = albedo * atten * light_color_f;
+	const vec2 noise_uv = uv_f + (vec2(sin(globals.time), cos(globals.time)) * 1000.0);
+
+	const vec3 rgb_noise = texture(noise_tex, noise_uv).rgb * vec3(0.0625);
+
+	out_scene = (1.0 - rgb_noise) * albedo * atten * light_intensity_f * light_color_f;
 }

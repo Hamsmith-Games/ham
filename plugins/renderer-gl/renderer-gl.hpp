@@ -89,13 +89,13 @@ typedef struct ham_renderer_gl_api ham_renderer_gl{
 	ham_i32 light_frag_depth_tex_loc;
 	ham_i32 light_frag_diffuse_tex_loc;
 	ham_i32 light_frag_normal_tex_loc;
+	ham_i32 light_frag_noise_tex_loc;
 
 	ham_i32 scene_info_frag_diffuse_tex_loc;
 	ham_i32 screen_post_frag_depth_loc;
 	ham_i32 screen_post_frag_diffuse_loc;
 	ham_i32 screen_post_frag_normal_loc;
 	ham_i32 screen_post_frag_scene_loc;
-	ham_i32 screen_post_frag_noise_loc;
 
 	ham_draw_group_gl *screen_group;
 	ham_i32 screen_post_uv_scale_loc;
