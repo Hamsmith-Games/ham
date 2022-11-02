@@ -38,6 +38,7 @@ HAM_C_API_BEGIN
 
 typedef struct ham_renderer_vtable ham_renderer_vtable;
 typedef struct ham_draw_group_vtable ham_draw_group_vtable;
+typedef struct ham_light_group_vtable ham_light_group_vtable;
 
 // Renderer itself
 
@@ -51,6 +52,7 @@ struct ham_renderer{
 	ham_image *default_img;
 
 	ham_object_manager *draw_groups;
+	ham_object_manager *light_groups;
 
 	ham_mutex draw_mut;
 	ham_buffer draw_list, tmp_list;
@@ -60,6 +62,7 @@ struct ham_renderer_vtable{
 	ham_derive(ham_object_vtable)
 
 	const ham_draw_group_vtable*(*draw_group_vtable)();
+	const ham_light_group_vtable*(*light_group_vtable)();
 
 	bool(*resize)(ham_renderer *r, ham_u32 w, ham_u32 h);
 	void(*frame)(ham_renderer *r, ham_f64 dt, const ham_renderer_frame_data *data);
@@ -87,54 +90,79 @@ struct ham_draw_group_vtable{
 	ham_draw_group_instance_data*(*instance_data)(ham_draw_group *self);
 };
 
+// Light groups
+
+struct ham_light_group{
+	ham_derive(ham_object)
+
+	ham_renderer *r;
+	ham_mutex mut;
+
+	ham_u32 num_instances;
+};
+
+struct ham_light_group_vtable{
+	ham_derive(ham_object_vtable)
+
+	bool(*set_num_instances)(ham_light_group *self, ham_u32 n);
+	ham_light*(*instance_data)(ham_light_group *self);
+};
+
 //! @cond ignore
 
 #define ham_impl_define_renderer( \
 	derived_renderer, \
 	derived_draw_group, \
+	derived_light_group, \
 	ctor_fn, dtor_fn, \
 	resize_name, resize_fn, \
 	frame_name, frame_fn \
 ) \
-ham_extern_c ham_public ham_nothrow const ham_object_vtable *ham_object_vptr_name(derived_draw_group)(); \
-ham_nothrow static inline const ham_draw_group_vtable *ham_impl_draw_group_vtable_##derived_renderer(){ return (const ham_draw_group_vtable*)(ham_object_vptr_name(derived_draw_group)()); } \
-static inline bool resize_name(ham_renderer *r, ham_u32 w, ham_u32 h){ return (resize_fn)((derived_renderer*)r, w, h); } \
-static inline void frame_name(ham_renderer *r, ham_f64 dt, const ham_renderer_frame_data *data){ (frame_fn)((derived_renderer*)r, dt, data); } \
-ham_define_object_x( \
-	2, derived_renderer, 1, ham_renderer_vtable, \
-	ctor_fn, dtor_fn, \
-	( \
-		.draw_group_vtable = ham_impl_draw_group_vtable_##derived_renderer, \
-		.resize = resize_name, \
-		.frame = frame_name, \
-	) \
-)
+	ham_extern_c ham_public ham_nothrow const ham_object_vtable *ham_object_vptr_name(derived_draw_group)(); \
+	ham_extern_c ham_public ham_nothrow const ham_object_vtable *ham_object_vptr_name(derived_light_group)(); \
+	ham_nothrow static inline const ham_draw_group_vtable *ham_impl_draw_group_vtable_##derived_renderer(){ return (const ham_draw_group_vtable*)(ham_object_vptr_name(derived_draw_group)()); } \
+	ham_nothrow static inline const ham_light_group_vtable *ham_impl_light_group_vtable_##derived_renderer(){ return (const ham_light_group_vtable*)(ham_object_vptr_name(derived_light_group)()); } \
+	static inline bool resize_name(ham_renderer *r, ham_u32 w, ham_u32 h){ return (resize_fn)((derived_renderer*)r, w, h); } \
+	static inline void frame_name(ham_renderer *r, ham_f64 dt, const ham_renderer_frame_data *data){ (frame_fn)((derived_renderer*)r, dt, data); } \
+	ham_define_object_x(2, derived_renderer, 1, ham_renderer_vtable, ctor_fn, dtor_fn, \
+		( \
+			.draw_group_vtable = ham_impl_draw_group_vtable_##derived_renderer, \
+			.light_group_vtable = ham_impl_light_group_vtable_##derived_renderer, \
+			.resize = resize_name, \
+			.frame = frame_name, \
+		))
 
 #define ham_impl_define_draw_group( \
 	derived, \
 	ctor_fn, dtor_fn \
 ) \
-static inline bool ham_impl_set_num_instances_##derived(ham_draw_group *self, ham_u32 n){ \
-	return (derived##_set_num_instances)((derived*)self, n); \
-} \
-static inline ham_draw_group_instance_data *ham_impl_instance_data_##derived(ham_draw_group *self){ \
-	return (derived##_instance_data)((derived*)self); \
-} \
-ham_define_object_x( \
-	2, derived, 1, ham_draw_group_vtable, \
-	ctor_fn, dtor_fn, \
-	( \
-		.set_num_instances = ham_impl_set_num_instances_##derived,\
-		.instance_data = ham_impl_instance_data_##derived,\
-	) \
-)
+	static inline bool ham_impl_set_num_instances_##derived(ham_draw_group *self, ham_u32 n){ return (derived##_set_num_instances)((derived*)self, n); } \
+	static inline ham_draw_group_instance_data *ham_impl_instance_data_##derived(ham_draw_group *self){ return (derived##_instance_data)((derived*)self); } \
+	ham_define_object_x(2, derived, 1, ham_draw_group_vtable, ctor_fn, dtor_fn, \
+		( \
+			.set_num_instances = ham_impl_set_num_instances_##derived, \
+			.instance_data = ham_impl_instance_data_##derived, \
+		))
+
+#define ham_impl_define_light_group( \
+	derived, \
+	ctor_fn, dtor_fn \
+) \
+	static inline bool ham_impl_set_num_instances_##derived(ham_light_group *self, ham_u32 n){ return (derived##_set_num_instances)((derived*)self, n); } \
+	static inline ham_light *ham_impl_instance_data_##derived(ham_light_group *self){ return (derived##_instance_data)((derived*)self); } \
+	ham_define_object_x(2, derived, 1, ham_light_group_vtable, ctor_fn, dtor_fn, \
+		( \
+			.set_num_instances = ham_impl_set_num_instances_##derived, \
+			.instance_data = ham_impl_instance_data_##derived, \
+		))
 
 //! @endcond
 
-#define ham_define_renderer(derived_renderer, derived_draw_group) \
+#define ham_define_renderer(derived_renderer, derived_draw_group, derived_light_group) \
 	ham_impl_define_renderer(\
 		derived_renderer, \
 		derived_draw_group, \
+		derived_light_group, \
 		derived_renderer##_ctor, \
 		derived_renderer##_dtor, \
 		ham_impl_resize_##derived_renderer, derived_renderer##_resize, \
@@ -143,6 +171,9 @@ ham_define_object_x( \
 
 #define ham_define_draw_group(derived) \
 	ham_impl_define_draw_group(derived, derived##_ctor, derived##_dtor)
+
+#define ham_define_light_group(derived) \
+	ham_impl_define_light_group(derived, derived##_ctor, derived##_dtor)
 
 HAM_C_API_END
 

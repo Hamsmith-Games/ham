@@ -247,6 +247,12 @@ ham_constexpr ham_nothrow static inline ham_mat4 ham_camera_view_matrix(const ha
 }
 
 ham_nonnull_args(1)
+ham_constexpr ham_nothrow static inline ham_f32 ham_camera_near_z(const ham_camera *cam){ return cam->near_z; }
+
+ham_nonnull_args(1)
+ham_constexpr ham_nothrow static inline ham_f32 ham_camera_far_z(const ham_camera *cam){ return cam->far_z; }
+
+ham_nonnull_args(1)
 ham_constexpr ham_nothrow static inline void ham_camera_rotate(ham_camera *cam, ham_f32 rads, ham_vec3 axis){
 	ham_transform_rotate(&cam->_impl_trans, rads, axis);
 
@@ -353,6 +359,9 @@ namespace ham{
 			constexpr mat4 projection_matrix() const noexcept{ return ham_camera_proj_matrix(m_ptr); }
 			constexpr mat4 view_matrix() const noexcept{ return ham_camera_view_matrix(m_ptr); }
 
+			constexpr f32 near_z() const noexcept{ return ham_camera_near_z(m_ptr); }
+			constexpr f32 far_z() const noexcept{ return ham_camera_far_z(m_ptr); }
+
 			constexpr vec3 forward() const noexcept{ return ham_camera_forward(m_ptr); }
 			constexpr vec3 right() const noexcept{ return ham_camera_right(m_ptr); }
 			constexpr vec3 up() const noexcept{ return ham_camera_up(m_ptr); }
@@ -416,6 +425,9 @@ namespace ham{
 
 			constexpr mat4 projection_matrix() const noexcept{ return ham_camera_proj_matrix(&m_cam); }
 			constexpr mat4 view_matrix() const noexcept{ return ham_camera_view_matrix(&m_cam); }
+
+			constexpr f32 near_z() const noexcept{ return ham_camera_near_z(&m_cam); }
+			constexpr f32 far_z() const noexcept{ return ham_camera_far_z(&m_cam); }
 
 			constexpr vec3 forward() const noexcept{ return ham_camera_forward(&m_cam); }
 			constexpr vec3 right() const noexcept{ return ham_camera_right(&m_cam); }

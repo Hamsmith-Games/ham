@@ -173,6 +173,40 @@ struct ham_object{
 
 #define ham_derive(base) base HAM_SUPER_NAME;
 
+#ifdef __cplusplus
+#	define ham_impl_def_ctor(object_type, nargs_name, va_name) \
+		static inline object_type *object_type##_ctor_user(object_type *self, ham_u32 nargs_name, va_list va_name); \
+		static inline object_type *object_type##_ctor(object_type *self, ham_u32 nargs, va_list va){ \
+			auto super_slice = *ham_super(self); \
+			const auto ptr = new(self) object_type; \
+			*ham_super(ptr) = std::move(super_slice);\
+			const auto ret = object_type##_ctor_user(ptr, nargs, va); \
+			if(!ret) std::destroy_at(ptr); \
+			return ret; \
+		} \
+		object_type *object_type##_ctor_user(object_type *self, ham_u32 nargs_name, va_list va_name)
+
+#	define ham_impl_def_dtor(object_type) \
+		ham_nothrow static inline void object_type##_dtor_user(object_type *self); \
+		ham_nothrow static inline void object_type##_dtor(object_type *self){ \
+			object_type##_dtor_user(self); \
+			std::destroy_at(self); \
+		} \
+		ham_nothrow void object_type##_dtor_user(object_type *self)
+#else
+#	define ham_impl_def_ctor(object_type, nargs_name, va_name) \
+		static inline object_type *object_type##_ctor(object_type *self, ham_u32 nargs_name, va_list va_name)
+
+#	define ham_impl_def_dtor(object_type) \
+		ham_nothrow static inline void object_type##_dtor(object_type *self)
+#endif
+
+#define ham_def_ctor(object_type, nargs_name, va_name) \
+	ham_impl_def_ctor(object_type, nargs_name, va_name)
+
+#define ham_def_dtor(object_type) \
+	ham_impl_def_dtor(object_type)
+
 //! @cond ignore
 #define ham_impl_super_1(derived_ptr) (&(derived_ptr)->HAM_SUPER_NAME)
 #define ham_impl_super_2(derived_ptr) (&(derived_ptr)->HAM_SUPER_NAME.HAM_SUPER_NAME)

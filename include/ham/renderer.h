@@ -26,8 +26,9 @@
  */
 
 #include "shape.h"
-#include "camera.h"
+#include "light.h"
 #include "image.h"
+#include "camera.h"
 #include "vk.h" // IWYU pragma: keep
 
 #include <stdarg.h>
@@ -147,6 +148,39 @@ ham_api const ham_image *ham_draw_group_image(const ham_draw_group *group, ham_u
  * @}
  */
 
+/**
+ * @defgroup HAM_RENDERER_LIGHT_GROUP Light groups
+ * @{
+ */
+
+typedef struct ham_light_group ham_light_group;
+
+ham_api ham_light_group *ham_light_group_create(ham_renderer *r, ham_usize num_lights);
+
+ham_api void ham_light_group_destroy(ham_light_group *g);
+
+typedef bool(*ham_light_group_instance_iterate_fn)(ham_light *data, void *user);
+
+ham_api ham_u32 ham_light_group_instance_iterate(
+	ham_light_group *group,
+	ham_light_group_instance_iterate_fn fn,
+	void *user
+);
+
+ham_api bool ham_light_group_instance_visit(
+	ham_light_group *group, ham_u32 idx,
+	ham_light_group_instance_iterate_fn fn,
+	void *user
+);
+
+ham_api ham_u32 ham_light_group_num_instances(const ham_light_group *group);
+
+ham_api bool ham_light_group_set_num_instances(ham_light_group *group, ham_u32 n);
+
+/**
+ * @}
+ */
+
 HAM_C_API_END
 
 namespace ham{
@@ -233,6 +267,10 @@ namespace ham{
 
 			unique_handle<ham_renderer*, ham_renderer_destroy> m_handle;
 	};
+
+	//
+	// Draw groups
+	//
 
 	class draw_group_exception: public renderer_exception{};
 
@@ -341,6 +379,112 @@ namespace ham{
 			unique_handle<ham_draw_group*, ham_draw_group_destroy> m_handle;
 	};
 
+	//
+	// Light groups
+	//
+
+	class light_group_exception: public renderer_exception{};
+
+	class light_group_ctor_error: public light_group_exception{
+		public:
+			const char *api() const noexcept override{ return "ham::light_group::light_group"; }
+			const char *what() const noexcept override{ return "Error in ham_light_group_create"; }
+	};
+
+	class light_group;
+
+	template<typename ... Tags>
+	class basic_light_group_view{
+		public:
+			constexpr static bool is_mutable = meta::type_list_contains_v<meta::type_list<Tags...>, mutable_tag>;
+
+			using pointer = std::conditional_t<is_mutable, ham_light_group*, const ham_light_group*>;
+
+			basic_light_group_view(pointer ptr_ = nullptr) noexcept
+				: m_ptr(ptr_){}
+
+			template<std::same_as<draw_group> Group>
+			basic_light_group_view(Group &group) noexcept
+				: m_ptr(group.ptr()){}
+
+			template<std::same_as<draw_group> Group>
+			basic_light_group_view(const Group &group) noexcept requires (!is_mutable)
+				: m_ptr(group.ptr()){}
+
+			operator bool() const noexcept{ return !!m_ptr; }
+
+			operator pointer() const noexcept{ return m_ptr; }
+
+			pointer ptr() const noexcept{ return m_ptr; }
+
+			bool set_num_instances(u32 n)
+				requires (is_mutable)
+			{
+				return ham_light_group_set_num_instances(m_ptr, n);
+			}
+
+			u32 num_instances() const noexcept{ return ham_draw_group_num_instances(m_ptr); }
+
+			u32 instance_iterate(ham_draw_group_instance_iterate_fn iterate_fn, void *user)
+				requires is_mutable
+			{
+				return ham_light_group_instance_iterate(m_ptr, iterate_fn, user);
+			}
+
+			bool instance_visit(u32 idx, ham_draw_group_instance_iterate_fn view_fn, void *user)
+				requires is_mutable
+			{
+				return ham_light_group_instance_visit(m_ptr, idx, view_fn, user);
+			}
+
+		private:
+			pointer m_ptr;
+	};
+
+	using light_group_view = basic_light_group_view<mutable_tag>;
+	using const_light_group_view = basic_light_group_view<>;
+
+	class light_group{
+		public:
+			light_group() noexcept = default;
+
+			explicit light_group(ham_renderer *r, u32 num_lights)
+				: m_handle(ham_light_group_create(r, num_lights))
+			{
+				if(!m_handle) throw light_group_ctor_error();
+			}
+
+			static light_group make_from(ham_light_group *group) noexcept{
+				return light_group(group);
+			}
+
+			operator bool() const noexcept{ return !!m_handle; }
+
+			operator light_group_view() noexcept{ return m_handle.get(); }
+			operator const_light_group_view() const noexcept{ return m_handle.get(); }
+
+			ham_light_group *ptr() noexcept{ return m_handle.get(); }
+			const ham_light_group *ptr() const noexcept{ return m_handle.get(); }
+
+			bool set_num_instances(u32 n){ return ham_light_group_set_num_instances(m_handle.get(), n); }
+
+			u32 num_instances() const noexcept{ return ham_light_group_num_instances(m_handle.get()); }
+
+			u32 instance_iterate(ham_light_group_instance_iterate_fn iterate_fn, void *user){
+				return ham_light_group_instance_iterate(m_handle.get(), iterate_fn, user);
+			}
+
+			bool instance_visit(u32 idx, ham_light_group_instance_iterate_fn view_fn, void *user){
+				return ham_light_group_instance_visit(m_handle.get(), idx, view_fn, user);
+			}
+
+		private:
+			explicit light_group(ham_light_group *group) noexcept
+				: m_handle(group){}
+
+			unique_handle<ham_light_group*, ham_light_group_destroy> m_handle;
+	};
+
 	template<typename T>
 		requires std::same_as<std::remove_cvref_t<T>, ham_draw_group*> || (std::is_class_v<std::remove_cvref_t<T>>)
 	static inline bool draw_group_instance_iterate(T &&group, ham_draw_group_instance_iterate_fn iterate_fn, void *user){
@@ -401,6 +545,68 @@ namespace ham{
 		};
 
 		return draw_group_instance_visit(std::forward<T>(group), idx, dispatcher, &fn);
+	}
+
+	template<typename T>
+		requires std::same_as<std::remove_cvref_t<T>, ham_light_group*> || (std::is_class_v<std::remove_cvref_t<T>>)
+	static inline bool light_group_instance_iterate(T &&group, ham_light_group_instance_iterate_fn iterate_fn, void *user){
+		using group_type = std::remove_reference_t<T>;
+		if constexpr(std::is_same_v<group_type, ham_light_group*>){
+			return ham_light_group_instance_iterate(group, iterate_fn, user);
+		}
+		else{
+			return std::forward<T>(group).instance_iterate(iterate_fn, user);
+		}
+	}
+
+	template<typename T, typename Fn>
+		requires std::invocable<Fn, ham_light*>
+	static inline bool light_group_instance_iterate(T &&group, Fn &&fn)
+	noexcept(noexcept(std::forward<Fn>(fn)(std::declval<ham_light*>())))
+	{
+		static constexpr auto dispatcher = +[](ham_light *data, void *user) -> bool{
+			const auto fn = reinterpret_cast<Fn*>(user);
+			if constexpr(std::same_as<std::invoke_result_t<Fn, ham_light*>, void>){
+				(*fn)(data);
+				return true;
+			}
+			else{
+				return (*fn)(data);
+			}
+		};
+
+		return light_group_instance_iterate(std::forward<T>(group), dispatcher, &fn);
+	}
+
+	template<typename T>
+		requires std::same_as<std::remove_cvref_t<T>, ham_light_group*> || (std::is_class_v<std::remove_cvref_t<T>>)
+	static inline bool light_group_instance_visit(T &&group, u32 idx, ham_light_group_instance_iterate_fn visit_fn, void *user){
+		using group_type = std::remove_reference_t<T>;
+		if constexpr(std::is_same_v<group_type, ham_light_group*>){
+			return ham_light_group_instance_visit(group, idx, visit_fn, user);
+		}
+		else{
+			return std::forward<T>(group).instance_visit(idx, visit_fn, user);
+		}
+	}
+
+	template<typename T, typename Fn>
+		requires std::invocable<Fn, ham_light*>
+	static inline bool light_group_instance_visit(T &&group, u32 idx, Fn &&fn)
+		noexcept(noexcept(std::forward<Fn>(fn)(std::declval<ham_light*>())))
+	{
+		static constexpr auto dispatcher = +[](ham_light *data, void *user) -> bool{
+			const auto fn = reinterpret_cast<Fn*>(user);
+			if constexpr(std::same_as<std::invoke_result_t<Fn, ham_light*>, void>){
+				(*fn)(data);
+				return true;
+			}
+			else{
+				return (*fn)(data);
+			}
+		};
+
+		return light_group_instance_visit(std::forward<T>(group), idx, dispatcher, &fn);
 	}
 }
 

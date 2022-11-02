@@ -107,6 +107,13 @@ struct ham_draw_group_vulkan{
 	void *instance_mapping;
 };
 
+struct ham_light_group_vulkan{
+	ham_derive(ham_light_group)
+
+	ham_u32 inst_cap;
+	void *inst_map;
+};
+
 HAM_C_API_END
 
 #endif // !HAM_RENDERER_VULKAN_RENDERER_HPP

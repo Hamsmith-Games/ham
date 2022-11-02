@@ -98,6 +98,8 @@ editor::world_view::world_view(ham_engine *engine, QWidget *parent)
 		m_gizmo_group = ham::draw_group(m_r_widget->renderer(), 1, &quad_shape, &default_img);
 		m_gizmo_group.set_num_instances(2);
 
+		m_cam_light_group = ham::light_group(m_r_widget->renderer(), 1);
+
 		ham::draw_group_instance_visit(m_gizmo_group, 0, [](ham_draw_group_instance_data *data){
 			ham::transform trans;
 			trans.translate({0.f, -0.5f, 0.f});
@@ -115,6 +117,13 @@ editor::world_view::world_view(ham_engine *engine, QWidget *parent)
 
 			data->trans = trans.matrix();
 			data->color = ham::vec4(1.f, 1.f, 0.f, 1.f);
+		});
+
+		ham::light_group_instance_visit(m_cam_light_group, 0, [](ham_light *light){
+			light->pos = ham_make_vec3(0.f, 0.f, 0.f);
+			light->effective_radius = 5.f;
+			light->color = ham_make_vec3(1.f, 1.f, 1.f);
+			light->intensity = 1.f;
 		});
 	});
 
@@ -135,6 +144,10 @@ editor::world_view::world_view(ham_engine *engine, QWidget *parent)
 		const auto dp = dx + dy + dz;
 
 		m_cam.translate(dt * ham_vec3_normalize(dp));
+
+		ham::light_group_instance_visit(m_cam_light_group, 0, [this](ham_light *light){
+			light->pos = m_cam.position();
+		});
 	});
 
 	connect(this, &QWidget::customContextMenuRequested, this, &world_view::show_context_menu);

@@ -26,7 +26,8 @@
  */
 
 layout(std140, binding = 0) uniform RenderData{
-	mat4 view_proj;
+	mat4 view_proj, inv_view_proj;
+	float near_z, far_z;
 	float time;
 } globals;
 
@@ -38,6 +39,9 @@ uniform vec2 uv_scale;
 uniform sampler2D depth_tex;
 uniform sampler2D diffuse_tex;
 uniform sampler2D normal_tex;
+uniform sampler2D scene_tex;
+
+uniform sampler2D noise_tex;
 
 layout(location = 0) in vec3 vert_f;
 layout(location = 1) in vec3 norm_f;
@@ -59,7 +63,9 @@ void main(){
 
 //	const vec3 hsv_color = hsv_to_rgb(vec3(hue, 1.0, 1.0));
 
-//	const float d = texture(depth_tex, uv_f).r;
+	const vec2 noise_uv = uv_f + (vec2(sin(globals.time), cos(globals.time)) * 1000.0);
 
-	out_color = vec4(texture(diffuse_tex, uv_f * uv_scale).rgb, 1.0);
+	const vec3 rgb_noise = texture(noise_tex, noise_uv).rgb * vec3(0.125);
+
+	out_color = vec4((1.0 - rgb_noise) * texture(scene_tex, uv_f * uv_scale).rgb, 1.0);
 }

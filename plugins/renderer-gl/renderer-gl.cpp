@@ -21,6 +21,7 @@
 #include "ham/check.h"
 #include "ham/fs.h"
 #include "ham/gl.h"
+#include "ham/noise.h"
 
 #include "glad/glad.h"
 
@@ -216,8 +217,11 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	}
 
 	constexpr ham_renderer_gl_global_ubo_data default_ubo_data = {
-		.view_proj = ham_mat4_identity(),
-		.time      = 0.f,
+		.view_proj     = ham_mat4_identity(),
+		.inv_view_proj = ham_mat4_identity(),
+		.near_z        = 0.f,
+		.far_z         = 1.f,
+		.time          = 0.f,
 	};
 
 	memcpy(global_ubo_map, &default_ubo_data, sizeof(default_ubo_data));
@@ -238,19 +242,9 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		return nullptr;
 	}
 
-	const auto scene_info_pipeline = ham_renderer_gl_create_pipeline(r, scene_info_vert, scene_info_frag);
-	if(scene_info_pipeline == (u32)-1){
-		ham::logapierror("Error creating scene info shader pipeline");
-		glDeleteProgram(scene_info_vert);
-		glDeleteProgram(scene_info_frag);
-		glDeleteBuffers(1, &global_ubo);
-		return nullptr;
-	}
-
 	const auto screen_vert = ham_renderer_gl_load_shader(r, GL_VERTEX_SHADER, HAM_LIT("shaders-gl/screen.vert"));
 	if(screen_vert == (u32)-1){
 		ham::logapierror("Error loading screen vertex shader");
-		glDeleteProgramPipelines(1, &scene_info_pipeline);
 		glDeleteProgram(scene_info_vert);
 		glDeleteProgram(scene_info_frag);
 		glDeleteBuffers(1, &global_ubo);
@@ -260,7 +254,6 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	const auto screen_frag = ham_renderer_gl_load_shader(r, GL_FRAGMENT_SHADER, HAM_LIT("shaders-gl/screen.frag"));
 	if(screen_frag == (u32)-1){
 		ham::logapierror("Error loading screen fragment shader");
-		glDeleteProgramPipelines(1, &scene_info_pipeline);
 		glDeleteProgram(scene_info_vert);
 		glDeleteProgram(scene_info_frag);
 		glDeleteProgram(screen_vert);
@@ -268,24 +261,66 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		return nullptr;
 	}
 
+	const auto light_vert = ham_renderer_gl_load_shader(r, GL_VERTEX_SHADER, HAM_LIT("shaders-gl/light.vert"));
+	if(light_vert == (u32)-1){
+		ham::logapierror("Error loading light vertex shader");
+		glDeleteProgram(screen_frag);
+		glDeleteProgram(screen_vert);
+		glDeleteProgram(scene_info_vert);
+		glDeleteProgram(scene_info_frag);
+		glDeleteBuffers(1, &global_ubo);
+		return nullptr;
+	}
+
+	const auto light_frag = ham_renderer_gl_load_shader(r, GL_FRAGMENT_SHADER, HAM_LIT("shaders-gl/light.frag"));
+	if(light_frag == (u32)-1){
+		ham::logapierror("Error loading light fragment shader");
+		glDeleteProgram(light_vert);
+		glDeleteProgram(screen_frag);
+		glDeleteProgram(screen_vert);
+		glDeleteProgram(scene_info_vert);
+		glDeleteProgram(scene_info_frag);
+		glDeleteBuffers(1, &global_ubo);
+		return nullptr;
+	}
+
+	r->light_vert_uv_scale_loc = glGetUniformLocation(light_vert, "uv_scale");
+
+	r->light_frag_depth_tex_loc = glGetUniformLocation(light_frag, "depth_tex");
+	r->light_frag_diffuse_tex_loc = glGetUniformLocation(light_frag, "diffuse_tex");
+	r->light_frag_normal_tex_loc = glGetUniformLocation(light_frag, "normal_tex");
+
 	r->scene_info_frag_diffuse_tex_loc = glGetUniformLocation(scene_info_frag, "diffuse_tex");
 
 	r->screen_post_frag_depth_loc = glGetUniformLocation(screen_frag, "depth_tex");
 	r->screen_post_frag_diffuse_loc = glGetUniformLocation(screen_frag, "diffuse_tex");
 	r->screen_post_frag_normal_loc = glGetUniformLocation(screen_frag, "normal_tex");
+	r->screen_post_frag_scene_loc = glGetUniformLocation(screen_frag, "scene_tex");
+	r->screen_post_frag_noise_loc = glGetUniformLocation(screen_frag, "noise_tex");
 	r->screen_post_uv_scale_loc = glGetUniformLocation(screen_frag, "uv_scale");
 
 	glProgramUniform1i(scene_info_frag, r->scene_info_frag_diffuse_tex_loc, HAM_DIFFUSE_TEXTURE_UNIT);
 
+	glProgramUniform2f(light_vert, r->light_vert_uv_scale_loc, 1.f, 1.f);
+
+	glProgramUniform1i(light_frag, r->light_frag_depth_tex_loc, HAM_GBO_DEPTH_TEXTURE_UNIT);
+	glProgramUniform1i(light_frag, r->light_frag_diffuse_tex_loc, HAM_GBO_DIFFUSE_TEXTURE_UNIT);
+	glProgramUniform1i(light_frag, r->light_frag_normal_tex_loc, HAM_GBO_NORMAL_TEXTURE_UNIT);
+
 	glProgramUniform1i(screen_frag, r->screen_post_frag_depth_loc, HAM_GBO_DEPTH_TEXTURE_UNIT);
 	glProgramUniform1i(screen_frag, r->screen_post_frag_diffuse_loc, HAM_GBO_DIFFUSE_TEXTURE_UNIT);
 	glProgramUniform1i(screen_frag, r->screen_post_frag_normal_loc, HAM_GBO_NORMAL_TEXTURE_UNIT);
+	glProgramUniform1i(screen_frag, r->screen_post_frag_scene_loc, HAM_GBO_SCENE_TEXTURE_UNIT);
+
+	glProgramUniform1i(screen_frag, r->screen_post_frag_noise_loc, HAM_NOISE_TEXTURE_UNIT);
+
 	glProgramUniform2f(screen_frag, r->screen_post_uv_scale_loc, 1.f, 1.f);
 
-	const auto screen_pipeline = ham_renderer_gl_create_pipeline(r, screen_vert, screen_frag);
-	if(screen_pipeline == (u32)-1){
+	const auto scene_info_pipeline = ham_renderer_gl_create_pipeline(r, scene_info_vert, scene_info_frag);
+	if(scene_info_pipeline == (u32)-1){
 		ham::logapierror("Error creating screen shader pipeline");
-		glDeleteProgramPipelines(1, &scene_info_pipeline);
+		glDeleteProgram(light_vert);
+		glDeleteProgram(light_frag);
 		glDeleteProgram(scene_info_vert);
 		glDeleteProgram(scene_info_frag);
 		glDeleteProgram(screen_vert);
@@ -294,10 +329,60 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		return nullptr;
 	}
 
+	const auto screen_pipeline = ham_renderer_gl_create_pipeline(r, screen_vert, screen_frag);
+	if(screen_pipeline == (u32)-1){
+		ham::logapierror("Error creating screen shader pipeline");
+		glDeleteProgramPipelines(1, &scene_info_pipeline);
+		glDeleteProgram(light_vert);
+		glDeleteProgram(light_frag);
+		glDeleteProgram(scene_info_vert);
+		glDeleteProgram(scene_info_frag);
+		glDeleteProgram(screen_vert);
+		glDeleteProgram(screen_frag);
+		glDeleteBuffers(1, &global_ubo);
+		return nullptr;
+	}
+
+	const auto light_pipeline = ham_renderer_gl_create_pipeline(r, light_vert, light_frag);
+	if(screen_pipeline == (u32)-1){
+		ham::logapierror("Error creating light shader pipeline");
+		glDeleteProgramPipelines(1, &screen_pipeline);
+		glDeleteProgramPipelines(1, &scene_info_pipeline);
+		glDeleteProgram(light_vert);
+		glDeleteProgram(light_frag);
+		glDeleteProgram(scene_info_vert);
+		glDeleteProgram(scene_info_frag);
+		glDeleteProgram(screen_vert);
+		glDeleteProgram(screen_frag);
+		glDeleteBuffers(1, &global_ubo);
+		return nullptr;
+	}
+
+	ham_random32_state rand_state;
+	ham_srand(&rand_state, (uptr)time(NULL), (uptr)&rand_state);
+
+	ham_color_u8 noise_pixels[512*512];
+	for(int y = 0; y < 512; y++){
+		for(int x = 0; x < 512; x++){
+			const auto idx = (y * 512) + x;
+			noise_pixels[idx].bits = ham_rand(&rand_state);
+		}
+	}
+
+	GLuint noise_tex;
+	glCreateTextures(GL_TEXTURE_2D, 1, &noise_tex);
+
+	// 1 + floor(log2(512)) == 10
+	const GLsizei num_diffuse_levels = 10;
+
+	glTextureStorage2D(noise_tex, num_diffuse_levels, GL_RGBA8, 512, 512);
+	glTextureSubImage2D(noise_tex, 0, 0, 0, 512, 512, GL_RGBA, GL_UNSIGNED_BYTE, noise_pixels);
+	glGenerateTextureMipmap(noise_tex);
+
 	GLuint samplers[2];
 	glCreateSamplers(std::size(samplers), samplers);
 
-	// Depth/normal sampler
+	// GBO sampler
 	glSamplerParameteri(samplers[0], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glSamplerParameteri(samplers[0], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -318,9 +403,15 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	ret->screen_post_frag = screen_frag;
 	ret->screen_post_pipeline = screen_pipeline;
 
+	ret->light_vert = light_vert;
+	ret->light_frag = light_frag;
+	ret->light_pipeline = light_pipeline;
+
 	ret->scene_info_vert = scene_info_vert;
 	ret->scene_info_frag = scene_info_frag;
 	ret->scene_info_pipeline = scene_info_pipeline;
+
+	ret->noise_tex = noise_tex;
 
 	memcpy(ret->samplers, samplers, sizeof(samplers));
 
@@ -339,9 +430,15 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 static inline void ham_renderer_gl_dtor(ham_renderer_gl *r){
 	glDeleteSamplers(std::size(r->samplers), r->samplers);
 
+	glDeleteTextures(1, &r->noise_tex);
+
 	glDeleteProgramPipelines(1, &r->scene_info_pipeline);
 	glDeleteProgram(r->scene_info_vert);
 	glDeleteProgram(r->scene_info_frag);
+
+	glDeleteProgramPipelines(1, &r->light_pipeline);
+	glDeleteProgram(r->light_vert);
+	glDeleteProgram(r->light_frag);
 
 	glDeleteProgramPipelines(1, &r->screen_post_pipeline);
 	glDeleteProgram(r->screen_post_vert);
@@ -364,7 +461,12 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 		if(old_w >= w && old_h >= h){
 			r->render_w = w;
 			r->render_h = h;
-			glProgramUniform2f(r->screen_post_frag, r->screen_post_uv_scale_loc, f64(w)/f64(old_w), f64(h)/f64(old_h));
+
+			ham_f32 uv_scale_x = f64(w)/f64(old_w);
+			ham_f32 uv_scale_y = f64(h)/f64(old_h);
+
+			glProgramUniform2f(r->light_vert, r->light_vert_uv_scale_loc, uv_scale_x, uv_scale_y);
+			glProgramUniform2f(r->screen_post_frag, r->screen_post_uv_scale_loc, uv_scale_x, uv_scale_y);
 			return true;
 		}
 	}
@@ -411,6 +513,7 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 	r->render_w = w;
 	r->render_h = h;
 
+	glProgramUniform2f(r->light_vert, r->light_vert_uv_scale_loc, 1.f, 1.f);
 	glProgramUniform2f(r->screen_post_frag, r->screen_post_uv_scale_loc, 1.f, 1.f);
 
 	return true;
@@ -421,10 +524,12 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 
 	const ham::const_camera_view cam = data->common.cam;
 
-	const ham_renderer_gl_global_ubo_data global_data = {
-		.view_proj = cam.projection_matrix() * cam.view_matrix(),
-		.time      = (f32)r->total_time,
-	};
+	ham_renderer_gl_global_ubo_data global_data;
+	global_data.view_proj     = cam.projection_matrix() * cam.view_matrix();
+	global_data.inv_view_proj = ham_mat4_inverse(global_data.view_proj);
+	global_data.near_z        = cam.near_z();
+	global_data.far_z         = cam.far_z();
+	global_data.time          = (f32)r->total_time;
 
 	memcpy(r->global_ubo_writep, &global_data, sizeof(global_data));
 	glFlushMappedNamedBufferRange(r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));
@@ -436,6 +541,7 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, r->fbo);
 	glViewport(0, 0, r->render_w, r->render_h);
 
+	glDisable(GL_FRAMEBUFFER_SRGB);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	//glEnable(GL_DEPTH_CLAMP);
@@ -465,7 +571,6 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 			glBindSampler(HAM_DIFFUSE_TEXTURE_UNIT, r->samplers[1]);
 
 			glBindVertexArray(group->vao);
-			glBindBufferRange(GL_UNIFORM_BUFFER, 0, r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));
 			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, group->bufs[HAM_DRAW_BUFFER_GL_COMMANDS]);
 			glMultiDrawElementsIndirect(group->mode, GL_UNSIGNED_INT, nullptr, ham_super(group)->num_shapes, sizeof(ham_gl_draw_elements_indirect_command));
 			return true;
@@ -477,15 +582,47 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	glDisable(GL_CULL_FACE);
 	glDepthMask(GL_FALSE);
 
-	// TODO: do lighting pass
+	//
+	// Do scene lighting
+	//
 
-	glBindTextureUnit(HAM_GBO_DEPTH_TEXTURE_UNIT,   r->fbo_attachments[0]);
+	glBindTextureUnit(HAM_GBO_DEPTH_TEXTURE_UNIT, r->fbo_attachments[0]);
 	glBindTextureUnit(HAM_GBO_DIFFUSE_TEXTURE_UNIT, r->fbo_attachments[1]);
 	glBindTextureUnit(HAM_GBO_NORMAL_TEXTURE_UNIT,  r->fbo_attachments[2]);
 
 	glBindSampler(HAM_GBO_DEPTH_TEXTURE_UNIT,   r->samplers[0]);
 	glBindSampler(HAM_GBO_DIFFUSE_TEXTURE_UNIT, r->samplers[0]);
 	glBindSampler(HAM_GBO_NORMAL_TEXTURE_UNIT,  r->samplers[0]);
+
+	glBindProgramPipeline(r->light_pipeline);
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));
+
+	ham_object_manager_iterate(
+		ham_super(r)->light_groups, [](ham_object *obj, void *user) -> bool{
+			const auto group = (const ham_light_group_gl*)obj;
+			if(!ham_super(group)->num_instances) return true;
+
+			//const auto r = (const ham_renderer_gl*)ham_super(group)->r;
+
+			glBindVertexArray(group->vao);
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, group->cbo);
+			glDrawElementsIndirect(GL_TRIANGLE_FAN, GL_UNSIGNED_INT, nullptr);
+			return true;
+		},
+		nullptr
+	);
+
+	//
+	// Draw to screen
+	//
+
+	glEnable(GL_FRAMEBUFFER_SRGB);
+
+	glBindTextureUnit(HAM_GBO_SCENE_TEXTURE_UNIT, r->fbo_attachments[3]);
+	glBindTextureUnit(HAM_NOISE_TEXTURE_UNIT, r->noise_tex);
+
+	glBindSampler(HAM_GBO_SCENE_TEXTURE_UNIT, r->samplers[0]);
+	glBindSampler(HAM_NOISE_TEXTURE_UNIT, r->samplers[0]);
 
 	//const ham_mat4 *const view_mat = ham_camera_view_matrix(data->common.cam);
 	//const ham_mat4 *const proj_mat = ham_camera_proj_matrix(data->common.cam);
@@ -510,7 +647,7 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	r->total_time += dt;
 }
 
-ham_define_renderer(ham_renderer_gl, ham_draw_group_gl)
+ham_define_renderer(ham_renderer_gl, ham_draw_group_gl, ham_light_group_gl)
 
 //
 // Shaders

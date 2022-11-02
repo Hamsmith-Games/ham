@@ -37,6 +37,13 @@ typedef struct ham_gl_draw_elements_indirect_command{
 	ham_u32 base_instance;
 } ham_gl_draw_elements_indirect_command;
 
+typedef struct ham_gl_draw_arrays_indirect_command{
+	ham_u32 count;
+	ham_u32 instance_count;
+	ham_u32 first;
+	ham_u32 base_instance;
+} ham_gl_draw_arrays_indirect_command;
+
 HAM_C_API_END
 
 /**

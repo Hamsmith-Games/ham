@@ -54,6 +54,8 @@ target_include_directories(glad PUBLIC glad/include)
 # Targets
 ##
 
+ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/light.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.vert.spv)
+ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/light.frag ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.frag.spv)
 ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/screen.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert.spv)
 ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/screen.frag ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.frag.spv)
 ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/scene_info.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.vert.spv)
@@ -67,6 +69,8 @@ function(ham_ensure_file INPUT OUTPUT)
 	)
 endfunction()
 
+ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/light.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.vert)
+ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/light.frag ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.frag)
 ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/screen.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert)
 ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/screen.frag ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.frag)
 ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/scene_info.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.vert)
@@ -74,10 +78,14 @@ ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/scene_info.frag ${HAM_PLUGIN_BINARY_DI
 
 set(
 	HAM_RENDERER_GL_SHADERS
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.vert.spv
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.frag.spv
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert.spv
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.frag.spv
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.vert.spv
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.frag.spv
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.vert
+	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.frag
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.frag
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.vert
@@ -90,6 +98,7 @@ ham_add_plugin(
 	renderer-gl.hpp
 	renderer-gl.cpp
 	draw-group-gl.cpp
+	light-group-gl.cpp
 )
 
 target_compile_definitions(ham-renderer-gl PRIVATE HAM_RENDERER_GL_IMPLEMENTATION)

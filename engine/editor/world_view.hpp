@@ -75,6 +75,9 @@ namespace ham::engine::editor{
 			renderer_widget *m_r_widget;
 			draw_group m_gizmo_group, m_test_group;
 
+			ham_light *m_cam_light;
+			light_group	m_cam_light_group;
+
 			ham::camera m_cam;
 			Qt::MouseButton m_cam_btn = Qt::MiddleButton;
 			bool m_cam_held = false;

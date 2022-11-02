@@ -102,6 +102,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 	}
 
 	const auto draw_group_vtable = (const ham_object_vtable*)((const ham_renderer_vtable*)obj_vtable)->draw_group_vtable();
+	const auto light_group_vtable = (const ham_object_vtable*)((const ham_renderer_vtable*)obj_vtable)->light_group_vtable();
 
 	const auto draw_group_manager = ham_object_manager_create(draw_group_vtable);
 	if(!draw_group_manager){
@@ -114,9 +115,22 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 		return nullptr;
 	}
 
+	const auto light_group_manager = ham_object_manager_create(light_group_vtable);
+	if(!light_group_manager){
+		ham::logapierror("Failed to create object manager for light groups");
+		ham_object_manager_destroy(draw_group_manager);
+		ham_image_destroy(default_img);
+		ham_mutex_finish(&draw_mut);
+		ham_allocator_free(allocator, obj);
+		ham_plugin_unload(plugin);
+		ham_dso_close(dso);
+		return nullptr;
+	}
+
 	ham_buffer draw_list, tmp_list;
 	if(!ham_buffer_init_allocator(&draw_list, allocator, alignof(ham_draw_group*), 0)){
 		ham::logapierror("Failed to initialize draw list: error in ham_buffer_init");
+		ham_object_manager_destroy(light_group_manager);
 		ham_object_manager_destroy(draw_group_manager);
 		ham_image_destroy(default_img);
 		ham_mutex_finish(&draw_mut);
@@ -129,6 +143,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 	if(!ham_buffer_init_allocator(&tmp_list, allocator, alignof(ham_draw_group*), 0)){
 		ham::logapierror("Failed to initialize draw temp list: error in ham_buffer_init");
 		ham_buffer_finish(&draw_list);
+		ham_object_manager_destroy(light_group_manager);
 		ham_object_manager_destroy(draw_group_manager);
 		ham_image_destroy(default_img);
 		ham_mutex_finish(&draw_mut);
@@ -153,6 +168,7 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 		ham::logapierror("Failed to construct renderer object '{}'", obj_id);
 		ham_buffer_finish(&draw_list);
 		ham_buffer_finish(&tmp_list);
+		ham_object_manager_destroy(light_group_manager);
 		ham_object_manager_destroy(draw_group_manager);
 		ham_image_destroy(default_img);
 		ham_mutex_finish(&draw_mut);
@@ -164,13 +180,14 @@ ham_renderer *ham_renderer_create(const char *plugin_id, const char *obj_id, con
 
 	// in case somebody did something weird in a constructor, we have to set these again
 	// TODO: only do this in debug builds?
-	obj->vptr      = obj_vtable;
-	ret->allocator   = allocator;
-	ret->dso         = dso;
-	ret->default_img = default_img;
-	ret->plugin      = plugin;
-	ret->draw_mut    = draw_mut;
-	ret->draw_groups = draw_group_manager;
+	obj->vptr         = obj_vtable;
+	ret->allocator    = allocator;
+	ret->dso          = dso;
+	ret->default_img  = default_img;
+	ret->plugin       = plugin;
+	ret->draw_mut     = draw_mut;
+	ret->draw_groups  = draw_group_manager;
+	ret->light_groups = light_group_manager;
 
 	// check we don't muck up the draw lists tho
 	if(
@@ -357,7 +374,7 @@ ham_draw_group *ham_draw_group_create(
 }
 
 void ham_draw_group_destroy(ham_draw_group *group){
-	if(ham_unlikely(group == NULL)) return;
+	if(ham_unlikely(!group)) return;
 
 	const auto allocator = group->r->allocator;
 
@@ -454,6 +471,155 @@ bool ham_draw_group_instance_visit(
 		const auto vptr = (const ham_draw_group_vtable*)ham_super(group)->vptr;
 		const auto data = vptr->instance_data(group);
 		result = fn(data + idx, user);
+	}
+
+	if(!ham_mutex_unlock(&group->mut)){
+		ham::logapiwarn("Error in ham_mutex_unlock");
+	}
+
+	return result;
+}
+
+//
+// Light groups
+//
+
+ham_light_group *ham_light_group_create(ham_renderer *r, ham_usize num_lights){
+	if(!ham_check(r != NULL)) return nullptr;
+
+	struct light_group_data{
+		ham_renderer *r;
+		ham_mutex mut;
+		ham_usize num_lights;
+	};
+
+	light_group_data data;
+	data.r = r;
+	data.num_lights = num_lights;
+
+	if(!ham_mutex_init(&data.mut, HAM_MUTEX_NORMAL)){
+		ham::logapierror("Error in ham_mutex_init");
+		return nullptr;
+	}
+
+	const auto obj = ham_object_new_init(
+		r->light_groups, [](ham_object *obj, void *user){
+			const auto data = (const light_group_data*)user;
+			const auto group = (ham_light_group*)obj;
+			group->r = data->r;
+			group->mut = data->mut;;
+			group->num_instances = 0;
+			return true;
+		},
+		&data
+	);
+	if(!obj){
+		ham::logapierror("Failed to construct new light group");
+		ham_mutex_finish(&data.mut);
+		return nullptr;
+	}
+
+	const auto group = (ham_light_group*)obj;
+
+	const auto vptr = (const ham_light_group_vtable*)ham_super(group)->vptr;
+	const bool result = vptr->set_num_instances(group, num_lights);
+	if(result){
+		group->num_instances = num_lights;
+	}
+	else{
+		ham::logapiwarn("Failed to set number of instances to {}", num_lights);
+	}
+
+	return (ham_light_group*)obj;
+}
+
+void ham_light_group_destroy(ham_light_group *group){
+	if(ham_unlikely(!group)) return;
+
+	ham_mutex_finish(&group->mut);
+
+	ham_object_delete(group->r->light_groups, ham_super(group));
+}
+
+ham_u32 ham_light_group_instance_iterate(
+	ham_light_group *group,
+	ham_light_group_instance_iterate_fn fn,
+	void *user
+){
+	if(!ham_check(group != NULL)) return (ham_u32)-1;
+
+	if(!ham_mutex_lock(&group->mut)){
+		ham::logapierror("Error in ham_mutex_lock");
+		return (ham_u32)-1;
+	}
+
+	u32 result = group->num_instances;
+
+	if(fn){
+		const auto vptr = (const ham_light_group_vtable*)ham_super(group)->vptr;
+		const auto data = vptr->instance_data(group);
+
+		const auto n = group->num_instances;
+
+		for(result = 0; result < n; result++){
+			const auto inst = data + result;
+			if(!fn(inst, data)) break;
+		}
+	}
+
+	if(!ham_mutex_unlock(&group->mut)){
+		ham::logapiwarn("Error in ham_mutex_unlock");
+	}
+
+	return result;
+}
+
+bool ham_light_group_instance_visit(
+	ham_light_group *group, ham_u32 idx,
+	ham_light_group_instance_iterate_fn fn,
+	void *user
+){
+	if(!ham_check(group != NULL)) return false;
+
+	if(!ham_mutex_lock(&group->mut)){
+		ham::logapierror("Error in ham_mutex_lock");
+		return false;
+	}
+
+	bool result = ham_check(idx < group->num_instances);
+	if(result){
+		const auto vptr = (const ham_light_group_vtable*)ham_super(group)->vptr;
+		const auto data = vptr->instance_data(group);
+		result = fn(data + idx, user);
+	}
+
+	if(!ham_mutex_unlock(&group->mut)){
+		ham::logapiwarn("Error in ham_mutex_unlock");
+	}
+
+	return result;
+}
+
+ham_u32 ham_light_group_num_instances(const ham_light_group *group){
+	if(!ham_check(group != NULL)) return (ham_u32)-1;
+	else return group->num_instances;
+}
+
+bool ham_light_group_set_num_instances(ham_light_group *group, ham_u32 n){
+	if(!ham_check(group != NULL)) return false;
+
+	if(!ham_mutex_lock(&group->mut)){
+		ham::logapierror("Error in ham_mutex_lock");
+		return false;
+	}
+
+	const auto vptr = (const ham_light_group_vtable*)ham_super(group)->vptr;
+	const bool result = vptr->set_num_instances(group, n);
+	if(result){
+		group->num_instances = n;
+	}
+	else{
+		ham::logapierror("Failed to set number of instances to {}", n);
 	}
 
 	if(!ham_mutex_unlock(&group->mut)){

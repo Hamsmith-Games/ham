@@ -192,8 +192,8 @@ static inline ham_draw_group_gl *ham_draw_group_gl_ctor(ham_draw_group_gl *group
 
 	ret->diffuse_tex_arr = diffuse_tex_arr;
 
-	ret->instance_capacity = 0;
-	ret->instance_mapping = nullptr;
+	ret->inst_cap = 0;
+	ret->inst_map = nullptr;
 
 	return ret;
 }
@@ -242,7 +242,7 @@ static bool ham_draw_group_gl_set_num_instances(ham_draw_group_gl *group, ham_u3
 		ham_make_vec4(1.f, 1.f, 1.f, 1.f),
 	};
 
-	if(!group->instance_mapping || group->instance_capacity < n){
+	if(!group->inst_map || group->inst_cap < n){
 		GLuint new_buffer;
 		glCreateBuffers(1, &new_buffer);
 
@@ -257,23 +257,23 @@ static bool ham_draw_group_gl_set_num_instances(ham_draw_group_gl *group, ham_u3
 			return false;
 		}
 
-		if(group->instance_mapping && cur_n){
-			memcpy(new_mapping, group->instance_mapping, cur_n * sizeof(ham_draw_group_instance_data));
+		if(group->inst_map && cur_n){
+			memcpy(new_mapping, group->inst_map, cur_n * sizeof(ham_draw_group_instance_data));
 		}
 
 		glVertexArrayVertexBuffer(group->vao, 1, new_buffer, 0, (GLsizei)sizeof(ham_draw_group_instance_data));
 
 		glDeleteBuffers(1, &group->bufs[HAM_DRAW_BUFFER_GL_INSTANCE_DATA]);
 
-		group->instance_capacity = n;
-		group->instance_mapping  = new_mapping;
+		group->inst_cap = n;
+		group->inst_map  = new_mapping;
 		group->bufs[HAM_DRAW_BUFFER_GL_INSTANCE_DATA] = new_buffer;
 	}
 
 	const isize diff_n = n - cur_n;
 	const isize zero_n = std::abs(diff_n);
 
-	const auto data_ptr = (ham_draw_group_instance_data*)group->instance_mapping + (n < cur_n ? n : cur_n);
+	const auto data_ptr = (ham_draw_group_instance_data*)group->inst_map + (n < cur_n ? n : cur_n);
 
 	for(isize i = 0; i < zero_n; i++){
 		memcpy(data_ptr + i, &default_data, sizeof(ham_draw_group_instance_data));
@@ -283,7 +283,7 @@ static bool ham_draw_group_gl_set_num_instances(ham_draw_group_gl *group, ham_u3
 }
 
 static ham_draw_group_instance_data *ham_draw_group_gl_instance_data(ham_draw_group_gl *group){
-	return (ham_draw_group_instance_data*)group->instance_mapping;
+	return (ham_draw_group_instance_data*)group->inst_map;
 }
 
 HAM_C_API_END

@@ -28,7 +28,8 @@ out gl_PerVertex {
 };
 
 layout(std140, binding = 0) uniform RenderData{
-	mat4 view_proj;
+	mat4 view_proj, inv_view_proj;
+	float near_z, far_z;
 	float time;
 } globals;
 

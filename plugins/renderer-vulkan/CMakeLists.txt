@@ -48,6 +48,7 @@ ham_add_plugin(
 	renderer.hpp
 	renderer.cpp
 	draw_group.cpp
+	light_group_vulkan.cpp
 )
 
 target_link_libraries(ham-renderer-vulkan PRIVATE VulkanMemoryAllocator)

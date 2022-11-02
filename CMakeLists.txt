@@ -245,6 +245,7 @@ set(
 	${HAM_SOURCE_INCLUDE_DIR}/ham/functional.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/noise.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/typesys.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/argpack.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/object.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/hash.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/fs.h
@@ -262,6 +263,7 @@ set(
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/transform.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/shape.h
+	${HAM_SOURCE_INCLUDE_DIR}/ham/light.h
 	${HAM_SOURCE_INCLUDE_DIR}/ham/camera.h
 
 	${HAM_SOURCE_INCLUDE_DIR}/ham/gl.h # just a dispatch/helper header, not a loader

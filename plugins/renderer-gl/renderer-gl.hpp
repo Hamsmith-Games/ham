@@ -35,6 +35,7 @@ enum {
 	HAM_GBO_NORMAL_TEXTURE_UNIT,
 	HAM_GBO_SCENE_TEXTURE_UNIT,
 
+	HAM_NOISE_TEXTURE_UNIT,
 	HAM_DIFFUSE_TEXTURE_UNIT,
 	HAM_NORMAL_TEXTURE_UNIT,
 	HAM_SPECULAR_TEXTURE_UNIT,
@@ -61,7 +62,8 @@ typedef enum ham_draw_buffer_gl_data{
 typedef struct ham_draw_group_gl ham_draw_group_gl;
 
 typedef struct ham_renderer_gl_global_ubo_data{
-	ham_mat4 view_proj;
+	ham_mat4 view_proj, inv_view_proj;
+	ham_f32 near_z, far_z;
 	ham_f32 time;
 } ham_renderer_gl_global_ubo_data;
 
@@ -76,15 +78,24 @@ typedef struct ham_renderer_gl_api ham_renderer_gl{
 	ham_u32 render_w, render_h;
 
 	ham_u32 scene_info_vert, scene_info_frag, scene_info_pipeline;
+	ham_u32 light_vert, light_frag, light_pipeline;
 	ham_u32 screen_post_vert, screen_post_frag, screen_post_pipeline;
 
 	// gbo, scene diffuse
 	ham_u32 samplers[2];
+	ham_u32 noise_tex;
+
+	ham_i32 light_vert_uv_scale_loc;
+	ham_i32 light_frag_depth_tex_loc;
+	ham_i32 light_frag_diffuse_tex_loc;
+	ham_i32 light_frag_normal_tex_loc;
 
 	ham_i32 scene_info_frag_diffuse_tex_loc;
 	ham_i32 screen_post_frag_depth_loc;
 	ham_i32 screen_post_frag_diffuse_loc;
 	ham_i32 screen_post_frag_normal_loc;
+	ham_i32 screen_post_frag_scene_loc;
+	ham_i32 screen_post_frag_noise_loc;
 
 	ham_draw_group_gl *screen_group;
 	ham_i32 screen_post_uv_scale_loc;
@@ -106,8 +117,17 @@ struct ham_renderer_gl_api ham_draw_group_gl{
 	ham_u32 bufs[HAM_DRAW_BUFFER_GL_DATA_COUNT];
 	ham_u32 diffuse_tex_arr;
 
-	ham_u32 instance_capacity;
-	void *instance_mapping;
+	ham_u32 inst_cap;
+	void *inst_map;
+};
+
+struct ham_renderer_gl_api ham_light_group_gl{
+	ham_derive(ham_light_group)
+
+	ham_u32 vao, vbo, ibo, cbo, buf;
+
+	ham_u32 inst_cap;
+	void *inst_map;
 };
 
 HAM_C_API_END
