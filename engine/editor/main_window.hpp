@@ -43,6 +43,7 @@ namespace ham::engine::editor{
 
 		private:
 			ham_engine *m_engine;
+			ham_world *m_world;
 			class project *m_proj;
 			class world_view *m_world_view;
 	};

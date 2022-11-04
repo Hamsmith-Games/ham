@@ -306,7 +306,9 @@ ham_nothrow void ham_engine_destroy(ham_engine *engine){
 
 	app->fini(engine, app->user);
 
-	for(int i = 0; i < engine->num_subsystems; i++){
+	const auto num_subsys = engine->num_subsystems.load(std::memory_order_relaxed);
+
+	for(ham_usize i = 0; i < num_subsys; i++){
 		const auto subsys = engine->subsystems[i];
 		ham_impl_engine_subsys_destroy(subsys);
 	}

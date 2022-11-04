@@ -16,29 +16,40 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#ifndef HAM_ENGINE_ENTITY_DRAW_INSTANCE_COMPONENT_H
+#define HAM_ENGINE_ENTITY_DRAW_INSTANCE_COMPONENT_H 1
+
 /**
- * @defgroup HAM_ENGINE_ENTITY_TRANSFORM_COMPONENT Transform component
+ * @defgroup HAM_ENGINE_ENTITY_DRAW_INSTANCE_COMPONENT Draw instance component
  * @ingroup HAM_ENGINE_ENTITY_COMPONENTS
  * @{
  */
 
-#ifndef HAM_ENGINE_ENTITY_TRANSFORM_COMPONENT_H
-#define HAM_ENGINE_ENTITY_TRANSFORM_COMPONENT_H 1
-
 #include "../entity.h"
 
-#include "ham/transform.h"
+#include "ham/renderer.h"
 
-ham_declare_object(ham_entity_component_transform, ham_entity_component)
+HAM_C_API_BEGIN
 
-struct ham_entity_component_transform{
+ham_declare_object(ham_entity_component_draw_instance, ham_entity_component)
+
+struct ham_entity_component_draw_instance{
 	ham_derive(ham_entity_component)
 
-	ham_transform trans;
+	ham_u32 id;
+	ham_draw_group *group;
 };
+
+struct ham_entity_component_draw_instance_vtable{
+	ham_derive(ham_entity_component_vtable)
+
+	// TODO: draw instance component functions
+};
+
+HAM_C_API_END
 
 /**
  * @}
  */
 
-#endif // !HAM_ENGINE_ENTITY_TRANSFORM_COMPONENT_H
+#endif // !HAM_ENGINE_ENTITY_DRAW_INSTANCE_COMPONENT_H

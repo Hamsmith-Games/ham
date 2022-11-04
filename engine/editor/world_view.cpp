@@ -56,9 +56,10 @@ editor::world_context_menu::~world_context_menu(){}
 // World editor main view
 //
 
-editor::world_view::world_view(ham_engine *engine, QWidget *parent)
+editor::world_view::world_view(ham_engine *engine, ham_world *world, QWidget *parent)
 	: QWidget(parent)
 	, m_engine(engine)
+	, m_world(world)
 	, m_cam_dir(0.f)
 {
 	setContentsMargins(0, 0, 0, 0);
@@ -185,7 +186,6 @@ bool editor::world_view::eventFilter(QObject *watched, QEvent *ev){
 
 void editor::world_view::mouseMoveEvent(QMouseEvent *ev){
 	if(m_cam_held){
-		// TODO: camera rotation
 		const QPointF cur_pos = ev->pos();
 
 		QPointF dpos = cur_pos - m_cam_last_pos;

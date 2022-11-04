@@ -31,27 +31,11 @@ typedef struct ham_world_partition ham_world_partition;
 
 #include "ham/object.h"
 #include "ham/buffer.h"
+#include "ham/transform.h"
 
 HAM_C_API_BEGIN
 
 ham_declare_object(ham_entity, ham_object)
-
-ham_engine_api ham_entity *ham_entity_vcreate(const ham_entity_vtable *ent_vptr, ham_u32 nargs, va_list va);
-
-//! @cond ignore
-static inline ham_entity *ham_impl_entity_create(const ham_entity_vtable *ent_vptr, ham_u32 nargs, ...){
-	va_list va;
-	va_start(va, nargs);
-	ham_entity *const ret = ham_entity_vcreate(ent_vptr, nargs, va);
-	va_end(va);
-	return ret;
-}
-//! @endcond
-
-#define ham_entity_create(ent_vptr, ...) \
-	ham_impl_entity_create((ent_vptr), HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__)
-
-ham_engine_api void ham_entity_destroy(ham_entity *ent);
 
 /**
  * @defgroup HAM_ENGINE_ENTITY_COMPONENTS Components
@@ -66,10 +50,16 @@ struct ham_entity_component{
 	ham_entity *ent;
 };
 
-ham_engine_api ham_entity_component *ham_entity_component_vcreate(ham_entity *ent, const ham_entity_vtable *comp_vptr, ham_u32 nargs, va_list va);
+struct ham_entity_component_vtable{
+	ham_derive(ham_object_vtable)
+
+	void(*update)(ham_entity_component *self, ham_f64 dt);
+};
+
+ham_engine_api ham_entity_component *ham_entity_component_vcreate(ham_entity *ent, const ham_entity_component_vtable *comp_vptr, ham_u32 nargs, va_list va);
 
 //! @cond ignore
-static inline ham_entity_component *ham_impl_entity_component_create(ham_entity *ent, const ham_entity_vtable *comp_vptr, ham_u32 nargs, ...){
+ham_used static inline ham_entity_component *ham_impl_entity_component_create(ham_entity *ent, const ham_entity_component_vtable *comp_vptr, ham_u32 nargs, ...){
 	va_list va;
 	va_start(va, nargs);
 	ham_entity_component *const ret = ham_entity_component_vcreate(ent, comp_vptr, nargs, va);
@@ -87,6 +77,9 @@ static inline ham_entity_component *ham_impl_entity_component_create(ham_entity 
 
 struct ham_entity{
 	ham_derive(ham_object)
+
+	//! @brief Transform within \ref world_partition .
+	ham_transform transform;
 
 	//! @brief World partition this entity belongs to.
 	ham_world_partition *world_partition;

@@ -20,11 +20,14 @@
 #define HAM_ENGINE_EDITOR_WORLD_VIEW_HPP 1
 
 #include "ham/engine.h"
+#include "ham/engine/world.h"
 
 #include <QWidget>
 #include <QMenu>
 
 #include "renderer_widget.hpp"
+
+Q_DECLARE_METATYPE(ham::engine::world_view)
 
 namespace ham::engine::editor{
 	class world_view;
@@ -49,12 +52,15 @@ namespace ham::engine::editor{
 		Q_OBJECT
 
 		Q_PROPERTY(ham::engine::editor::renderer_widget* renderer READ renderer CONSTANT)
+		Q_PROPERTY(ham::engine::world_view world READ world CONSTANT)
 
 		public:
-			explicit world_view(ham_engine *engine, QWidget *parent = nullptr);
+			world_view(ham_engine *engine, ham_world *world, QWidget *parent = nullptr);
 			~world_view();
 
 			renderer_widget *renderer() const noexcept{ return m_r_widget; }
+
+			ham::engine::world_view world() const noexcept{ return m_world; }
 
 			void show_context_menu(const QPoint &pos);
 
@@ -72,6 +78,7 @@ namespace ham::engine::editor{
 
 		private:
 			ham_engine *m_engine;
+			ham_world *m_world;
 			renderer_widget *m_r_widget;
 			draw_group m_gizmo_group, m_test_group;
 

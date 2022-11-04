@@ -42,7 +42,51 @@ ham_engine_api ham_world *ham_world_create(ham_str8 name);
 
 ham_engine_api void ham_world_destroy(ham_world *world);
 
+ham_engine_api ham_entity *ham_entity_vcreate(ham_world *world, const ham_entity_vtable *ent_vt, ham_u32 nargs, va_list va);
+
+ham_engine_api void ham_entity_destroy(ham_entity *ent);
+
+//! @cond ignore
+ham_used static inline ham_entity *ham_impl_entity_create(ham_world *world, const ham_entity_vtable *ent_vt, ham_u32 nargs, ...){
+	va_list va;
+	va_start(va, nargs);
+	ham_entity *const ret = ham_entity_vcreate(world, ent_vt, nargs, va);
+	va_end(va);
+	return ret;
+}
+//! @endcond
+
+#define ham_entity_create(world, ent_vt, ...) \
+	ham_impl_entity_create((world), (ent_vt), HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__)
+
 HAM_C_API_END
+
+#ifdef __cplusplus
+
+namespace ham::engine{
+	template<typename ... Tags>
+	class basic_world_view{
+		public:
+			static constexpr bool is_mutable = ham::meta::type_list_contains_v<meta::type_list<Tags...>, mutable_tag>;
+
+			using pointer = std::conditional_t<is_mutable, ham_world*, const ham_world*>;
+
+			basic_world_view(pointer ptr_) noexcept
+				: m_ptr(ptr_){}
+
+			operator pointer() const noexcept{ return m_ptr; }
+
+			pointer ptr() const noexcept{ return m_ptr; }
+
+		private:
+			pointer m_ptr;
+	};
+
+	using world_view = basic_world_view<mutable_tag>;
+	using const_world_view = basic_world_view<>;
+}
+
+#endif // __cplusplus
 
 /**
  * @}

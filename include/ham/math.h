@@ -32,14 +32,14 @@
 
 #include <string.h>
 
-#define ham_math_api ham_nothrow static inline
+#define ham_math_api ham_nothrow ham_used static inline
 
 HAM_C_API_BEGIN
 
 //! @cond ignore
 
 // unused unless proven necessary
-//ham_constexpr ham_nothrow static inline ham_f32 ham_impl_rsqrtf(ham_f32 x){
+//ham_constexpr ham_math_api ham_f32 ham_impl_rsqrtf(ham_f32 x){
 //	// evil floating point bit level "what the fuck?"
 //	const ham_i32 i = 0x5f375a86 - (ham_bit_cast(ham_i32, x) >> 1);
 
@@ -153,10 +153,10 @@ typedef union alignas(16) ham_vec4i{
 #endif
 } ham_vec4i;
 
-ham_constexpr ham_nothrow static inline ham_vec2 ham_make_vec2(ham_f32 x, ham_f32 y){ return (ham_vec2){ .data = { x, y } }; }
-ham_constexpr ham_nothrow static inline ham_vec3 ham_make_vec3(ham_f32 x, ham_f32 y, ham_f32 z){ return (ham_vec3){ .data = { x, y, z } }; }
+ham_constexpr ham_math_api ham_vec2 ham_make_vec2(ham_f32 x, ham_f32 y){ return (ham_vec2){ .data = { x, y } }; }
+ham_constexpr ham_math_api ham_vec3 ham_make_vec3(ham_f32 x, ham_f32 y, ham_f32 z){ return (ham_vec3){ .data = { x, y, z } }; }
 
-ham_constexpr ham_nothrow static inline ham_vec4 ham_make_vec4(ham_f32 x, ham_f32 y, ham_f32 z, ham_f32 w){
+ham_constexpr ham_math_api ham_vec4 ham_make_vec4(ham_f32 x, ham_f32 y, ham_f32 z, ham_f32 w){
 #if defined(__cplusplus) && defined(HAM_SIMD)
 	if(std::is_constant_evaluated()) return (ham_vec4){ .data = { x, y, z, w } };
 #endif
@@ -170,10 +170,10 @@ ham_constexpr ham_nothrow static inline ham_vec4 ham_make_vec4(ham_f32 x, ham_f3
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_vec2i ham_make_vec2i(ham_i32 x, ham_i32 y){ return (ham_vec2i){ .data = { x, y } }; }
-ham_constexpr ham_nothrow static inline ham_vec3i ham_make_vec3i(ham_i32 x, ham_i32 y, ham_i32 z){ return (ham_vec3i){ .data = { x, y, z } }; }
+ham_constexpr ham_math_api ham_vec2i ham_make_vec2i(ham_i32 x, ham_i32 y){ return (ham_vec2i){ .data = { x, y } }; }
+ham_constexpr ham_math_api ham_vec3i ham_make_vec3i(ham_i32 x, ham_i32 y, ham_i32 z){ return (ham_vec3i){ .data = { x, y, z } }; }
 
-ham_constexpr ham_nothrow static inline ham_vec4i ham_make_vec4i(ham_i32 x, ham_i32 y, ham_i32 z, ham_i32 w){
+ham_constexpr ham_math_api ham_vec4i ham_make_vec4i(ham_i32 x, ham_i32 y, ham_i32 z, ham_i32 w){
 #if defined(__cplusplus) && defined(HAM_SIMD)
 	if(std::is_constant_evaluated()) return (ham_vec4i){ .data = { x, y, z, w } };
 #endif
@@ -799,25 +799,25 @@ ham_constexpr ham_math_api ham_mat4 ham_mat4_inverse(ham_mat4 m){
 	const ham_f32 coef22 = m.cols[1].data[0] * m.cols[3].data[1] - m.cols[3].data[0] * m.cols[1].data[1];
 	const ham_f32 coef23 = m.cols[1].data[0] * m.cols[2].data[1] - m.cols[2].data[0] * m.cols[1].data[1];
 
-	const ham_vec4 fac0 = (ham_vec4){ coef00, coef00, coef02, coef03};
-	const ham_vec4 fac1 = (ham_vec4){ coef04, coef04, coef06, coef07};
-	const ham_vec4 fac2 = (ham_vec4){ coef08, coef08, coef10, coef11};
-	const ham_vec4 fac3 = (ham_vec4){ coef12, coef12, coef14, coef15};
-	const ham_vec4 fac4 = (ham_vec4){ coef16, coef16, coef18, coef19};
-	const ham_vec4 fac5 = (ham_vec4){ coef20, coef20, coef22, coef23};
+	const ham_vec4 fac0 = ham_make_vec4(coef00, coef00, coef02, coef03);
+	const ham_vec4 fac1 = ham_make_vec4(coef04, coef04, coef06, coef07);
+	const ham_vec4 fac2 = ham_make_vec4(coef08, coef08, coef10, coef11);
+	const ham_vec4 fac3 = ham_make_vec4(coef12, coef12, coef14, coef15);
+	const ham_vec4 fac4 = ham_make_vec4(coef16, coef16, coef18, coef19);
+	const ham_vec4 fac5 = ham_make_vec4(coef20, coef20, coef22, coef23);
 
-	const ham_vec4 vec0 = (ham_vec4){ m.cols[1].data[0], m.cols[0].data[0], m.cols[0].data[0], m.cols[0].data[0] };
-	const ham_vec4 vec1 = (ham_vec4){ m.cols[1].data[1], m.cols[0].data[1], m.cols[0].data[1], m.cols[0].data[1] };
-	const ham_vec4 vec2 = (ham_vec4){ m.cols[1].data[2], m.cols[0].data[2], m.cols[0].data[2], m.cols[0].data[2] };
-	const ham_vec4 vec3 = (ham_vec4){ m.cols[1].data[3], m.cols[0].data[3], m.cols[0].data[3], m.cols[0].data[3] };
+	const ham_vec4 vec0 = ham_make_vec4(m.cols[1].data[0], m.cols[0].data[0], m.cols[0].data[0], m.cols[0].data[0]);
+	const ham_vec4 vec1 = ham_make_vec4(m.cols[1].data[1], m.cols[0].data[1], m.cols[0].data[1], m.cols[0].data[1]);
+	const ham_vec4 vec2 = ham_make_vec4(m.cols[1].data[2], m.cols[0].data[2], m.cols[0].data[2], m.cols[0].data[2]);
+	const ham_vec4 vec3 = ham_make_vec4(m.cols[1].data[3], m.cols[0].data[3], m.cols[0].data[3], m.cols[0].data[3]);
 
 	const ham_vec4 inv0 = ham_vec4_add(ham_vec4_sub(ham_vec4_mul(vec1, fac0), ham_vec4_mul(vec2, fac1)), ham_vec4_mul(vec3, fac2));
 	const ham_vec4 inv1 = ham_vec4_add(ham_vec4_sub(ham_vec4_mul(vec0, fac0), ham_vec4_mul(vec2, fac3)), ham_vec4_mul(vec3, fac4));
 	const ham_vec4 inv2 = ham_vec4_add(ham_vec4_sub(ham_vec4_mul(vec0, fac1), ham_vec4_mul(vec1, fac3)), ham_vec4_mul(vec3, fac5));
 	const ham_vec4 inv3 = ham_vec4_add(ham_vec4_sub(ham_vec4_mul(vec0, fac2), ham_vec4_mul(vec1, fac4)), ham_vec4_mul(vec2, fac5));
 
-	const ham_vec4 sign_a = (ham_vec4){ .data = {  1.f, -1.f,  1.f, -1.f } };
-	const ham_vec4 sign_b = (ham_vec4){ .data = { -1.f,  1.f, -1.f,  1.f } };
+	const ham_vec4 sign_a = ham_make_vec4( 1.f, -1.f,  1.f, -1.f);
+	const ham_vec4 sign_b = ham_make_vec4(-1.f,  1.f, -1.f,  1.f);
 	const ham_mat4 inverse = ham_make_mat4_cols(
 		ham_vec4_mul(inv0, sign_a),
 		ham_vec4_mul(inv1, sign_b),
@@ -825,7 +825,7 @@ ham_constexpr ham_math_api ham_mat4 ham_mat4_inverse(ham_mat4 m){
 		ham_vec4_mul(inv3, sign_b)
 	);
 
-	const ham_vec4 row0 = (ham_vec4){ inverse.cols[0].data[0], inverse.cols[1].data[0], inverse.cols[2].data[0], inverse.cols[3].data[0] };
+	const ham_vec4 row0 = ham_make_vec4(inverse.cols[0].data[0], inverse.cols[1].data[0], inverse.cols[2].data[0], inverse.cols[3].data[0]);
 
 	const ham_vec4 dot0 = ham_vec4_mul(m.cols[0], row0);
 
@@ -1533,7 +1533,7 @@ namespace ham{
 		private:
 			template<usize ... Is>
 			basic_vec(T all, meta::index_seq<Is...>)
-				: m_data{ .data = { (Is, all)... } }{}
+				: m_data{ .data = { ((void)Is, all)... } }{}
 
 			detail::vec_data_t<T, N> m_data;
 	};

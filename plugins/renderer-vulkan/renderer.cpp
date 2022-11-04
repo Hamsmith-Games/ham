@@ -177,7 +177,6 @@ static inline bool ham_renderer_vulkan_init_logical_device(ham_renderer_vulkan *
 	graphics_queue_info.queueCount = 1;
 	graphics_queue_info.pQueuePriorities = &graphics_priority;
 
-	VkDeviceQueueCreateInfo present_queue_info;
 	if(r->vk_graphics_family != r->vk_present_family){
 		auto &&present_queue_info = queue_infos[1];
 		present_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;

@@ -60,12 +60,19 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 
 		m_engine = ham_engine_create(&engine_app);
 		if(!m_engine){
-			ham_logerrorf("ham::engine::editor::main_window::main_window", "Error in ham_engine_create");
-			throw std::runtime_error("Could not create main window");
+			ham::logapierror("Error in ham_engine_create");
+			throw std::runtime_error("Could not create main window engine instance");
 		}
 	}
 
-	m_world_view = new editor::world_view(m_engine, this);
+	m_world = ham_world_create(HAM_LIT("ham-editor"));
+	if(!m_world){
+		ham::logapierror("Error in ham_world_create");
+		ham_engine_destroy(m_engine);
+		throw std::runtime_error("Could not create main window world instance");
+	}
+
+	m_world_view = new editor::world_view(m_engine, m_world, this);
 
 	project_->setParent(this);
 
@@ -101,6 +108,7 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 }
 
 editor::main_window::~main_window(){
+	ham_world_destroy(m_world);
 	ham_engine_destroy(m_engine);
 }
 

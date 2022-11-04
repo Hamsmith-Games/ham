@@ -329,7 +329,7 @@
 #	include <signal.h>
 
 // Got most of the info for this from https://github.com/scottt/debugbreak
-__attribute__((nothrow, always_inline))
+__attribute__((used, nothrow, always_inline))
 static inline void ham_breakpoint(){
 #if defined(HAM_DEBUG)
 #	if __has_builtin(__builtin_debugtrap)
@@ -349,6 +349,8 @@ static inline void ham_breakpoint(){
 #	endif
 #endif
 }
+
+#	define ham_used __attribute__((used))
 
 #	define HAM_DIAGNOSTIC_PUSH() _Pragma("GCC diagnostic push")
 #	define HAM_DIAGNOSTIC_POP() _Pragma("GCC diagnostic pop")
@@ -452,6 +454,10 @@ static inline void ham_breakpoint(){
 
 #ifndef ham_nonnull_args
 #	define ham_nonnull_args(...)
+#endif
+
+#ifndef ham_used
+#	define ham_used
 #endif
 
 #ifdef HAM_LIB_IMPLEMENTATION

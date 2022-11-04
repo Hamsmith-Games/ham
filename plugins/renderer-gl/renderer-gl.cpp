@@ -460,7 +460,7 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 		glGetTextureLevelParameteriv(r->fbo_attachments[1], 0, GL_TEXTURE_WIDTH, &old_w);
 		glGetTextureLevelParameteriv(r->fbo_attachments[1], 0, GL_TEXTURE_HEIGHT, &old_h);
 
-		if(old_w >= w && old_h >= h){
+		if((GLuint)old_w >= w && (GLuint)old_h >= h){
 			r->render_w = w;
 			r->render_h = h;
 

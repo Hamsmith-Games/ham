@@ -43,6 +43,7 @@ ham_add_library(
 	argparse.cpp
 	sys.cpp
 	model.cpp
+	entity_component.cpp
 	world.cpp
 )
 

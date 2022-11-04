@@ -16,14 +16,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-##
-# Ham programming language interpreter
-##
-
 find_package(Readline REQUIRED)
 
-add_executable(hami main.cpp)
+ham_add_executable(hami main.cpp)
+
 add_executable(ham::interpreter ALIAS hami)
 
-target_link_libraries(hami PRIVATE ${HAM_CPU_LIBS})
-target_link_libraries(hami PUBLIC ham::runtime readline::readline)
+target_link_libraries(hami PRIVATE readline::readline)

@@ -103,12 +103,12 @@ ham_api ham_object *ham_object_vnew_init(
  * @param va list for the arguments
  * @returns newly created object or ``NULL`` on error
  */
-static inline ham_object *ham_object_vnew(ham_object_manager *manager, ham_usize nargs, va_list va){
+ham_used static inline ham_object *ham_object_vnew(ham_object_manager *manager, ham_usize nargs, va_list va){
 	return ham_object_vnew_init(manager, nullptr, nullptr, nargs, va);
 }
 
 //! @cond ignore
-static inline ham_object *ham_impl_object_new_init(
+ham_used static inline ham_object *ham_impl_object_new_init(
 	ham_object_manager *manager,
 	ham_object_manager_iterate_fn init_fn, void *user,
 	ham_usize nargs, ...
@@ -271,9 +271,9 @@ struct ham_object{
 	typedef struct obj##_vtable obj##_vtable; \
 	typedef struct base##_vtable obj##_vtable_base; \
 	typedef struct base obj##_base; \
-	ham_nothrow static inline base *obj##_super(obj *ptr){ return (base*)ptr; } \
-	ham_nothrow static inline const base##_vtable *obj##_vtable_super(const obj##_vtable *vptr){ return (const base##_vtable*)vptr; } \
-	ham_nothrow static inline const obj##_vtable *obj##_vptr(obj *ptr){ return (const obj##_vtable*)((ham_object*)ptr)->vptr; }
+	ham_nothrow ham_used static inline base *obj##_super(obj *ptr){ return (base*)ptr; } \
+	ham_nothrow ham_used static inline const base##_vtable *obj##_vtable_super(const obj##_vtable *vptr){ return (const base##_vtable*)vptr; } \
+	ham_nothrow ham_used static inline const obj##_vtable *obj##_vptr(obj *ptr){ return (const obj##_vtable*)((ham_object*)ptr)->vptr; }
 
 #define ham_define_object_x(obj_depth, obj, vtable_depth, vtable, ctor, dtor, vtable_body) \
 	ham_impl_define_object(obj_depth, obj, vtable_depth, vtable, ctor, dtor, vtable_body)

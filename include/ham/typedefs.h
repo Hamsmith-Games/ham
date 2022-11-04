@@ -95,12 +95,25 @@ typedef struct alignas(sizeof(ham_u64)*2) ham_rat128{
 	ham_u64 den;
 } ham_rat128;
 
-#ifdef HAM_INT128
 typedef struct alignas(sizeof(ham_u128)*2) ham_rat256{
-	ham_i128 num;
-	ham_u128 den;
-} ham_rat256;
+	union {
+#ifdef HAM_INT128
+		ham_i128 num;
 #endif
+		struct {
+			ham_i64 num_hi, num_lo;
+		};
+	};
+
+	union {
+#ifdef HAM_INT128
+		ham_u128 den;
+#endif
+		struct {
+			ham_i64 den_hi, den_lo;
+		};
+	};
+} ham_rat256;
 
 typedef float  ham_f32;
 typedef double ham_f64;

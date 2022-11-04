@@ -255,7 +255,7 @@ static bool ham_impl_write_project_template_path(const QDir &tmpl_dir, const QDi
 	const auto tmpl_dir_path = tmpl_dir.absolutePath();
 
 	if(!tmpl_dir.exists()){
-		const auto tmpl_dir_utf8 = tmpl_dir_path.toUtf8();
+		//const auto tmpl_dir_utf8 = tmpl_dir_path.toUtf8();
 		qWarning() << "Project template directory does not exist" << tmpl_dir_path;
 		return false;
 	}
@@ -263,7 +263,7 @@ static bool ham_impl_write_project_template_path(const QDir &tmpl_dir, const QDi
 	const auto proj_dir_path = proj_dir.absolutePath();
 
 	if(!proj_dir.exists() && !QDir().mkdir(proj_dir.absolutePath())){
-		const auto proj_dir_utf8 = proj_dir_path.toUtf8();
+		//const auto proj_dir_utf8 = proj_dir_path.toUtf8();
 		qWarning() << "Failed to create project directory" << proj_dir_path;
 		return false;
 	}
@@ -279,8 +279,8 @@ static bool ham_impl_write_project_template_path(const QDir &tmpl_dir, const QDi
 		if(!tmpl_file_name.endsWith(".in")){
 			const auto proj_file_path = QString("%1/%2").arg(proj_dir_path, tmpl_file_name);
 			if(!QFile::copy(tmpl_file_path, proj_file_path)){
-				const auto tmpl_file_utf8 = tmpl_file_path.toUtf8();
-				const auto proj_file_utf8 = proj_file_path.toUtf8();
+				//const auto tmpl_file_utf8 = tmpl_file_path.toUtf8();
+				//const auto proj_file_utf8 = proj_file_path.toUtf8();
 
 				qWarning() << "Failed to copy template file" << tmpl_file_path << "to" << proj_file_path;
 				return false;
@@ -289,7 +289,7 @@ static bool ham_impl_write_project_template_path(const QDir &tmpl_dir, const QDi
 
 		QFile tmpl_file(tmpl_file_path);
 		if(!tmpl_file.open(QFile::ReadOnly)){
-			const auto tmpl_file_utf8 = tmpl_file_path.toUtf8();
+			//const auto tmpl_file_utf8 = tmpl_file_path.toUtf8();
 			qWarning() << "Failed to open template file" << tmpl_file_path;
 			continue;
 		}
@@ -315,7 +315,7 @@ static bool ham_impl_write_project_template_path(const QDir &tmpl_dir, const QDi
 			continue;
 		}
 
-		if(out_file.write(mustach_out, mustach_out_size) != mustach_out_size){
+		if(out_file.write(mustach_out, mustach_out_size) != (qint64)mustach_out_size){
 			qWarning() << "Error writing file" << proj_file_path;
 			continue;
 		}

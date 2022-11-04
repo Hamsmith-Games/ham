@@ -16,8 +16,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-add_executable(hamc main.cpp)
-add_executable(ham::compiler ALIAS hamc)
+ham_add_executable(hamc main.cpp)
 
-target_link_libraries(hamc PRIVATE ${HAM_CPU_LIBS})
-target_link_libraries(hamc PUBLIC ham::runtime)
+add_executable(ham::compiler ALIAS hamc)

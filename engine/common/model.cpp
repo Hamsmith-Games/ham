@@ -148,6 +148,10 @@ ham_model *ham_model_load_from_mem(ham_usize len, const void *data){
 			const ham_u32 bone_idx = shape_data.bones.size();
 			ham_shape_bone &bone = shape_data.bones.emplace_back();
 
+			// TODO: set bone matrix to good value
+
+			bone.transform = ham_mat4_identity();
+
 			for(unsigned int weight_i = 0; weight_i < ai_bone->mNumnWeights; weight_i++){
 				const auto ai_weight = ai_bone->mWeights + weight_i;
 
