@@ -31,6 +31,7 @@ out gl_PerVertex {
 
 layout(std140, binding = 0) uniform RenderData{
 	mat4 view_proj, inv_view_proj;
+	vec3 view_pos;
 	float near_z, far_z;
 	float time;
 } globals;
@@ -49,6 +50,7 @@ layout(location = 4) in vec4  bone_weights;
 // Instance attributes
 layout(location = 5) in uint material_id;
 layout(location = 6) in mat4 trans;
+layout(location = 10) in mat4 normal_mat;
 
 // Outputs
 layout(location = 0) out vec3 vert_f;
@@ -74,7 +76,7 @@ void main(){
 	}
 
 	vert_f        = final_vert.xyz;
-	norm_f        = final_norm.xyz;
+	norm_f        = (normal_mat * vec4(final_norm.xyz, 1.0)).xyz;
 	uv_f          = uv;
 	draw_id_f     = gl_DrawID;
 	material_id_f = material_id;

@@ -33,6 +33,7 @@ struct material{
 
 layout(std140, binding = 0) uniform RenderData{
 	mat4 view_proj, inv_view_proj;
+	vec3 view_pos;
 	float near_z, far_z;
 	float time;
 } globals;
@@ -59,6 +60,6 @@ void main(){
 	const vec4 color = texture(diffuse_tex, vec3(uv_f, draw_id_f));
 
 	out_diffuse  = color * mat.albedo;
-	out_normal   = norm_f;
+	out_normal   = normalize(norm_f);
 	out_material = vec3(mat.metallic, mat.roughness, mat.rim);
 }

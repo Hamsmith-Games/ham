@@ -220,6 +220,7 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	constexpr ham_renderer_gl_global_ubo_data default_ubo_data = {
 		.view_proj     = ham_mat4_identity(),
 		.inv_view_proj = ham_mat4_identity(),
+		.view_pos      = ham_make_vec3_scalar(0.f),
 		.near_z        = 0.f,
 		.far_z         = 1.f,
 		.time          = 0.f,
@@ -290,6 +291,7 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	r->light_frag_depth_tex_loc = glGetUniformLocation(light_frag, "depth_tex");
 	r->light_frag_diffuse_tex_loc = glGetUniformLocation(light_frag, "diffuse_tex");
 	r->light_frag_normal_tex_loc = glGetUniformLocation(light_frag, "normal_tex");
+	r->light_frag_material_tex_loc = glGetUniformLocation(light_frag, "material_tex");
 	r->light_frag_noise_tex_loc = glGetUniformLocation(light_frag, "noise_tex");
 
 	r->scene_info_frag_diffuse_tex_loc = glGetUniformLocation(scene_info_frag, "diffuse_tex");
@@ -308,6 +310,7 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	glProgramUniform1i(light_frag, r->light_frag_depth_tex_loc, HAM_GBO_DEPTH_TEXTURE_UNIT);
 	glProgramUniform1i(light_frag, r->light_frag_diffuse_tex_loc, HAM_GBO_DIFFUSE_TEXTURE_UNIT);
 	glProgramUniform1i(light_frag, r->light_frag_normal_tex_loc, HAM_GBO_NORMAL_TEXTURE_UNIT);
+	glProgramUniform1i(light_frag, r->light_frag_material_tex_loc, HAM_GBO_MATERIAL_TEXTURE_UNIT);
 
 	glProgramUniform1i(light_frag, r->light_frag_noise_tex_loc, HAM_NOISE_TEXTURE_UNIT);
 
@@ -529,6 +532,7 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	ham_renderer_gl_global_ubo_data global_data;
 	global_data.view_proj     = cam.projection_matrix() * cam.view_matrix();
 	global_data.inv_view_proj = ham_mat4_inverse(global_data.view_proj);
+	global_data.view_pos      = cam.position();
 	global_data.near_z        = cam.near_z();
 	global_data.far_z         = cam.far_z();
 	global_data.time          = (f32)r->total_time;
@@ -591,15 +595,17 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	// Do scene lighting
 	//
 
-	glBindTextureUnit(HAM_GBO_DEPTH_TEXTURE_UNIT, r->fbo_attachments[HAM_RENDERER_GL_FBO_DEPTH_STENCIL]);
-	glBindTextureUnit(HAM_GBO_DIFFUSE_TEXTURE_UNIT, r->fbo_attachments[HAM_RENDERER_GL_FBO_DIFFUSE]);
-	glBindTextureUnit(HAM_GBO_NORMAL_TEXTURE_UNIT,  r->fbo_attachments[HAM_RENDERER_GL_FBO_NORMAL]);
-	glBindTextureUnit(HAM_NOISE_TEXTURE_UNIT, r->noise_tex);
+	glBindTextureUnit(HAM_GBO_DEPTH_TEXTURE_UNIT,    r->fbo_attachments[HAM_RENDERER_GL_FBO_DEPTH_STENCIL]);
+	glBindTextureUnit(HAM_GBO_DIFFUSE_TEXTURE_UNIT,  r->fbo_attachments[HAM_RENDERER_GL_FBO_DIFFUSE]);
+	glBindTextureUnit(HAM_GBO_NORMAL_TEXTURE_UNIT,   r->fbo_attachments[HAM_RENDERER_GL_FBO_NORMAL]);
+	glBindTextureUnit(HAM_GBO_MATERIAL_TEXTURE_UNIT, r->fbo_attachments[HAM_RENDERER_GL_FBO_MATERIAL]);
+	glBindTextureUnit(HAM_NOISE_TEXTURE_UNIT,        r->noise_tex);
 
-	glBindSampler(HAM_GBO_DEPTH_TEXTURE_UNIT,   r->samplers[0]);
-	glBindSampler(HAM_GBO_DIFFUSE_TEXTURE_UNIT, r->samplers[0]);
-	glBindSampler(HAM_GBO_NORMAL_TEXTURE_UNIT,  r->samplers[0]);
-	glBindSampler(HAM_NOISE_TEXTURE_UNIT, r->samplers[0]);
+	glBindSampler(HAM_GBO_DEPTH_TEXTURE_UNIT,    r->samplers[0]);
+	glBindSampler(HAM_GBO_DIFFUSE_TEXTURE_UNIT,  r->samplers[0]);
+	glBindSampler(HAM_GBO_NORMAL_TEXTURE_UNIT,   r->samplers[0]);
+	glBindSampler(HAM_GBO_MATERIAL_TEXTURE_UNIT, r->samplers[0]);
+	glBindSampler(HAM_NOISE_TEXTURE_UNIT,        r->samplers[0]);
 
 	glBindProgramPipeline(r->light_pipeline);
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));

@@ -54,7 +54,6 @@ target_include_directories(glad PUBLIC glad/include)
 # Targets
 ##
 
-ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/bone_skin.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/bone_skin.vert.spv)
 ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/light.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.vert.spv)
 ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/light.frag ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.frag.spv)
 ham_compile_shader_gl(${CMAKE_CURRENT_LIST_DIR}/screen.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert.spv)
@@ -70,7 +69,6 @@ function(ham_ensure_file INPUT OUTPUT)
 	)
 endfunction()
 
-ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/bone_skin.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/bone_skin.vert)
 ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/light.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.vert)
 ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/light.frag ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.frag)
 ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/screen.vert ${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert)
@@ -89,7 +87,6 @@ set(
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.vert.spv
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/scene_info.frag.spv
 
-	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/bone_skin.vert
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.vert
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.frag
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert

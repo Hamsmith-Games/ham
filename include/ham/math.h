@@ -774,6 +774,14 @@ ham_constexpr ham_math_api ham_mat4 ham_mat4_rotate(ham_mat4 m, ham_f32 angle, h
 	return ret;
 }
 
+ham_constexpr ham_math_api ham_mat4 ham_mat4_transpose(ham_mat4 m){
+	const ham_vec4 col0 = ham_make_vec4(m.cols[0].x, m.cols[1].x, m.cols[2].x, m.cols[3].x);
+	const ham_vec4 col1 = ham_make_vec4(m.cols[0].y, m.cols[1].y, m.cols[2].y, m.cols[3].y);
+	const ham_vec4 col2 = ham_make_vec4(m.cols[0].z, m.cols[1].z, m.cols[2].z, m.cols[3].z);
+	const ham_vec4 col3 = ham_make_vec4(m.cols[0].w, m.cols[1].w, m.cols[2].w, m.cols[3].w);
+	return (ham_mat4){ .cols = { col0, col1, col2, col3 } };
+}
+
 ham_constexpr ham_math_api ham_mat4 ham_mat4_inverse(ham_mat4 m){
 	const ham_f32 coef00 = m.cols[2].data[2] * m.cols[3].data[3] - m.cols[3].data[2] * m.cols[2].data[3];
 	const ham_f32 coef02 = m.cols[1].data[2] * m.cols[3].data[3] - m.cols[3].data[2] * m.cols[1].data[3];

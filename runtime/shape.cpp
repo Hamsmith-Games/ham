@@ -177,10 +177,10 @@ const ham_shape *ham_shape_unit_square(){
 	};
 
 	static ham_vec3 norms[] = {
-		{ .data = { 0.f, 0.f, 1.f } },
-		{ .data = { 0.f, 0.f, 1.f } },
-		{ .data = { 0.f, 0.f, 1.f } },
-		{ .data = { 0.f, 0.f, 1.f } },
+		{ .data = { 0.f, 0.f, -1.f } },
+		{ .data = { 0.f, 0.f, -1.f } },
+		{ .data = { 0.f, 0.f, -1.f } },
+		{ .data = { 0.f, 0.f, -1.f } },
 	};
 
 	static ham_vec2 uvs[] = {
@@ -280,10 +280,10 @@ ham_shape *ham_shape_create_quad(const ham_vec2 *points){
 	};
 
 	constexpr ham_vec3 norms[] = {
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
 	};
 
 	constexpr ham_u32 indices[] = { 0, 1, 2, 3 };
@@ -315,10 +315,10 @@ ham_shape *ham_shape_create_rect(ham_f32 w, ham_f32 h){
 	};
 
 	constexpr ham_vec3 norms[] = {
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
 	};
 
 	constexpr ham_u32 indices[] = { 0, 1, 2, 3 };
@@ -349,10 +349,10 @@ ham_shape *ham_shape_create_square(ham_f32 dim){
 	};
 
 	constexpr ham_vec3 norms[] = {
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
-		ham_vec3{ .data = { 0.f, 0.f, 1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
+		ham_vec3{ .data = { 0.f, 0.f, -1.f } },
 	};
 
 	constexpr ham_u32 indices[] = { 0, 1, 2, 3 };

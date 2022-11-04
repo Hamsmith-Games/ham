@@ -27,6 +27,7 @@
 
 layout(std140, binding = 0) uniform RenderData{
 	mat4 view_proj, inv_view_proj;
+	vec3 view_pos;
 	float near_z, far_z;
 	float time;
 } globals;
@@ -48,13 +49,39 @@ vec3 hsv_to_rgb(in vec3 c){
 	return c.z * mix(k.xxx, clamp(p - k.xxx, 0.0, 1.0), c.y);
 }
 
+float tonemap_reinhard(in float x){
+	return x / (x + 1.0);
+}
+
+float tonemap_reinhard2(in float x){
+	const float white = 4.0;
+	return (x * (1.0 + x / (white * white))) / (1.0 + x);
+}
+
+float tonemap_aces(in float x){
+	const float a = 2.51;
+	const float b = 0.03;
+	const float c = 2.43;
+	const float d = 0.59;
+	const float e = 0.14;
+	return (x * (a * x + b)) / (x * (c * x + d) + e);
+}
+
+vec3 tonemap_aces(in vec3 x){
+  const float a = 2.51;
+  const float b = 0.03;
+  const float c = 2.43;
+  const float d = 0.59;
+  const float e = 0.14;
+  return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
 void main(){
 //	const float t = globals.time;
 
-//	const vec2 hxy = uv_f * (vec2(sin(t), cos(t)) * 0.5 + 1.0);
-//	const float hue = ((hxy.x + hxy.y) * 0.5);
 
-//	const vec3 hsv_color = hsv_to_rgb(vec3(hue, 1.0, 1.0));
+	const vec3 hdr = texture(scene_tex, uv_f).rgb;
+	const vec3 ldr = tonemap_aces(hdr);
 
-	out_color = vec4(texture(scene_tex, uv_f).rgb, 1.0);
+	out_color = vec4(ldr, 1.0);
 }

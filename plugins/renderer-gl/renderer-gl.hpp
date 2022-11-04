@@ -33,6 +33,7 @@ enum {
 	HAM_GBO_DEPTH_TEXTURE_UNIT,
 	HAM_GBO_DIFFUSE_TEXTURE_UNIT,
 	HAM_GBO_NORMAL_TEXTURE_UNIT,
+	HAM_GBO_MATERIAL_TEXTURE_UNIT,
 	HAM_GBO_SCENE_TEXTURE_UNIT,
 
 	HAM_NOISE_TEXTURE_UNIT,
@@ -66,6 +67,7 @@ typedef struct ham_draw_group_gl ham_draw_group_gl;
 
 typedef struct ham_renderer_gl_global_ubo_data{
 	ham_mat4 view_proj, inv_view_proj;
+	ham_vec3 view_pos; float pad0;
 	ham_f32 near_z, far_z;
 	ham_f32 time;
 } ham_renderer_gl_global_ubo_data;
@@ -92,6 +94,7 @@ typedef struct ham_renderer_gl_api ham_renderer_gl{
 	ham_i32 light_frag_depth_tex_loc;
 	ham_i32 light_frag_diffuse_tex_loc;
 	ham_i32 light_frag_normal_tex_loc;
+	ham_i32 light_frag_material_tex_loc;
 	ham_i32 light_frag_noise_tex_loc;
 
 	ham_i32 scene_info_frag_diffuse_tex_loc;

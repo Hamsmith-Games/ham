@@ -27,6 +27,13 @@ enum ham_shader_attribute_index{
 	HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION2,
 	HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION3,
 
+	HAM_SHADER_ATTRIBUTE_INSTANCED_NORMAL_MAT,
+
+	HAM_SHADER_ATTRIBUTE_INSTANCED_NORMAL_MAT0 = HAM_SHADER_ATTRIBUTE_INSTANCED_NORMAL_MAT,
+	HAM_SHADER_ATTRIBUTE_INSTANCED_NORMAL_MAT1,
+	HAM_SHADER_ATTRIBUTE_INSTANCED_NORMAL_MAT2,
+	HAM_SHADER_ATTRIBUTE_INSTANCED_NORMAL_MAT3,
+
 	HAM_SHADER_ATTRIBUTE_INSTANCED_END,
 
 	HAM_SHADER_ATTRIBUTE_INDEX_COUNT = HAM_SHADER_ATTRIBUTE_INSTANCED_END
@@ -141,8 +148,8 @@ static inline ham_draw_group_gl *ham_draw_group_gl_ctor(ham_draw_group_gl *group
 	glNamedBufferStorage(bufs[HAM_DRAW_BUFFER_GL_COMMANDS], num_shapes    * sizeof(ham_gl_draw_elements_indirect_command), cmds.data(), GL_MAP_WRITE_BIT | GL_MAP_READ_BIT);
 
 	constexpr ham_shape_material default_material = {
-		.metallic  = 0.f,
-		.roughness = 1.f,
+		.metallic  = 0.2f,
+		.roughness = 0.6f,
 		.rim       = 0.f,
 		.pad0      = 0.f,
 		.albedo    = ham_make_vec4_scalar(1.f)
@@ -243,6 +250,12 @@ static inline ham_draw_group_gl *ham_draw_group_gl_ctor(ham_draw_group_gl *group
 	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION2, 4, GL_FLOAT, false, (GLuint)(offsetof(ham_draw_group_instance_data, trans) + (2 * sizeof(ham_vec4))));
 	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION3, 4, GL_FLOAT, false, (GLuint)(offsetof(ham_draw_group_instance_data, trans) + (3 * sizeof(ham_vec4))));
 
+	// normal matrix cols
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_INSTANCED_NORMAL_MAT0, 4, GL_FLOAT, false, (GLuint) offsetof(ham_draw_group_instance_data, normal_mat));
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_INSTANCED_NORMAL_MAT1, 4, GL_FLOAT, false, (GLuint)(offsetof(ham_draw_group_instance_data, normal_mat) + sizeof(ham_vec4)));
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_INSTANCED_NORMAL_MAT2, 4, GL_FLOAT, false, (GLuint)(offsetof(ham_draw_group_instance_data, normal_mat) + (2 * sizeof(ham_vec4))));
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_INSTANCED_NORMAL_MAT3, 4, GL_FLOAT, false, (GLuint)(offsetof(ham_draw_group_instance_data, normal_mat) + (3 * sizeof(ham_vec4))));
+
 	glVertexArrayBindingDivisor(vao, 1, 1);
 
 	const auto ret = new(group) ham_draw_group_gl;
@@ -302,6 +315,7 @@ static bool ham_draw_group_gl_set_num_instances(ham_draw_group_gl *group, ham_u3
 	constexpr ham_draw_group_instance_data default_data = {
 		0,
 		ham_mat4_identity(),
+		ham_mat4_identity()
 	};
 
 	if(!group->inst_map || group->inst_cap < n){

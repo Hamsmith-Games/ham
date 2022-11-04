@@ -106,7 +106,8 @@ editor::world_view::world_view(ham_engine *engine, ham_world *world, QWidget *pa
 			trans.translate({0.f, -0.5f, 0.f});
 			trans.scale(ham::vec3(1.f));
 
-			data->trans = trans.matrix();
+			data->trans      = trans.matrix();
+			data->normal_mat = ham_mat4_transpose(ham_mat4_inverse(data->trans));
 		});
 
 		ham::draw_group_instance_visit(m_gizmo_group, 1, [](ham_draw_group_instance_data *data){
@@ -115,7 +116,8 @@ editor::world_view::world_view(ham_engine *engine, ham_world *world, QWidget *pa
 			trans.rotate(M_PI_2, {1.f, 0.f, 0.f});
 			trans.scale(ham::vec3(5.f));
 
-			data->trans = trans.matrix();
+			data->trans      = trans.matrix();
+			data->normal_mat = ham_mat4_transpose(ham_mat4_inverse(data->trans));
 		});
 
 		ham::light_group_instance_visit(m_cam_light_group, 0, [](ham_light *light){
