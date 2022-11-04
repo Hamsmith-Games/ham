@@ -79,7 +79,6 @@ ham_ensure_file(${CMAKE_CURRENT_LIST_DIR}/scene_info.frag ${HAM_PLUGIN_BINARY_DI
 set(
 	HAM_RENDERER_GL_SHADERS
 
-	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/bone_skin.vert.spv
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.vert.spv
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/light.frag.spv
 	${HAM_PLUGIN_BINARY_DIR}/shaders-gl/screen.vert.spv
