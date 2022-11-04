@@ -21,27 +21,44 @@
 
 //layout(origin_upper_left) in vec4 gl_FragCoord;
 
+#define MAX_MATERIALS 256
+
+struct material{
+	float metallic;
+	float roughness;
+	float rim;
+	float pad0;
+	vec4 albedo;
+};
+
 layout(std140, binding = 0) uniform RenderData{
 	mat4 view_proj, inv_view_proj;
 	float near_z, far_z;
 	float time;
 } globals;
 
+layout(std140, binding = 2) uniform MaterialData{
+	material materials[MAX_MATERIALS];
+} materials;
+
 uniform sampler2DArray diffuse_tex;
 
 layout(location = 0) in vec3 vert_f;
 layout(location = 1) in vec3 norm_f;
 layout(location = 2) in vec2 uv_f;
-layout(location = 3) in vec4 color_f;
-layout(location = 4) flat in int draw_id_f;
+layout(location = 3) flat in int draw_id_f;
+layout(location = 4) flat in uint material_id_f;
 
 layout(location = 0) out vec4 out_diffuse;
 layout(location = 1) out vec3 out_normal;
+layout(location = 2) out vec3 out_material;
 
 void main(){
-	// TODO: texture mapping
+	const material mat = materials.materials[material_id_f];
+
 	const vec4 color = texture(diffuse_tex, vec3(uv_f, draw_id_f));
 
-	out_diffuse = color_f * color;
-	out_normal  = norm_f;
+	out_diffuse  = color * mat.albedo;
+	out_normal   = norm_f;
+	out_material = vec3(mat.metallic, mat.roughness, mat.rim);
 }

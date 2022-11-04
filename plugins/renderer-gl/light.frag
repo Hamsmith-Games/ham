@@ -18,6 +18,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#define MAX_MATERIALS 256
+
+struct material{
+	float metallic;
+	float roughness;
+	float rim;
+	float pad0;
+	vec4 albedo;
+};
+
 layout(std140, binding = 0) uniform RenderData{
 	mat4 view_proj, inv_view_proj;
 	float near_z, far_z;
@@ -27,6 +37,7 @@ layout(std140, binding = 0) uniform RenderData{
 uniform sampler2D depth_tex;
 uniform sampler2D diffuse_tex;
 uniform sampler2D normal_tex;
+uniform sampler2D material_tex;
 
 uniform sampler2D noise_tex;
 
@@ -43,9 +54,7 @@ layout(location = 3) in float light_intensity_f;
 
 layout(location = 4) in vec2 uv_f;
 
-layout(location = 0) out vec4 out_diffuse;
-layout(location = 1) out vec3 out_normal;
-layout(location = 2) out vec3 out_scene;
+layout(location = 3) out vec3 out_scene;
 
 void main(){
 	const float depth = texture(depth_tex, uv_f).r;
@@ -62,7 +71,9 @@ void main(){
 
 	const vec2 noise_uv = uv_f + (vec2(sin(globals.time), cos(globals.time)) * 1000.0);
 
-	const vec3 rgb_noise = texture(noise_tex, noise_uv).rgb * vec3(0.0625);
+	const vec3 rgb_noise = texture(noise_tex, noise_uv).rgb * 0.03125;
 
-	out_scene = (1.0 - rgb_noise) * albedo * atten * light_intensity_f * light_color_f;
+	vec3 lit_color = albedo * atten * light_color_f * (1.0 - rgb_noise);
+
+	out_scene = pow(lit_color, vec3(max(light_intensity_f, 1.0)));
 }

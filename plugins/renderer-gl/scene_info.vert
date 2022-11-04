@@ -22,6 +22,8 @@
 
 #define gl_DrawID gl_DrawIDARB
 
+#define MAX_BONES 256
+
 out gl_PerVertex {
 	vec4 gl_Position;
 	float gl_PointSize;
@@ -33,27 +35,51 @@ layout(std140, binding = 0) uniform RenderData{
 	float time;
 } globals;
 
-layout(location = 0) in vec3 vert;
-layout(location = 1) in vec3 norm;
-layout(location = 2) in vec2 uv;
+layout(std140, binding = 1) uniform BoneData{
+	mat4 transforms[MAX_BONES];
+} bones;
 
-layout(location = 3) in vec4 color;
-layout(location = 4) in mat4 trans;
+// Vertex attributes
+layout(location = 0) in vec3  vert;
+layout(location = 1) in vec3  norm;
+layout(location = 2) in vec2  uv;
+layout(location = 3) in ivec4 bone_indices;
+layout(location = 4) in vec4  bone_weights;
 
+// Instance attributes
+layout(location = 5) in uint material_id;
+layout(location = 6) in mat4 trans;
+
+// Outputs
 layout(location = 0) out vec3 vert_f;
 layout(location = 1) out vec3 norm_f;
 layout(location = 2) out vec2 uv_f;
-layout(location = 3) out vec4 color_f;
-layout(location = 4) out int draw_id_f;
+layout(location = 3) flat out int draw_id_f;
+layout(location = 4) flat out uint material_id_f;
 
 void main(){
-	vert_f    = vert;
-	norm_f    = norm;
-	uv_f      = uv;
-	color_f   = color;
-	draw_id_f = gl_DrawID;
+	vec4 final_vert = vec4(0.0, 0.0, 0.0, 1.0);
+	vec4 final_norm = vec4(0.0, 0.0, 0.0, 0.0);
+
+	for(int index_i = 0; index_i < 4; index_i++){
+		const int bone_i = bone_indices[index_i];
+
+		const float bone_w = bone_weights[index_i];
+
+		const vec4 bone_v = bones.transforms[bone_i] * vec4(vert, 1.0);
+		const vec4 bone_n = bones.transforms[bone_i] * vec4(norm, 0.0);
+
+		final_vert += bone_v * bone_w;
+		final_norm += bone_n * bone_w;
+	}
+
+	vert_f        = final_vert.xyz;
+	norm_f        = final_norm.xyz;
+	uv_f          = uv;
+	draw_id_f     = gl_DrawID;
+	material_id_f = material_id;
 
 	const mat4 mvp = globals.view_proj * trans;
 
-	gl_Position = mvp * vec4(vert, 1.0);
+	gl_Position = mvp * vec4(final_vert.xyz, 1.0);
 }

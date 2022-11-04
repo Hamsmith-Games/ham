@@ -45,6 +45,7 @@ typedef enum ham_renderer_gl_fbo_attachment{
 	HAM_RENDERER_GL_FBO_DEPTH_STENCIL,
 	HAM_RENDERER_GL_FBO_DIFFUSE,
 	HAM_RENDERER_GL_FBO_NORMAL,
+	HAM_RENDERER_GL_FBO_MATERIAL,
 	HAM_RENDERER_GL_FBO_SCENE,
 
 	HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT
@@ -55,6 +56,8 @@ typedef enum ham_draw_buffer_gl_data{
 	HAM_DRAW_BUFFER_GL_INDICES,
 	HAM_DRAW_BUFFER_GL_COMMANDS,
 	HAM_DRAW_BUFFER_GL_INSTANCE_DATA,
+	HAM_DRAW_BUFFER_GL_BONE_DATA,
+	HAM_DRAW_BUFFER_GL_MATERIAL_DATA,
 
 	HAM_DRAW_BUFFER_GL_DATA_COUNT
 } ham_draw_buffer_gl_data;
@@ -98,7 +101,7 @@ typedef struct ham_renderer_gl_api ham_renderer_gl{
 	ham_i32 screen_post_frag_scene_loc;
 
 	ham_draw_group_gl *screen_group;
-	ham_i32 screen_post_uv_scale_loc;
+	ham_i32 screen_post_vert_uv_scale_loc;
 
 	ham_u32 global_ubo;
 	void *global_ubo_writep;

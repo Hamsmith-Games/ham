@@ -111,8 +111,8 @@ typedef struct ham_draw_group ham_draw_group;
 // typedef struct ham_draw
 
 typedef struct ham_draw_group_instance_data{
+	ham_u32 material_id;
 	ham_mat4 trans;
-	ham_vec4 color;
 } ham_draw_group_instance_data;
 
 ham_api ham_draw_group *ham_draw_group_create(

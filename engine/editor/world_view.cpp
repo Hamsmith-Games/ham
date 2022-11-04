@@ -106,7 +106,6 @@ editor::world_view::world_view(ham_engine *engine, QWidget *parent)
 			trans.scale(ham::vec3(1.f));
 
 			data->trans = trans.matrix();
-			data->color = ham::vec4(0.f, 1.f, 1.f, 1.f);
 		});
 
 		ham::draw_group_instance_visit(m_gizmo_group, 1, [](ham_draw_group_instance_data *data){
@@ -116,12 +115,11 @@ editor::world_view::world_view(ham_engine *engine, QWidget *parent)
 			trans.scale(ham::vec3(5.f));
 
 			data->trans = trans.matrix();
-			data->color = ham::vec4(1.f, 1.f, 0.f, 1.f);
 		});
 
 		ham::light_group_instance_visit(m_cam_light_group, 0, [](ham_light *light){
 			light->pos = ham_make_vec3(0.f, 0.f, 0.f);
-			light->effective_radius = 5.f;
+			light->effective_radius = 20.f;
 			light->color = ham_make_vec3(1.f, 1.f, 1.f);
 			light->intensity = 1.f;
 		});

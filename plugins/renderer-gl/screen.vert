@@ -24,6 +24,11 @@ out gl_PerVertex {
 	float gl_PointSize;
 };
 
+#ifdef GL_SPIRV
+layout(location = 0)
+#endif
+uniform vec2 uv_scale;
+
 layout(location = 0) in vec3 vert;
 layout(location = 1) in vec3 norm;
 layout(location = 2) in vec2 uv;
@@ -35,7 +40,7 @@ layout(location = 2) out vec2 uv_f;
 void main(){
 	vert_f = vert * 2.0;
 	norm_f = norm;
-	uv_f   = uv;
+	uv_f   = uv_scale * uv;
 
 	gl_Position = vec4(vert * 2.0, 1.0);
 }

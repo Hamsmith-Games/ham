@@ -6,6 +6,32 @@
 
 #include "glad/glad.h" // IWYU pragma: keep
 
+enum ham_shader_attribute_index{
+	HAM_SHADER_ATTRIBUTE_REGULAR_BEGIN,
+
+	HAM_SHADER_ATTRIBUTE_VERT = HAM_SHADER_ATTRIBUTE_REGULAR_BEGIN,
+	HAM_SHADER_ATTRIBUTE_NORM,
+	HAM_SHADER_ATTRIBUTE_UV,
+	HAM_SHADER_ATTRIBUTE_BONE_INDICES,
+	HAM_SHADER_ATTRIBUTE_BONE_WEIGHTS,
+
+	HAM_SHADER_ATTRIBUTE_REGULAR_END,
+
+	HAM_SHADER_ATTRIBUTE_INSTANCED_BEGIN = HAM_SHADER_ATTRIBUTE_REGULAR_END,
+
+	HAM_SHADER_ATTRIBUTE_INSTANCED_MATERIAL_ID = HAM_SHADER_ATTRIBUTE_INSTANCED_BEGIN,
+	HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION,
+
+	HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION0 = HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION,
+	HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION1,
+	HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION2,
+	HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION3,
+
+	HAM_SHADER_ATTRIBUTE_INSTANCED_END,
+
+	HAM_SHADER_ATTRIBUTE_INDEX_COUNT = HAM_SHADER_ATTRIBUTE_INSTANCED_END
+};
+
 using namespace ham::typedefs;
 
 HAM_C_API_BEGIN
@@ -53,11 +79,20 @@ static inline ham_draw_group_gl *ham_draw_group_gl_ctor(ham_draw_group_gl *group
 
 	glTextureStorage3D(diffuse_tex_arr, num_diffuse_levels, GL_RGBA8, (GLsizei)max_w, (GLsizei)max_h, (GLsizei)num_shapes);
 
+	ham::basic_buffer<ham_vec2> uv_scales;
+	uv_scales.resize(num_shapes);
+
 	for(ham_usize i = 0; i < num_shapes; i++){
-		const auto img_i = ham_super(group)->images[i];
+		const auto img_i = images[i];
 		const auto img_w = ham_image_width(img_i);
 		const auto img_h = ham_image_height(img_i);
 		const auto img_p = ham_image_pixels(img_i);
+
+		uv_scales[i] = ham_make_vec2(
+			f64(img_w) / f64(max_w),
+			f64(img_h) / f64(max_h)
+		);
+
 		glTextureSubImage3D(
 			diffuse_tex_arr,
 			0, 0, 0,
@@ -71,10 +106,13 @@ static inline ham_draw_group_gl *ham_draw_group_gl_ctor(ham_draw_group_gl *group
 
 	glGenerateTextureMipmap(diffuse_tex_arr);
 
-	constexpr usize interleaved_point_size = (2UL * sizeof(ham_vec3)) + sizeof(ham_vec2);
-	constexpr usize interleaved_vertex_off = 0;
-	constexpr usize interleaved_normal_off = sizeof(ham_vec3);
-	constexpr usize interleaved_uv_off     = sizeof(ham_vec3) * 2UL;
+	constexpr usize interleaved_vertex_off       = 0;
+	constexpr usize interleaved_normal_off       = interleaved_vertex_off + sizeof(ham_vec3);
+	constexpr usize interleaved_uv_off           = interleaved_normal_off + sizeof(ham_vec3);
+	constexpr usize interleaved_bone_indices_off = interleaved_uv_off + sizeof(ham_vec2);
+	constexpr usize interleaved_bone_weights_off = interleaved_bone_indices_off + sizeof(ham_vec4i);
+
+	constexpr usize interleaved_point_size = interleaved_bone_weights_off + sizeof(ham_vec4);
 
 	u32 total_points = 0, total_indices = 0;
 
@@ -98,16 +136,32 @@ static inline ham_draw_group_gl *ham_draw_group_gl_ctor(ham_draw_group_gl *group
 		total_indices += num_indices;
 	}
 
-	glNamedBufferStorage(bufs[HAM_DRAW_BUFFER_GL_POINTS],   total_points  * interleaved_point_size, nullptr, GL_MAP_WRITE_BIT);
-	glNamedBufferStorage(bufs[HAM_DRAW_BUFFER_GL_INDICES],  total_indices * sizeof(ham_u32), nullptr, GL_MAP_WRITE_BIT);
+	glNamedBufferStorage(bufs[HAM_DRAW_BUFFER_GL_POINTS],   total_points  * interleaved_point_size,                        nullptr,     GL_MAP_WRITE_BIT);
+	glNamedBufferStorage(bufs[HAM_DRAW_BUFFER_GL_INDICES],  total_indices * sizeof(ham_u32),                               nullptr,     GL_MAP_WRITE_BIT);
 	glNamedBufferStorage(bufs[HAM_DRAW_BUFFER_GL_COMMANDS], num_shapes    * sizeof(ham_gl_draw_elements_indirect_command), cmds.data(), GL_MAP_WRITE_BIT | GL_MAP_READ_BIT);
+
+	constexpr ham_shape_material default_material = {
+		.metallic  = 0.f,
+		.roughness = 1.f,
+		.rim       = 0.f,
+		.pad0      = 0.f,
+		.albedo    = ham_make_vec4_scalar(1.f)
+	};
+
+	glNamedBufferStorage(bufs[HAM_DRAW_BUFFER_GL_MATERIAL_DATA], sizeof(ham_shape_material), &default_material, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
+
+	const ham_mat4 mat4_ident = ham_mat4_identity();
+	glNamedBufferStorage(bufs[HAM_DRAW_BUFFER_GL_BONE_DATA], sizeof(ham_mat4), mat4_ident.data, GL_MAP_READ_BIT);
 
 	const auto points_map = (char*)glMapNamedBuffer(bufs[HAM_DRAW_BUFFER_GL_POINTS], GL_WRITE_ONLY);
 	const auto indices_map = (char*)glMapNamedBuffer(bufs[HAM_DRAW_BUFFER_GL_INDICES], GL_WRITE_ONLY);
 
-	for(usize i = 0; i < num_shapes; i++){
-		const auto shape = shapes[i];
-		const auto &cmd  = cmds[i];
+	constexpr auto empty_bone_indices = ham_make_vec4i_scalar(0);
+	constexpr auto empty_bone_weights = ham_make_vec4(1.f, 0.f, 0.f, 0.f);
+
+	for(usize shape_i = 0; shape_i < num_shapes; shape_i++){
+		const auto shape = shapes[shape_i];
+		const auto &cmd  = cmds[shape_i];
 
 		const usize points_map_off  = interleaved_point_size * cmd.base_vertex;
 		const usize indices_map_off = sizeof(u32) * cmd.first_index;
@@ -123,15 +177,24 @@ static inline ham_draw_group_gl *ham_draw_group_gl_ctor(ham_draw_group_gl *group
 
 		auto write_ptr = points_map + points_map_off;
 
-		for(usize i = 0; i < num_points; i++){
-			memcpy(write_ptr, verts + i, sizeof(ham_vec3));
+		for(usize point_i = 0; point_i < num_points; point_i++){
+			memcpy(write_ptr, verts + point_i, sizeof(ham_vec3));
 			write_ptr += sizeof(ham_vec3);
 
-			memcpy(write_ptr, norms + i, sizeof(ham_vec3));
+			memcpy(write_ptr, norms + point_i, sizeof(ham_vec3));
 			write_ptr += sizeof(ham_vec3);
 
-			memcpy(write_ptr, uvs + i, sizeof(ham_vec2));
+			const ham_vec2 uv_scale = uv_scales[shape_i];
+			const ham_vec2 new_uv = ham_vec2_mul(uvs[point_i], uv_scale);
+
+			memcpy(write_ptr, &new_uv, sizeof(ham_vec2));
 			write_ptr += sizeof(ham_vec2);
+
+			memcpy(write_ptr, empty_bone_indices.data, sizeof(ham_vec4i));
+			write_ptr += sizeof(ham_vec4i);
+
+			memcpy(write_ptr, empty_bone_weights.data, sizeof(ham_vec4));
+			write_ptr += sizeof(ham_vec4);
 		}
 
 		memcpy(indices_map + indices_map_off, indices, sizeof(u32) * num_indices);
@@ -146,40 +209,39 @@ static inline ham_draw_group_gl *ham_draw_group_gl_ctor(ham_draw_group_gl *group
 	glVertexArrayVertexBuffer(vao, 0, bufs[HAM_DRAW_BUFFER_GL_POINTS], 0, (GLsizei)interleaved_point_size);
 	glVertexArrayElementBuffer(vao, bufs[HAM_DRAW_BUFFER_GL_INDICES]);
 
-	glEnableVertexArrayAttrib(vao, 0);
-	glEnableVertexArrayAttrib(vao, 1);
-	glEnableVertexArrayAttrib(vao, 2);
-	glEnableVertexArrayAttrib(vao, 3);
+	for(GLuint i = 0; i < HAM_SHADER_ATTRIBUTE_INDEX_COUNT; i++){
+		glEnableVertexArrayAttrib(vao, i);
+	}
 
-	// translation matrix takes 4 attributes, 1 for each col
-	glEnableVertexArrayAttrib(vao, 4);
-	glEnableVertexArrayAttrib(vao, 5);
-	glEnableVertexArrayAttrib(vao, 6);
-	glEnableVertexArrayAttrib(vao, 7);
+	glVertexArrayAttribBinding(vao, HAM_SHADER_ATTRIBUTE_VERT, 0);
+	glVertexArrayAttribBinding(vao, HAM_SHADER_ATTRIBUTE_NORM, 0);
+	glVertexArrayAttribBinding(vao, HAM_SHADER_ATTRIBUTE_UV,   0);
 
-	glVertexArrayAttribBinding(vao, 0, 0);
-	glVertexArrayAttribBinding(vao, 1, 0);
-	glVertexArrayAttribBinding(vao, 2, 0);
+	glVertexArrayAttribBinding(vao, HAM_SHADER_ATTRIBUTE_BONE_INDICES, 0);
+	glVertexArrayAttribBinding(vao, HAM_SHADER_ATTRIBUTE_BONE_WEIGHTS, 0);
 
-	glVertexArrayAttribBinding(vao, 3, 1);
+	for(GLuint i = HAM_SHADER_ATTRIBUTE_REGULAR_BEGIN; i < HAM_SHADER_ATTRIBUTE_REGULAR_END; i++){
+		glVertexArrayAttribBinding(vao, i, 0);
+	}
+
+	for(GLuint i = HAM_SHADER_ATTRIBUTE_INSTANCED_BEGIN; i < HAM_SHADER_ATTRIBUTE_INSTANCED_END; i++){
+		glVertexArrayAttribBinding(vao, i, 1);
+	}
+
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_VERT, 3, GL_FLOAT, false, (GLuint)interleaved_vertex_off);
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_NORM, 3, GL_FLOAT, false, (GLuint)interleaved_normal_off);
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_UV,   2, GL_FLOAT, false, (GLuint)interleaved_uv_off);
+
+	glVertexArrayAttribIFormat(vao, HAM_SHADER_ATTRIBUTE_BONE_INDICES, 4, GL_INT, (GLuint)interleaved_bone_indices_off);
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_BONE_WEIGHTS, 4, GL_FLOAT, false, (GLuint)interleaved_bone_weights_off);
+
+	glVertexArrayAttribIFormat(vao, HAM_SHADER_ATTRIBUTE_INSTANCED_MATERIAL_ID, 1, GL_UNSIGNED_INT, (GLuint)offsetof(ham_draw_group_instance_data, material_id));
 
 	// translation matrix cols
-	glVertexArrayAttribBinding(vao, 4, 1);
-	glVertexArrayAttribBinding(vao, 5, 1);
-	glVertexArrayAttribBinding(vao, 6, 1);
-	glVertexArrayAttribBinding(vao, 7, 1);
-
-	glVertexArrayAttribFormat(vao, 0, 3, GL_FLOAT, false, (GLuint)interleaved_vertex_off);
-	glVertexArrayAttribFormat(vao, 1, 3, GL_FLOAT, false, (GLuint)interleaved_normal_off);
-	glVertexArrayAttribFormat(vao, 2, 2, GL_FLOAT, false, (GLuint)interleaved_uv_off);
-
-	glVertexArrayAttribFormat(vao, 3, 4, GL_FLOAT, false, (GLuint)offsetof(ham_draw_group_instance_data, color));
-
-	// translation matrix cols
-	glVertexArrayAttribFormat(vao, 4, 4, GL_FLOAT, false, (GLuint)offsetof(ham_draw_group_instance_data, trans));
-	glVertexArrayAttribFormat(vao, 5, 4, GL_FLOAT, false, (GLuint)(offsetof(ham_draw_group_instance_data, trans) + sizeof(ham_vec4)));
-	glVertexArrayAttribFormat(vao, 6, 4, GL_FLOAT, false, (GLuint)(offsetof(ham_draw_group_instance_data, trans) + (2 * sizeof(ham_vec4))));
-	glVertexArrayAttribFormat(vao, 7, 4, GL_FLOAT, false, (GLuint)(offsetof(ham_draw_group_instance_data, trans) + (3 * sizeof(ham_vec4))));
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION0, 4, GL_FLOAT, false, (GLuint) offsetof(ham_draw_group_instance_data, trans));
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION1, 4, GL_FLOAT, false, (GLuint)(offsetof(ham_draw_group_instance_data, trans) + sizeof(ham_vec4)));
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION2, 4, GL_FLOAT, false, (GLuint)(offsetof(ham_draw_group_instance_data, trans) + (2 * sizeof(ham_vec4))));
+	glVertexArrayAttribFormat(vao, HAM_SHADER_ATTRIBUTE_INSTANCED_TRANSLATION3, 4, GL_FLOAT, false, (GLuint)(offsetof(ham_draw_group_instance_data, trans) + (3 * sizeof(ham_vec4))));
 
 	glVertexArrayBindingDivisor(vao, 1, 1);
 
@@ -238,8 +300,8 @@ static bool ham_draw_group_gl_set_num_instances(ham_draw_group_gl *group, ham_u3
 	const auto cur_n = ham_super(group)->num_instances;
 
 	constexpr ham_draw_group_instance_data default_data = {
+		0,
 		ham_mat4_identity(),
-		ham_make_vec4(1.f, 1.f, 1.f, 1.f),
 	};
 
 	if(!group->inst_map || group->inst_cap < n){

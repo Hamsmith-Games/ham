@@ -221,7 +221,7 @@ ham_constexpr ham_math_api ham_vec4i ham_make_vec4i_scalar(ham_i32 all){
 #ifdef HAM_SIMD
 		.v4i32 =
 #	ifdef __x86_64__
-			_mm_set1_epi32(all)
+			(ham_v4i32)_mm_set1_epi32(all)
 #	else
 			(ham_v4f32){ all, all, all, all }
 #	endif

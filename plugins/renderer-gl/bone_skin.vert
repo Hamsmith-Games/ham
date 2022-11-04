@@ -1,11 +1,4 @@
 #version 450 core
-#extension GL_ARB_separate_shader_objects : require
-
-#ifdef GL_SPIRV
-#extension GL_GOOGLE_include_directive : enable
-#else
-#extension GL_ARB_shading_language_include : enable
-#endif
 
 /*
  * Ham Renderer OpenGL Shaders
@@ -25,36 +18,29 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+out gl_PerVertex {
+	vec4 gl_Position;
+	float gl_PointSize;
+};
+
+#define MAX_BONES 256
+
 layout(std140, binding = 0) uniform RenderData{
 	mat4 view_proj, inv_view_proj;
 	float near_z, far_z;
 	float time;
 } globals;
 
-uniform sampler2D depth_tex;
-uniform sampler2D diffuse_tex;
-uniform sampler2D normal_tex;
-uniform sampler2D scene_tex;
+layout(std140, binding = 1) uniform BoneData{
+	mat4 transforms[MAX_BONES];
+} bones;
 
-layout(location = 0) in vec3 vert_f;
-layout(location = 1) in vec3 norm_f;
-layout(location = 2) in vec2 uv_f;
-
-layout(location = 0) out vec4 out_color;
-
-vec3 hsv_to_rgb(in vec3 c){
-	const vec4 k = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-	const vec3 p = abs(fract(c.xxx + k.xyz) * 6.0 - k.www);
-	return c.z * mix(k.xxx, clamp(p - k.xxx, 0.0, 1.0), c.y);
-}
+layout(location = 0) in vec3 vert;
+layout(location = 1) in vec3 norm;
+layout(location = 2) in vec2 uv;
+layout(location = 3) in ivec4 bone_indices;
+layout(location = 4) in vec4 bone_weights;
 
 void main(){
-//	const float t = globals.time;
-
-//	const vec2 hxy = uv_f * (vec2(sin(t), cos(t)) * 0.5 + 1.0);
-//	const float hue = ((hxy.x + hxy.y) * 0.5);
-
-//	const vec3 hsv_color = hsv_to_rgb(vec3(hue, 1.0, 1.0));
-
-	out_color = vec4(texture(scene_tex, uv_f).rgb, 1.0);
+	
 }

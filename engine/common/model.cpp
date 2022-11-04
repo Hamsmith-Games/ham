@@ -27,6 +27,8 @@
 #include "assimp/postprocess.h"
 #include "assimp/Importer.hpp"
 
+#include "robin_hood.h"
+
 using namespace ham::typedefs;
 
 HAM_C_API_BEGIN
@@ -68,6 +70,20 @@ ham_model *ham_model_load_from_mem(ham_usize len, const void *data){
 	ham::basic_buffer<ham_shape*> shapes;
 	ham::basic_buffer<ham_image*> images;
 
+	struct mesh_data{
+		ham::basic_buffer<ham_vec3> verts;
+		ham::basic_buffer<ham_vec3> norms;
+		ham::basic_buffer<ham_vec2> uvs;
+		ham::basic_buffer<ham_vec4i> bone_indices;
+		ham::basic_buffer<ham_vec4> bone_weights;
+		ham::basic_buffer<ham_u32> indices;
+		ham::basic_buffer<ham_shape_bone> bones;
+
+		ham::basic_buffer<ham_u32> bone_index_counters;
+	};
+
+	robin_hood::unordered_flat_map<aiMesh*, mesh_data> shape_data_map;
+
 	shapes.resize(scene->mNumMeshes);
 	images.resize(scene->mNumTextures);
 
@@ -83,11 +99,15 @@ ham_model *ham_model_load_from_mem(ham_usize len, const void *data){
 		ham::basic_buffer<ham_vec3> verts, norms;
 		ham::basic_buffer<ham_vec2> uvs;
 		ham::basic_buffer<ham_u32> indices;
+		ham::basic_buffer<ham_u32> bone_index_counters;
 
 		verts.resize(num_points);
 		norms.resize(num_points);
 		uvs.resize(num_points);
 		indices.resize(num_indices);
+		bone_index_counters.resize(num_points);
+
+		memset(bone_index_counters.data(), 0, num_points * sizeof(ham_u32));
 
 		for(unsigned int point_idx = 0; point_idx < mesh->mNumVertices; point_idx++){
 			const auto vert = mesh->mVertices + point_idx;
@@ -107,7 +127,60 @@ ham_model *ham_model_load_from_mem(ham_usize len, const void *data){
 			}
 		}
 
-		shapes[mesh_idx] = ham_shape_create_triangle_mesh(num_points, verts.data(), norms.data(), uvs.data(), num_indices, indices.data());
+		auto &shape_data = shape_data_map[mesh];
+		shape_data.verts = std::move(verts);
+		shape_data.norms = std::move(norms);
+		shape_data.uvs = std::move(uvs);
+		shape_data.indices = std::move(indices);
+		shape_data.bone_index_counters = std::move(bone_index_counters);
+	}
+
+	const auto allocator = ham_current_allocator();
+
+	for(unsigned int skel_i = 0; skel_i < scene->mNumSkeletons; skel_i++){
+		const auto ai_skel = scene->mSkeletons[skel_i];
+
+		for(unsigned int bone_i = 0; bone_i < ai_skel->mNumBones; bone_i++){
+			const auto ai_bone = ai_skel->mBones[bone_i];
+
+			auto &shape_data = shape_data_map[ai_bone->mMeshId];
+
+			const ham_u32 bone_idx = shape_data.bones.size();
+			ham_shape_bone &bone = shape_data.bones.emplace_back();
+
+			for(unsigned int weight_i = 0; weight_i < ai_bone->mNumnWeights; weight_i++){
+				const auto ai_weight = ai_bone->mWeights + weight_i;
+
+				ham_u32 &vert_bone_counter = shape_data.bone_index_counters[ai_weight->mVertexId];
+				if(vert_bone_counter >= 4){
+					ham::logapiwarn("Skipping bone '{}' for vertex {}", ai_bone->mNode->mName.C_Str(), ai_weight->mVertexId);
+					continue;
+				}
+
+				shape_data.bone_indices[ai_weight->mVertexId].data[vert_bone_counter] = bone_idx;
+				shape_data.bone_weights[ai_weight->mVertexId].data[vert_bone_counter] = f32(ai_weight->mWeight);
+
+				++vert_bone_counter;
+			}
+		}
+	}
+
+	ham_u32 shape_counter = 0;
+	for(auto &&shape_data_p : shape_data_map){
+		const auto &shape_data = shape_data_p.second;
+		shapes[shape_counter] = ham_shape_create_triangle_mesh(
+			(ham_u32)shape_data.verts.size(),
+			shape_data.verts.data(),
+			shape_data.norms.data(),
+			shape_data.uvs.data(),
+			shape_data.bone_indices.data(),
+			shape_data.bone_weights.data(),
+			(ham_u32)shape_data.indices.size(),
+			shape_data.indices.data(),
+			(ham_u32)shape_data.bones.size(),
+			shape_data.bones.data()
+		);
+		++shape_counter;
 	}
 
 	// TODO: load from central resource manager when not embedded/filename given
@@ -173,8 +246,6 @@ ham_model *ham_model_load_from_mem(ham_usize len, const void *data){
 
 		images[img_idx] = img;
 	}
-
-	const auto allocator = ham_current_allocator();
 
 	const auto mdl = ham_allocator_new(allocator, ham_model);
 	if(!mdl) return nullptr;

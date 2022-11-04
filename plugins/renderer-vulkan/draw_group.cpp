@@ -187,8 +187,8 @@ bool ham_draw_group_vulkan_set_num_instances(ham_draw_group_vulkan *group, ham_u
 	const isize cur_n = ham_super(group)->num_instances;
 
 	constexpr ham_draw_group_instance_data default_data = {
+		0,
 		ham_mat4_identity(),
-		ham_make_vec4(1.f, 1.f, 1.f, 1.f),
 	};
 
 	if(!group->instance_mapping || group->instance_capacity < n){

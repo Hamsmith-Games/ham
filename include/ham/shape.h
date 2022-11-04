@@ -53,15 +53,33 @@ typedef enum ham_vertex_order{
 
 typedef struct ham_shape ham_shape;
 
+#define HAM_SHAPE_BONE_WEIGHT_MAX_AFFECTED 4
+
+typedef struct ham_shape_bone{
+	ham_mat4 transform;
+} ham_shape_bone;
+
+typedef struct ham_shape_material{
+	float metallic;
+	float roughness;
+	float rim;
+	float pad0;
+	ham_vec4 albedo;
+} ham_shape_material;
+
 ham_api const ham_shape *ham_shape_unit_square();
 
 ham_api ham_shape *ham_shape_create_triangle_mesh(
-	ham_usize num_points,
+	ham_u32 num_points,
 	const ham_vec3 *verts,
 	const ham_vec3 *norms,
 	const ham_vec2 *uvs,
-	ham_usize num_indices,
-	const ham_u32 *indices
+	const ham_vec4i *bone_indices,
+	const ham_vec4 *bone_weights,
+	ham_u32 num_indices,
+	const ham_u32 *indices,
+	ham_u32 num_bones,
+	const ham_shape_bone *bones
 );
 
 /**
@@ -93,14 +111,17 @@ ham_api void ham_shape_destroy(ham_shape *shape);
 ham_api ham_shape_kind ham_shape_get_kind(const ham_shape *shape);
 ham_api ham_vertex_order ham_shape_vertex_order(const ham_shape *shape);
 
-ham_api ham_usize ham_shape_num_points(const ham_shape *shape);
-ham_api ham_usize ham_shape_num_indices(const ham_shape *shape);
+ham_api ham_u32 ham_shape_num_points(const ham_shape *shape);
+ham_api ham_u32 ham_shape_num_indices(const ham_shape *shape);
+ham_api ham_u32 ham_shape_num_bones(const ham_shape *shape);
 
 ham_api const ham_vec3 *ham_shape_vertices(const ham_shape *shape);
 ham_api const ham_vec3 *ham_shape_normals(const ham_shape *shape);
 ham_api const ham_vec2 *ham_shape_uvs(const ham_shape *shape);
 
 ham_api const ham_u32 *ham_shape_indices(const ham_shape *shape);
+
+ham_api const ham_shape_bone *ham_shape_bones(const ham_shape *shape);
 
 HAM_C_API_END
 

@@ -51,6 +51,7 @@ constexpr static inline GLenum ham_renderer_gl_fbo_attachment_format(ham_rendere
 		case HAM_RENDERER_GL_FBO_DEPTH_STENCIL: return GL_DEPTH32F_STENCIL8;
 		case HAM_RENDERER_GL_FBO_DIFFUSE:       return GL_RGBA8;
 		case HAM_RENDERER_GL_FBO_NORMAL:        return GL_RGB16F;
+		case HAM_RENDERER_GL_FBO_MATERIAL:      return GL_RGB16F;
 		case HAM_RENDERER_GL_FBO_SCENE:         return GL_R11F_G11F_B10F;
 		default: return GL_RGBA8; // squelch warnings
 	}
@@ -293,11 +294,12 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 
 	r->scene_info_frag_diffuse_tex_loc = glGetUniformLocation(scene_info_frag, "diffuse_tex");
 
+	r->screen_post_vert_uv_scale_loc = glGetUniformLocation(screen_vert, "uv_scale");
+
 	r->screen_post_frag_depth_loc = glGetUniformLocation(screen_frag, "depth_tex");
 	r->screen_post_frag_diffuse_loc = glGetUniformLocation(screen_frag, "diffuse_tex");
 	r->screen_post_frag_normal_loc = glGetUniformLocation(screen_frag, "normal_tex");
 	r->screen_post_frag_scene_loc = glGetUniformLocation(screen_frag, "scene_tex");
-	r->screen_post_uv_scale_loc = glGetUniformLocation(screen_frag, "uv_scale");
 
 	glProgramUniform1i(scene_info_frag, r->scene_info_frag_diffuse_tex_loc, HAM_DIFFUSE_TEXTURE_UNIT);
 
@@ -314,7 +316,7 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	glProgramUniform1i(screen_frag, r->screen_post_frag_normal_loc, HAM_GBO_NORMAL_TEXTURE_UNIT);
 	glProgramUniform1i(screen_frag, r->screen_post_frag_scene_loc, HAM_GBO_SCENE_TEXTURE_UNIT);
 
-	glProgramUniform2f(screen_frag, r->screen_post_uv_scale_loc, 1.f, 1.f);
+	glProgramUniform2f(screen_vert, r->screen_post_vert_uv_scale_loc, 1.f, 1.f);
 
 	const auto scene_info_pipeline = ham_renderer_gl_create_pipeline(r, scene_info_vert, scene_info_frag);
 	if(scene_info_pipeline == (u32)-1){
@@ -466,7 +468,7 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 			ham_f32 uv_scale_y = f64(h)/f64(old_h);
 
 			glProgramUniform2f(r->light_vert, r->light_vert_uv_scale_loc, uv_scale_x, uv_scale_y);
-			glProgramUniform2f(r->screen_post_frag, r->screen_post_uv_scale_loc, uv_scale_x, uv_scale_y);
+			glProgramUniform2f(r->screen_post_vert, r->screen_post_vert_uv_scale_loc, uv_scale_x, uv_scale_y);
 			return true;
 		}
 	}
@@ -514,7 +516,7 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 	r->render_h = h;
 
 	glProgramUniform2f(r->light_vert, r->light_vert_uv_scale_loc, 1.f, 1.f);
-	glProgramUniform2f(r->screen_post_frag, r->screen_post_uv_scale_loc, 1.f, 1.f);
+	glProgramUniform2f(r->screen_post_vert, r->screen_post_vert_uv_scale_loc, 1.f, 1.f);
 
 	return true;
 }
@@ -558,7 +560,7 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 	glBindProgramPipeline(r->scene_info_pipeline);
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, r->global_ubo);
 
 	ham_object_manager_iterate(
 		ham_super(r)->draw_groups, [](ham_object *obj, void *user) -> bool{
@@ -566,6 +568,9 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 			if(!ham_super(group)->num_instances) return true;
 
 			const auto r = (const ham_renderer_gl*)ham_super(group)->r;
+
+			glBindBufferBase(GL_UNIFORM_BUFFER, 1, group->bufs[HAM_DRAW_BUFFER_GL_BONE_DATA]);
+			glBindBufferBase(GL_UNIFORM_BUFFER, 2, group->bufs[HAM_DRAW_BUFFER_GL_MATERIAL_DATA]);
 
 			glBindTextureUnit(HAM_DIFFUSE_TEXTURE_UNIT, group->diffuse_tex_arr);
 			glBindSampler(HAM_DIFFUSE_TEXTURE_UNIT, r->samplers[1]);
@@ -586,9 +591,9 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	// Do scene lighting
 	//
 
-	glBindTextureUnit(HAM_GBO_DEPTH_TEXTURE_UNIT, r->fbo_attachments[0]);
-	glBindTextureUnit(HAM_GBO_DIFFUSE_TEXTURE_UNIT, r->fbo_attachments[1]);
-	glBindTextureUnit(HAM_GBO_NORMAL_TEXTURE_UNIT,  r->fbo_attachments[2]);
+	glBindTextureUnit(HAM_GBO_DEPTH_TEXTURE_UNIT, r->fbo_attachments[HAM_RENDERER_GL_FBO_DEPTH_STENCIL]);
+	glBindTextureUnit(HAM_GBO_DIFFUSE_TEXTURE_UNIT, r->fbo_attachments[HAM_RENDERER_GL_FBO_DIFFUSE]);
+	glBindTextureUnit(HAM_GBO_NORMAL_TEXTURE_UNIT,  r->fbo_attachments[HAM_RENDERER_GL_FBO_NORMAL]);
 	glBindTextureUnit(HAM_NOISE_TEXTURE_UNIT, r->noise_tex);
 
 	glBindSampler(HAM_GBO_DEPTH_TEXTURE_UNIT,   r->samplers[0]);
@@ -620,7 +625,7 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 
 	glEnable(GL_FRAMEBUFFER_SRGB);
 
-	glBindTextureUnit(HAM_GBO_SCENE_TEXTURE_UNIT, r->fbo_attachments[3]);
+	glBindTextureUnit(HAM_GBO_SCENE_TEXTURE_UNIT, r->fbo_attachments[HAM_RENDERER_GL_FBO_SCENE]);
 
 	glBindSampler(HAM_GBO_SCENE_TEXTURE_UNIT, r->samplers[0]);
 
