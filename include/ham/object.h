@@ -149,11 +149,11 @@ ham_api const ham_object_vtable *ham_object_dso_vptr(ham_dso_handle dso, const c
 
 typedef bool(*ham_dso_iterate_object_vptrs_fn)(const ham_object_vtable *vptr, void *user);
 
-static inline ham_usize ham_dso_iterate_object_vptrs(
-	ham_dso_handle handle,
-	ham_dso_iterate_object_vptrs_fn fn,
-	void *user
-);
+//static inline ham_usize ham_dso_iterate_object_vptrs(
+//	ham_dso_handle handle,
+//	ham_dso_iterate_object_vptrs_fn fn,
+//	void *user
+//);
 
 typedef struct ham_object_info{
 	const char *type_id;

@@ -100,6 +100,37 @@ if(ANDROID)
 endif()
 
 ##
+# User options
+##
+
+option(HAM_BUILD_DOCS    "Whether to build documentation"       ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_PLUGINS "Whether to build the default plugins" ON)
+option(HAM_BUILD_TESTS   "Whether to build library tests"       ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_TOOLS   "Whether to build tools"               ${PROJECT_IS_TOP_LEVEL})
+option(HAM_BUILD_LANG    "Whether to build the Ham language"    ON)
+option(HAM_BUILD_ENGINE  "Whether to build the world engine"    ${PROJECT_IS_TOP_LEVEL})
+
+option(HAM_INSTALL_DOCS    "Whether to install generated documentation" ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_PLUGINS "Whether to install the default plugins"     ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_TOOLS   "Whether to install compiled tools"          ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_TOOLS   "Whether to install the Ham language"        ${PROJECT_IS_TOP_LEVEL})
+option(HAM_INSTALL_TESTS   "Whether to install the tests"               OFF)
+option(HAM_INSTALL_ENGINE  "Whether to install the world engine"        OFF)
+
+# Plugin options
+
+option(HAM_PLUGINS_ENABLE_GL     "Whether to enable OpenGL-related plugins" ON)
+option(HAM_PLUGINS_ENABLE_VULKAN "Whether to enable Vulkan-related plugins" ON)
+
+# Build options
+
+set(HAM_ENGINE_MAX_SUBSYSTEMS "16" CACHE STRING "Maximum number of subsystems allowed in an engine before an error")
+set(HAM_BUILD_STEAM_APPID "480" CACHE STRING "Steam appid to put in steam_appid.txt for build directories")
+
+set(HAM_COLONY_MAX_BUCKETS 14 CACHE STRING "Maximum number of storage buckets for each colony before an out of memory error")
+set(HAM_OBJECT_INSTANCE_MANAGER_MAX_BLOCKS 16 CACHE STRING "Maximum number of storage blocks for each instance manager before an out of memory error")
+
+##
 # Configuration
 ##
 
@@ -293,33 +324,6 @@ set(HAM_ALL_INCLUDE_DIRS "${HAM_BINARY_INCLUDE_DIR};${HAM_SOURCE_INCLUDE_DIR}")
 
 set(HAM_ENGINE_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/engine")
 
-# User options
-
-option(HAM_BUILD_DOCS    "Whether to build documentation"       ${PROJECT_IS_TOP_LEVEL})
-option(HAM_BUILD_PLUGINS "Whether to build the default plugins" ON)
-option(HAM_BUILD_TESTS   "Whether to build library tests"       ${PROJECT_IS_TOP_LEVEL})
-option(HAM_BUILD_TOOLS   "Whether to build tools"               ${PROJECT_IS_TOP_LEVEL})
-option(HAM_BUILD_ENGINE  "Whether to build the world engine"    ${PROJECT_IS_TOP_LEVEL})
-
-option(HAM_INSTALL_DOCS    "Whether to install generated documentation" ${PROJECT_IS_TOP_LEVEL})
-option(HAM_INSTALL_PLUGINS "Whether to install the default plugins"     ON)
-option(HAM_INSTALL_TOOLS   "Whether to install compiled tools"          ${PROJECT_IS_TOP_LEVEL})
-option(HAM_INSTALL_TESTS   "Whether to install the tests"               OFF)
-option(HAM_INSTALL_ENGINE  "Whether to install the world engine"        OFF)
-
-# Plugin options
-
-option(HAM_PLUGINS_ENABLE_GL     "Whether to enable OpenGL-related plugins" ON)
-option(HAM_PLUGINS_ENABLE_VULKAN "Whether to enable Vulkan-related plugins" ON)
-
-# Build options
-
-set(HAM_ENGINE_MAX_SUBSYSTEMS "16" CACHE STRING "Maximum number of subsystems allowed in an engine before an error")
-set(HAM_BUILD_STEAM_APPID "480" CACHE STRING "Steam appid to put in steam_appid.txt for build directories")
-
-set(HAM_COLONY_MAX_BUCKETS 14 CACHE STRING "Maximum number of storage buckets for each colony before an out of memory error")
-set(HAM_OBJECT_INSTANCE_MANAGER_MAX_BLOCKS 16 CACHE STRING "Maximum number of storage blocks for each instance manager before an out of memory error")
-
 # Create configuration file
 
 configure_file(
@@ -399,9 +403,10 @@ macro(ham_add_executable TGT)
 	)
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+		target_compile_options(${TGT} PRIVATE "-Wall")
 		target_link_options(${TGT} PRIVATE "-Wl,--enable-new-dtags")
 	elseif(MSVC)
-		target_compile_options(${TGT} PRIVATE "/nologo")
+		target_compile_options(${TGT} PRIVATE "/W4" "/nologo")
 	endif()
 endmacro()
 
@@ -420,8 +425,10 @@ macro(ham_add_library TGT)
 		VISIBILITY_INLINES_HIDDEN ON
 	)
 
-    if(MSVC)
-		target_compile_options(${TGT} PRIVATE "/nologo")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+		target_compile_options(${TGT} PRIVATE "-Wall")
+	elseif(MSVC)
+		target_compile_options(${TGT} PRIVATE "/W4" "/nologo")
 	endif()
 endmacro()
 
@@ -433,9 +440,8 @@ if(HAM_BUILD_PLUGINS)
 	add_subdirectory(plugins)
 endif()
 
-if(HAM_BUILD_TOOLS)
-	add_subdirectory(lang-interpreter)
-	add_subdirectory(lang-compiler)
+if(HAM_BUILD_LANG)
+	add_subdirectory(lang)
 endif()
 
 if(HAM_BUILD_ENGINE)
@@ -510,23 +516,6 @@ install(
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
-
-if(HAM_INSTALL_TOOLS)
-	install(
-		FILES interpreter/LICENSE.md
-		DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/hami
-	)
-
-	install(
-		FILES compiler/LICENSE.md
-		DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ham/hamc
-	)
-
-	install(
-		TARGETS hamc hami
-		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-	)
-endif()
 
 if(HAM_INSTALL_TEST)
 	install(

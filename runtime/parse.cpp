@@ -603,7 +603,7 @@ namespace ham{
 			const basic_token_iterator<Char> &head,
 			const basic_token_range<Char> &tail
 		){
-			using parse_scope_view_type = basic_parse_scope_view<Char, true>;
+			//using parse_scope_view_type = basic_parse_scope_view<Char, true>;
 
 			const auto toks_beg = head;
 			const auto toks_end = tail.end();
@@ -614,7 +614,7 @@ namespace ham{
 			basic_str<Char> indent_str;
 
 			if(tok_it->kind() == token_kind::space){
-				const auto indent_head = tok_it;
+				//const auto indent_head = tok_it;
 				indent_str = tok_it->str();
 				++tok_it;
 

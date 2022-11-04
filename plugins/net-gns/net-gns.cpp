@@ -53,28 +53,28 @@ static bool ham_net_gns_find_peer(ham_net_gns *net, ham_net_peer *ret, ham_str8 
 
 ham_define_net_object(ham_net_gns, ham_net_socket_gns, ham_net_connection_gns)
 
-static void ham_impl_gns_debug(ESteamNetworkingSocketsDebugOutputType type, const char *msg){
-	switch(type){
-		case k_ESteamNetworkingSocketsDebugOutputType_Bug:
-		case k_ESteamNetworkingSocketsDebugOutputType_Error:{ ham_logerrorf("GameNetworkingSockets", "%s", msg); break; }
-		case k_ESteamNetworkingSocketsDebugOutputType_Warning:{ ham_logwarnf("GameNetworkingSockets", "%s", msg); break; }
-		case k_ESteamNetworkingSocketsDebugOutputType_Verbose:{ ham_logverbosef("GameNetworkingSockets", "%s", msg); break; }
-		case k_ESteamNetworkingSocketsDebugOutputType_Debug:{ ham_logdebugf("GameNetworkingSockets", "%s", msg); break; }
+//static void ham_impl_gns_debug(ESteamNetworkingSocketsDebugOutputType type, const char *msg){
+//	switch(type){
+//		case k_ESteamNetworkingSocketsDebugOutputType_Bug:
+//		case k_ESteamNetworkingSocketsDebugOutputType_Error:{ ham_logerrorf("GameNetworkingSockets", "%s", msg); break; }
+//		case k_ESteamNetworkingSocketsDebugOutputType_Warning:{ ham_logwarnf("GameNetworkingSockets", "%s", msg); break; }
+//		case k_ESteamNetworkingSocketsDebugOutputType_Verbose:{ ham_logverbosef("GameNetworkingSockets", "%s", msg); break; }
+//		case k_ESteamNetworkingSocketsDebugOutputType_Debug:{ ham_logdebugf("GameNetworkingSockets", "%s", msg); break; }
 
-		case k_ESteamNetworkingSocketsDebugOutputType_Important:{
-			ham_loginfof("GameNetworkingSockets", "IMPORTANT! %s", msg);
-			break;
-		}
+//		case k_ESteamNetworkingSocketsDebugOutputType_Important:{
+//			ham_loginfof("GameNetworkingSockets", "IMPORTANT! %s", msg);
+//			break;
+//		}
 
-		case k_ESteamNetworkingSocketsDebugOutputType_Everything:
-		case k_ESteamNetworkingSocketsDebugOutputType_Msg:
-		case k_ESteamNetworkingSocketsDebugOutputType_None:
-		default:{
-			ham_loginfof("GameNetworkingSockets", "%s", msg);
-			break;
-		}
-	}
-}
+//		case k_ESteamNetworkingSocketsDebugOutputType_Everything:
+//		case k_ESteamNetworkingSocketsDebugOutputType_Msg:
+//		case k_ESteamNetworkingSocketsDebugOutputType_None:
+//		default:{
+//			ham_loginfof("GameNetworkingSockets", "%s", msg);
+//			break;
+//		}
+//	}
+//}
 
 static bool ham_net_on_load_gns(){
 	SteamDatagramErrMsg err_msg;

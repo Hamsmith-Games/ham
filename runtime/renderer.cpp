@@ -222,6 +222,7 @@ void ham_renderer_destroy(ham_renderer *r){
 		[](ham_object *obj, void*){
 			const auto vtable = (const ham_draw_group_vtable*)obj->vptr;
 			const auto group = (ham_draw_group*)obj;
+			(void)vtable; (void)group;
 			return true;
 		},
 		nullptr

@@ -67,8 +67,6 @@ ham_draw_group_vulkan *ham_draw_group_vulkan_ctor(ham_draw_group_vulkan *mem, ha
 		VkBufferUsageFlags usage;
 	};
 
-	const VkDeviceSize total_cbo_size = num_shapes * sizeof(VkDrawIndexedIndirectCommand);
-
 	group->instance_capacity = 0;
 	group->instance_bo = nullptr;
 	group->instance_alloc = nullptr;
@@ -115,7 +113,7 @@ ham_draw_group_vulkan *ham_draw_group_vulkan_ctor(ham_draw_group_vulkan *mem, ha
 
 	ham::std_vector<VkVertexInputBindingDescription> bindings;
 
-	ham_i32 vert_off = 0, vert_idx_off = 0;
+	ham_i32 vert_idx_off = 0;
 
 	ham_usize vbo_off = 0, ibo_off = 0;
 	for(ham_usize i = 0; i < num_shapes; i++){

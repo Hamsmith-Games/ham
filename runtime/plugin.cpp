@@ -59,7 +59,7 @@ bool ham_plugin_find(const char *id, ham_str8 path, ham_plugin **plugin_ret, ham
 		return false;
 	}
 
-	ham_path_buffer_utf8 cwd_buf;
+	//ham_path_buffer_utf8 cwd_buf;
 
 	if(!path.len){
 		path = ham_plugin_default_path();

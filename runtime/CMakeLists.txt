@@ -128,5 +128,8 @@ target_link_libraries(
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+	target_compile_options(ham PRIVATE "-Wall" "-Werror")
 	target_link_options(ham PRIVATE "-Wl,--enable-new-dtags")
+elseif(MSVC)
+	target_compile_options(ham PRIVATE "/W4" "/nologo")
 endif()

@@ -523,7 +523,7 @@ namespace ham{
 
 			using source_location_type = csource_location_t<Char>;
 			using str_type = basic_str<Char>;
-			using token_type = basic_token<Char>;
+			//using token_type = basic_token<Char>;
 			using str_iterator_type = const Char*;
 
 			constexpr auto lex_inline = [](

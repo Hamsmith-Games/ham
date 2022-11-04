@@ -113,9 +113,9 @@ ham_nothrow void ham_colony_destroy(ham_colony *colony){
 
 	const auto allocator = colony->allocator;
 
-	for(int i = 0; i < colony->num_buckets; i++){
+	for(ham_usize i = 0; i < colony->num_buckets; i++){
 		const auto bucket = colony->buckets[i];
-		const auto num_pages = (ham_usize)1 << (ham_usize)i;
+		const auto num_pages = (ham_usize)1 << i;
 		ham_unmap_pages(bucket, num_pages);
 	}
 
