@@ -32,6 +32,8 @@
 
 #include <string.h>
 
+#define ham_math_api ham_nothrow static inline
+
 HAM_C_API_BEGIN
 
 //! @cond ignore
@@ -50,7 +52,7 @@ HAM_C_API_BEGIN
 //	return y;
 //}
 
-ham_nothrow static inline ham_f32 ham_impl_intrin_rsqrtf(ham_f32 x){
+ham_math_api ham_f32 ham_impl_intrin_rsqrtf(ham_f32 x){
 #ifdef __x86_64__
 	__m128 tmp = _mm_set_ss(x);
 	tmp = _mm_rsqrt_ss(tmp);
@@ -64,7 +66,7 @@ ham_nothrow static inline ham_f32 ham_impl_intrin_rsqrtf(ham_f32 x){
 #endif
 }
 
-ham_nothrow static inline ham_f32 ham_impl_instrin_rcpf(ham_f32 x){
+ham_math_api ham_f32 ham_impl_instrin_rcpf(ham_f32 x){
 #ifdef __x86_64__
 	__m128 tmp = _mm_set_ss(x);
 	tmp = _mm_rcp_ss(tmp);
@@ -87,18 +89,12 @@ ham_nothrow static inline ham_f32 ham_impl_instrin_rcpf(ham_f32 x){
  * @param x number to aproximate inverse square root
  * @returns approximately ``1.f / sqrtf(x)``
  */
-ham_constexpr ham_nothrow static inline ham_f32 ham_rsqrtf(ham_f32 x){
+ham_constexpr ham_math_api ham_f32 ham_rsqrtf(ham_f32 x){
 #	ifdef __cplusplus
-	if(!std::is_constant_evaluated()){
+	if(std::is_constant_evaluated()) return 1.f / sqrtf(x);
 #	endif
 
 	return ham_impl_intrin_rsqrtf(x);
-
-#	ifdef __cplusplus
-	}
-
-	return 1.f / sqrtf(x);
-#	endif
 }
 
 /**
@@ -107,18 +103,12 @@ ham_constexpr ham_nothrow static inline ham_f32 ham_rsqrtf(ham_f32 x){
  * @param x number to approximate reciprocal
  * @returns approximately ``1.f / x``
  */
-ham_constexpr ham_nothrow static inline ham_f32 ham_rcpf(ham_f32 x){
+ham_constexpr ham_math_api ham_f32 ham_rcpf(ham_f32 x){
 #	ifdef __cplusplus
-	if(!std::is_constant_evaluated()){
+	if(std::is_constant_evaluated()) return 1.f / x;
 #	endif
 
 	return ham_impl_instrin_rcpf(x);
-
-#	ifdef __cplusplus
-	}
-
-	return 1.f / x;
-#	endif
 }
 
 
@@ -145,46 +135,111 @@ typedef union alignas(16) ham_vec4{
 #endif
 } ham_vec4;
 
-ham_constexpr ham_nothrow static inline ham_vec2 ham_make_vec2(ham_f32 x, ham_f32 y){
-	return (ham_vec2){ .data = { x, y } };
-}
+typedef union alignas(8) ham_vec2i{
+	struct { ham_i32 x, y; };
+	ham_i32 data[2];
+} ham_vec2i;
 
-ham_constexpr ham_nothrow static inline ham_vec3 ham_make_vec3(ham_f32 x, ham_f32 y, ham_f32 z){
-	return (ham_vec3){ .data = { x, y, z } };
-}
+typedef union ham_vec3i{
+	struct { ham_i32 x, y, z; };
+	ham_i32 data[3];
+} ham_vec3i;
+
+typedef union alignas(16) ham_vec4i{
+	struct { ham_i32 x, y, z, w; };
+	ham_i32 data[4];
+#ifdef HAM_SIMD
+	ham_v4i32 v4i32;
+#endif
+} ham_vec4i;
+
+ham_constexpr ham_nothrow static inline ham_vec2 ham_make_vec2(ham_f32 x, ham_f32 y){ return (ham_vec2){ .data = { x, y } }; }
+ham_constexpr ham_nothrow static inline ham_vec3 ham_make_vec3(ham_f32 x, ham_f32 y, ham_f32 z){ return (ham_vec3){ .data = { x, y, z } }; }
 
 ham_constexpr ham_nothrow static inline ham_vec4 ham_make_vec4(ham_f32 x, ham_f32 y, ham_f32 z, ham_f32 w){
+#if defined(__cplusplus) && defined(HAM_SIMD)
+	if(std::is_constant_evaluated()) return (ham_vec4){ .data = { x, y, z, w } };
+#endif
+
 	return (ham_vec4){
-	#ifdef HAM_SIMD
+#ifdef HAM_SIMD
 		.v4f32 = (ham_v4f32){ x, y, z, w }
-	#else
+#else
 		.data = { x, y, z, w }
-	#endif
+#endif
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_vec2 ham_make_vec2_scalar(ham_f32 all){ return (ham_vec2){ .data = { all, all } }; }
-ham_constexpr ham_nothrow static inline ham_vec3 ham_make_vec3_scalar(ham_f32 all){ return (ham_vec3){ .data = { all, all, all } }; }
+ham_constexpr ham_nothrow static inline ham_vec2i ham_make_vec2i(ham_i32 x, ham_i32 y){ return (ham_vec2i){ .data = { x, y } }; }
+ham_constexpr ham_nothrow static inline ham_vec3i ham_make_vec3i(ham_i32 x, ham_i32 y, ham_i32 z){ return (ham_vec3i){ .data = { x, y, z } }; }
 
-ham_constexpr ham_nothrow static inline ham_vec4 ham_make_vec4_scalar(ham_f32 all){
+ham_constexpr ham_nothrow static inline ham_vec4i ham_make_vec4i(ham_i32 x, ham_i32 y, ham_i32 z, ham_i32 w){
+#if defined(__cplusplus) && defined(HAM_SIMD)
+	if(std::is_constant_evaluated()) return (ham_vec4i){ .data = { x, y, z, w } };
+#endif
+
+	return (ham_vec4i){
+#ifdef HAM_SIMD
+		.v4i32 = (ham_v4i32){ x, y, z, w }
+#else
+		.data = { x, y, z, w }
+#endif
+	};
+}
+
+ham_constexpr ham_math_api ham_vec2 ham_make_vec2_scalar(ham_f32 all){ return (ham_vec2){ .data = { all, all } }; }
+ham_constexpr ham_math_api ham_vec3 ham_make_vec3_scalar(ham_f32 all){ return (ham_vec3){ .data = { all, all, all } }; }
+
+ham_constexpr ham_math_api ham_vec4 ham_make_vec4_scalar(ham_f32 all){
+#if defined(__cplusplus) && defined(HAM_SIMD)
+	if(std::is_constant_evaluated()) return (ham_vec4){ .data = { all, all, all, all } };
+#endif
+
 	return (ham_vec4){
-	#ifdef HAM_SIMD
-		.v4f32 = (ham_v4f32){ all, all, all, all }
-	#else
+#ifdef HAM_SIMD
+		.v4f32 =
+#	ifdef __x86_64__
+				_mm_set1_ps(all)
+#	else
+				(ham_v4f32){ all, all, all, all }
+#	endif
+#else
 		.data = { all, all, all, all }
-	#endif
+#endif
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_vec2 ham_vec2_shuffle(ham_vec2 v, ham_u32 i, ham_u32 j){
+ham_constexpr ham_math_api ham_vec2i ham_make_vec2i_scalar(ham_i32 all){ return (ham_vec2i){ .data = { all, all } }; }
+ham_constexpr ham_math_api ham_vec3i ham_make_vec3i_scalar(ham_i32 all){ return (ham_vec3i){ .data = { all, all, all } }; }
+
+ham_constexpr ham_math_api ham_vec4i ham_make_vec4i_scalar(ham_i32 all){
+#if defined(__cplusplus) && defined(HAM_SIMD)
+	if(std::is_constant_evaluated()) return (ham_vec4i){ .data = { all, all, all, all } };
+#endif
+
+	return (ham_vec4i){
+#ifdef HAM_SIMD
+		.v4i32 =
+#	ifdef __x86_64__
+			_mm_set1_epi32(all)
+#	else
+			(ham_v4f32){ all, all, all, all }
+#	endif
+#else
+		.data = { all, all, all, all }
+#endif
+	};
+}
+
+ham_constexpr ham_math_api ham_vec2 ham_vec2_shuffle(ham_vec2 v, ham_u32 i, ham_u32 j){
 	return (ham_vec2){ .data = { v.data[i], v.data[j] } };
 }
 
-ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_shuffle(ham_vec3 v, ham_u32 i, ham_u32 j, ham_u32 k){
+ham_constexpr ham_math_api ham_vec3 ham_vec3_shuffle(ham_vec3 v, ham_u32 i, ham_u32 j, ham_u32 k){
 	return (ham_vec3){ .data = { v.data[i], v.data[j], v.data[k] } };
 }
 
-ham_constexpr ham_nothrow static inline ham_vec4 ham_vec4_shuffle(ham_vec4 v, ham_u32 i, ham_u32 j, ham_u32 k, ham_u32 l){
+ham_constexpr ham_math_api ham_vec4 ham_vec4_shuffle(ham_vec4 v, ham_u32 i, ham_u32 j, ham_u32 k, ham_u32 l){
 	return (ham_vec4){ .data = { v.data[i], v.data[j], v.data[k], v.data[l] } };
 }
 
@@ -204,38 +259,38 @@ ham_constexpr ham_nothrow static inline ham_vec4 ham_vec4_shuffle(ham_vec4 v, ha
 
 //! @endcond
 
-ham_constexpr ham_nothrow static inline ham_vec2 ham_vec2_add(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, +); }
-ham_constexpr ham_nothrow static inline ham_vec2 ham_vec2_sub(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, -); }
-ham_constexpr ham_nothrow static inline ham_vec2 ham_vec2_mul(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, *); }
-ham_constexpr ham_nothrow static inline ham_vec2 ham_vec2_div(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, /); }
+ham_constexpr ham_math_api ham_vec2 ham_vec2_add(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, +); }
+ham_constexpr ham_math_api ham_vec2 ham_vec2_sub(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, -); }
+ham_constexpr ham_math_api ham_vec2 ham_vec2_mul(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, *); }
+ham_constexpr ham_math_api ham_vec2 ham_vec2_div(ham_vec2 a, ham_vec2 b){ return HAM_IMPL_VEC_OP_N(2, a, b, /); }
 
-ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_neg(ham_vec3 v){ return (ham_vec3){ .data = { -v.x, -v.y, -v.z } }; }
-ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_add(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, +); }
-ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_sub(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, -); }
-ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_mul(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, *); }
-ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_div(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, /); }
+ham_constexpr ham_math_api ham_vec3 ham_vec3_neg(ham_vec3 v){ return (ham_vec3){ .data = { -v.x, -v.y, -v.z } }; }
+ham_constexpr ham_math_api ham_vec3 ham_vec3_add(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, +); }
+ham_constexpr ham_math_api ham_vec3 ham_vec3_sub(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, -); }
+ham_constexpr ham_math_api ham_vec3 ham_vec3_mul(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, *); }
+ham_constexpr ham_math_api ham_vec3 ham_vec3_div(ham_vec3 a, ham_vec3 b){ return HAM_IMPL_VEC_OP_N(3, a, b, /); }
 
-ham_constexpr ham_nothrow static inline ham_vec4 ham_vec4_add(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, +); }
-ham_constexpr ham_nothrow static inline ham_vec4 ham_vec4_sub(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, -); }
-ham_constexpr ham_nothrow static inline ham_vec4 ham_vec4_mul(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, *); }
-ham_constexpr ham_nothrow static inline ham_vec4 ham_vec4_div(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, /); }
+ham_constexpr ham_math_api ham_vec4 ham_vec4_add(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, +); }
+ham_constexpr ham_math_api ham_vec4 ham_vec4_sub(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, -); }
+ham_constexpr ham_math_api ham_vec4 ham_vec4_mul(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, *); }
+ham_constexpr ham_math_api ham_vec4 ham_vec4_div(ham_vec4 a, ham_vec4 b){ return HAM_IMPL_VEC_OP_N(4, a, b, /); }
 
-ham_constexpr ham_nothrow static inline ham_f32 ham_vec2_dot(ham_vec2 a, ham_vec2 b){
+ham_constexpr ham_math_api ham_f32 ham_vec2_dot(ham_vec2 a, ham_vec2 b){
 	const ham_vec2 c = ham_vec2_mul(a, b);
 	return c.x + c.y;
 }
 
-ham_constexpr ham_nothrow static inline ham_f32 ham_vec3_dot(ham_vec3 a, ham_vec3 b){
+ham_constexpr ham_math_api ham_f32 ham_vec3_dot(ham_vec3 a, ham_vec3 b){
 	const ham_vec3 c = ham_vec3_mul(a, b);
 	return c.x + c.y + c.z;
 }
 
-ham_constexpr ham_nothrow static inline ham_f32 ham_vec4_dot(ham_vec4 a, ham_vec4 b){
+ham_constexpr ham_math_api ham_f32 ham_vec4_dot(ham_vec4 a, ham_vec4 b){
 	const ham_vec4 c = ham_vec4_mul(a, b);
 	return c.x + c.y + c.z + c.w;
 }
 
-ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_cross(ham_vec3 a, ham_vec3 b){
+ham_constexpr ham_math_api ham_vec3 ham_vec3_cross(ham_vec3 a, ham_vec3 b){
 	return (ham_vec3){
 		.data = {
 			a.y * b.z - a.z * b.y,
@@ -245,28 +300,34 @@ ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_cross(ham_vec3 a, ham_
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_f32 ham_vec3_length(ham_vec3 v){
+ham_constexpr ham_math_api ham_f32 ham_vec3_length(ham_vec3 v){
 	return sqrtf(ham_vec3_dot(v, v));
 }
 
-ham_constexpr ham_nothrow static inline ham_f32 ham_vec4_length(ham_vec4 v){
+ham_constexpr ham_math_api ham_f32 ham_vec4_length(ham_vec4 v){
 	return sqrtf(ham_vec4_dot(v, v));
 }
 
-ham_constexpr ham_nothrow static inline ham_vec3 ham_vec3_normalize(ham_vec3 v){
+ham_constexpr ham_math_api ham_vec3 ham_vec3_normalize(ham_vec3 v){
 	const ham_f32 inv_len = 1.f / ham_vec3_length(v);
 	return (ham_vec3){ .data = { v.x * inv_len, v.y * inv_len, v.z * inv_len } };
 }
 
-ham_constexpr ham_nothrow static inline ham_vec4 ham_vec4_normalize(ham_vec4 v){
+ham_constexpr ham_math_api ham_vec4 ham_vec4_normalize(ham_vec4 v){
 	const ham_f32 vdot = ham_vec4_dot(v, v);
 	const ham_f32 inv_len = ham_rsqrtf(vdot);
 
-#ifdef HAM_SIMD
-	return (ham_vec4){ .v4f32 = v.v4f32 * inv_len };
-#else
-	return (ham_vec4){ .data = { v.x * inv_len, v.y * inv_len, v.z * inv_len, v.w * inv_len } };
+#ifdef __cplusplus
+	if(std::is_constant_evaluated()) return (ham_vec4){ .data = { v.x * inv_len, v.y * inv_len, v.z * inv_len, v.w * inv_len } };
 #endif
+
+	return (ham_vec4){
+#ifdef HAM_SIMD
+		.v4f32 = v.v4f32 * inv_len
+#else
+		.data = { v.x * inv_len, v.y * inv_len, v.z * inv_len, v.w * inv_len }
+#endif
+	};
 }
 
 /**
@@ -286,15 +347,15 @@ typedef union alignas(16) ham_quat{
 #endif
 } ham_quat;
 
-ham_constexpr ham_nothrow static inline ham_quat ham_make_quat(ham_f32 x, ham_f32 y, ham_f32 z, ham_f32 w){
+ham_constexpr ham_math_api ham_quat ham_make_quat(ham_f32 x, ham_f32 y, ham_f32 z, ham_f32 w){
 	return (ham_quat){ .data = { x, y, z, w } };
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_identity(){
+ham_constexpr ham_math_api ham_quat ham_quat_identity(){
 	return (ham_quat){ .data = { 0.f, 0.f, 0.f, 1.f } };
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_axis(ham_f32 angle, ham_vec3 axis){
+ham_constexpr ham_math_api ham_quat ham_quat_axis(ham_f32 angle, ham_vec3 axis){
 	const ham_f32 angle_2 = angle * 0.5f;
 	const ham_f32 sin_angle_2 = sinf(angle_2);
 	return (ham_quat){
@@ -302,28 +363,28 @@ ham_constexpr ham_nothrow static inline ham_quat ham_quat_axis(ham_f32 angle, ha
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_pitch(ham_f32 pitch){
+ham_constexpr ham_math_api ham_quat ham_quat_pitch(ham_f32 pitch){
 	const ham_f32 pitch_2 = pitch * 0.5f;
 	return (ham_quat){
 		.data = { sinf(pitch_2), 0.f, 0.f, cosf(pitch_2) }
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_yaw(ham_f32 yaw){
+ham_constexpr ham_math_api ham_quat ham_quat_yaw(ham_f32 yaw){
 	const ham_f32 yaw_2 = yaw * 0.5f;
 	return (ham_quat){
 		.data = { 0.f, sinf(yaw_2), 0.f, cosf(yaw_2) }
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_roll(ham_f32 roll){
+ham_constexpr ham_math_api ham_quat ham_quat_roll(ham_f32 roll){
 	const ham_f32 roll_2 = roll * 0.5f;
 	return (ham_quat){
 		.data = { 0.f, 0.f, sinf(roll_2), cosf(roll_2) }
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_f32 ham_quat_dot(ham_quat a, ham_quat b){
+ham_constexpr ham_math_api ham_f32 ham_quat_dot(ham_quat a, ham_quat b){
 #ifdef HAM_SIMD
 	a.v4f32 *= b.v4f32;
 #else
@@ -336,26 +397,26 @@ ham_constexpr ham_nothrow static inline ham_f32 ham_quat_dot(ham_quat a, ham_qua
 	return a.x + a.y + a.z + a.w;
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_conjugate(ham_quat q){
+ham_constexpr ham_math_api ham_quat ham_quat_conjugate(ham_quat q){
 	return (ham_quat){ .data = { -q.x, -q.y, -q.z, q.w } };
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_inverse(ham_quat q){
+ham_constexpr ham_math_api ham_quat ham_quat_inverse(ham_quat q){
 	const ham_quat conj = ham_quat_conjugate(q);
 	const ham_f32  coef = ham_rcpf(ham_quat_dot(q, q));
 	return (ham_quat){ .data = { coef * conj.x, coef * conj.y, coef * conj.z, coef * conj.w } };
 }
 
-ham_constexpr ham_nothrow static inline ham_f32 ham_quat_length(ham_quat q){
+ham_constexpr ham_math_api ham_f32 ham_quat_length(ham_quat q){
 	return sqrtf(ham_quat_dot(q, q));
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_normalize(ham_quat q){
+ham_constexpr ham_math_api ham_quat ham_quat_normalize(ham_quat q){
 	const ham_f32 inv_len = 1.f / ham_quat_length(q);
 	return (ham_quat){ .data = { inv_len * q.x, inv_len * q.y, inv_len * q.z, inv_len * q.w } };
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_add(ham_quat a, ham_quat b){
+ham_constexpr ham_math_api ham_quat ham_quat_add(ham_quat a, ham_quat b){
 #ifdef HAM_SIMD
 	return (ham_quat){ .v4f32 = a.v4f32 + b.v4f32 };
 #else
@@ -363,22 +424,27 @@ ham_constexpr ham_nothrow static inline ham_quat ham_quat_add(ham_quat a, ham_qu
 #endif
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_mul(ham_quat a, ham_quat b){
+ham_constexpr ham_math_api ham_quat ham_quat_mul(ham_quat a, ham_quat b){
 	const ham_vec3 a_xyz = ham_make_vec3(a.x, a.y, a.z);
 	const ham_vec3 b_xyz = ham_make_vec3(b.x, b.y, b.z);
 	const ham_vec3 xyz_cross = ham_vec3_cross(a_xyz, b_xyz);
 
 	return (ham_quat){
-		.data = {
-			(a.w * b.x) + (b.w * a.x) + xyz_cross.x,
-			(a.w * b.y) + (b.w * a.y) + xyz_cross.y,
-			(a.w * b.z) + (b.w * a.z) + xyz_cross.z,
-			(a.w * b.w) - (a.x * b.x) - (a.y * b.y) - (a.z * b.z),
-		}
+#ifdef HAM_SIMD
+		.v4f32
+#else
+		.data
+#endif
+			= {
+				(a.w * b.x) + (b.w * a.x) + xyz_cross.x,
+				(a.w * b.y) + (b.w * a.y) + xyz_cross.y,
+				(a.w * b.z) + (b.w * a.z) + xyz_cross.z,
+				(a.w * b.w) - (a.x * b.x) - (a.y * b.y) - (a.z * b.z),
+			}
 	};
 }
 
-//ham_constexpr ham_nothrow static inline ham_quat ham_quat_hamilton(ham_quat a, ham_quat b){
+//ham_constexpr ham_math_api ham_quat ham_quat_hamilton(ham_quat a, ham_quat b){
 //#ifdef HAM_SIMD
 //	return (ham_quat){ .v4f32 = a.v4f32 * (b.x + b.y + b.z + b.w) };
 //#else
@@ -393,7 +459,7 @@ ham_constexpr ham_nothrow static inline ham_quat ham_quat_mul(ham_quat a, ham_qu
 //#endif
 //}
 
-ham_constexpr ham_nothrow static inline ham_vec3 ham_quat_mul_vec3(ham_quat q, ham_vec3 v){
+ham_constexpr ham_math_api ham_vec3 ham_quat_mul_vec3(ham_quat q, ham_vec3 v){
 	const ham_vec3 quat_vec = ham_make_vec3(q.x, q.y, q.z);
 	const ham_vec3 uv  = ham_vec3_cross(quat_vec, v);
 	const ham_vec3 uuv = ham_vec3_cross(quat_vec, uv);
@@ -430,7 +496,7 @@ typedef union alignas(16) ham_mat4{
 	ham_f32 data[4*4];
 } ham_mat4;
 
-ham_constexpr ham_nothrow static inline ham_mat2 ham_mat2_identity(){
+ham_constexpr ham_math_api ham_mat2 ham_mat2_identity(){
 	return (ham_mat2){
 		.data = {
 			1.f, 0.f,
@@ -439,7 +505,7 @@ ham_constexpr ham_nothrow static inline ham_mat2 ham_mat2_identity(){
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_mat3 ham_mat3_identity(){
+ham_constexpr ham_math_api ham_mat3 ham_mat3_identity(){
 	return (ham_mat3){
 		.data = {
 			1.f, 0.f, 0.f,
@@ -449,18 +515,16 @@ ham_constexpr ham_nothrow static inline ham_mat3 ham_mat3_identity(){
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_identity(){
-	return (ham_mat4){
-		.data = {
-			1.f, 0.f, 0.f, 0.f,
-			0.f, 1.f, 0.f, 0.f,
-			0.f, 0.f, 1.f, 0.f,
-			0.f, 0.f, 0.f, 1.f,
-		}
-	};
+ham_constexpr ham_math_api ham_mat4 ham_mat4_identity(){
+	const ham_vec4 col0 = ham_make_vec4(1.f, 0.f, 0.f, 0.f);
+	const ham_vec4 col1 = ham_make_vec4(0.f, 1.f, 0.f, 0.f);
+	const ham_vec4 col2 = ham_make_vec4(0.f, 0.f, 1.f, 0.f);
+	const ham_vec4 col3 = ham_make_vec4(0.f, 0.f, 0.f, 1.f);
+
+	return (ham_mat4){ .cols = { col0, col1, col2, col3 } };
 }
 
-ham_constexpr ham_nothrow static inline ham_mat2 ham_mat2_from_f32(ham_f32 f){
+ham_constexpr ham_math_api ham_mat2 ham_mat2_from_f32(ham_f32 f){
 	return (ham_mat2){
 		.data = {
 			f, 0.f,
@@ -469,7 +533,7 @@ ham_constexpr ham_nothrow static inline ham_mat2 ham_mat2_from_f32(ham_f32 f){
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_mat3 ham_mat3_from_f32(ham_f32 f){
+ham_constexpr ham_math_api ham_mat3 ham_mat3_from_f32(ham_f32 f){
 	return (ham_mat3){
 		.data = {
 			f, 0.f, 0.f,
@@ -479,18 +543,16 @@ ham_constexpr ham_nothrow static inline ham_mat3 ham_mat3_from_f32(ham_f32 f){
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_from_f32(ham_f32 f){
-	return (ham_mat4){
-		.data = {
-			f, 0.f, 0.f, 0.f,
-			0.f, f, 0.f, 0.f,
-			0.f, 0.f, f, 0.f,
-			0.f, 0.f, 0.f, f,
-		}
-	};
+ham_constexpr ham_math_api ham_mat4 ham_mat4_from_f32(ham_f32 f){
+	const ham_vec4 col0 = ham_make_vec4(f, 0.f, 0.f, 0.f);
+	const ham_vec4 col1 = ham_make_vec4(0.f, f, 0.f, 0.f);
+	const ham_vec4 col2 = ham_make_vec4(0.f, 0.f, f, 0.f);
+	const ham_vec4 col3 = ham_make_vec4(0.f, 0.f, 0.f, f);
+
+	return (ham_mat4){ .cols = { col0, col1, col2, col3 } };
 }
 
-ham_constexpr ham_nothrow static inline ham_mat3 ham_mat3_from_quat(ham_quat q){
+ham_constexpr ham_math_api ham_mat3 ham_mat3_from_quat(ham_quat q){
 	const ham_f32 xx = q.x * q.x;
 	const ham_f32 yy = q.y * q.y;
 	const ham_f32 zz = q.z * q.z;
@@ -515,51 +577,24 @@ ham_constexpr ham_nothrow static inline ham_mat3 ham_mat3_from_quat(ham_quat q){
 	};
 }
 
-ham_constexpr ham_nothrow static inline ham_mat4 ham_make_mat4_cols(ham_vec4 c0, ham_vec4 c1, ham_vec4 c2, ham_vec4 c3){
+ham_constexpr ham_math_api ham_mat4 ham_make_mat4_cols(ham_vec4 c0, ham_vec4 c1, ham_vec4 c2, ham_vec4 c3){
 	return (ham_mat4){ .cols = { c0, c1, c2, c3 } };
 }
 
-ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_from_quat(ham_quat q){
+ham_constexpr ham_math_api ham_mat4 ham_mat4_from_quat(ham_quat q){
 	const ham_f32 xx = q.x * q.x;
 	const ham_f32 yy = q.y * q.y;
 	const ham_f32 zz = q.z * q.z;
 
-	return (ham_mat4){
-//		.data = {
-//			1.f - 2.f * (yy + zz),         2.f * (q.x * q.y - q.z * q.w), 2.f * (q.x * q.z + q.y * q.w), 0.f,
-//			2.f * (q.x * q.y + q.z * q.w), 1.f - 2.f * (xx + zz),         2.f * (q.y * q.z - q.x * q.w), 0.f,
-//			2.f * (q.x * q.z - q.y * q.w), 2.f * (q.y * q.z + q.x * q.w), 1.f - 2.f * (xx + yy), 0.f,
-//			0.f, 0.f, 0.f, 1.f,
-//		}
-		.data = {
-			// column 0
-			1.f - 2.f * (yy + zz),
-			2.f * (q.x * q.y + q.z * q.w),
-			2.f * (q.x * q.z - q.y * q.w),
-			0.f,
+	const ham_vec4 col0 = ham_make_vec4(1.f - 2.f * (yy + zz), 2.f * (q.x * q.y + q.z * q.w), 2.f * (q.x * q.z - q.y * q.w), 0.f);
+	const ham_vec4 col1 = ham_make_vec4(2.f * (q.x * q.y - q.z * q.w), 1.f - 2.f * (xx + zz), 2.f * (q.y * q.z + q.x * q.w), 0.f);
+	const ham_vec4 col2 = ham_make_vec4(2.f * (q.x * q.z + q.y * q.w), 2.f * (q.y * q.z - q.x * q.w), 1.f - 2.f * (xx + yy), 0.f);
+	const ham_vec4 col3 = ham_make_vec4(0.f, 0.f, 0.f, 1.f);
 
-			// column 1
-			2.f * (q.x * q.y - q.z * q.w),
-			1.f - 2.f * (xx + zz),
-			2.f * (q.y * q.z + q.x * q.w),
-			0.f,
-
-			// column 2
-			2.f * (q.x * q.z + q.y * q.w),
-			2.f * (q.y * q.z - q.x * q.w),
-			1.f - 2.f * (xx + yy),
-			0.f,
-
-			// column 3
-			0.f,
-			0.f,
-			0.f,
-			1.f,
-		}
-	};
+	return (ham_mat4){ .cols = { col0, col1, col2, col3 } };
 }
 
-ham_constexpr ham_nothrow static inline ham_mat4 ham_look_at(ham_vec3 pos, ham_vec3 focus, ham_vec3 world_up){
+ham_constexpr ham_math_api ham_mat4 ham_look_at(ham_vec3 pos, ham_vec3 focus, ham_vec3 world_up){
 	const ham_vec3 f = ham_vec3_normalize(ham_vec3_sub(focus, pos));
 	const ham_vec3 s = ham_vec3_normalize(ham_vec3_cross(world_up, f));
 	const ham_vec3 u = ham_vec3_cross(f, s);
@@ -619,10 +654,10 @@ ham_constexpr ham_nothrow static inline ham_mat4 ham_look_at(ham_vec3 pos, ham_v
 
 //! @endcond
 
-ham_constexpr ham_nothrow static inline ham_mat2 ham_mat2_mul(ham_mat2 a, ham_mat2 b){ return HAM_IMPL_MAT_MUL(2, a, b); }
-ham_constexpr ham_nothrow static inline ham_mat3 ham_mat3_mul(ham_mat3 a, ham_mat3 b){ return HAM_IMPL_MAT_MUL(3, a, b); }
+ham_constexpr ham_math_api ham_mat2 ham_mat2_mul(ham_mat2 a, ham_mat2 b){ return HAM_IMPL_MAT_MUL(2, a, b); }
+ham_constexpr ham_math_api ham_mat3 ham_mat3_mul(ham_mat3 a, ham_mat3 b){ return HAM_IMPL_MAT_MUL(3, a, b); }
 
-ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_mul(ham_mat4 a, ham_mat4 b){
+ham_constexpr ham_math_api ham_mat4 ham_mat4_mul(ham_mat4 a, ham_mat4 b){
 	/*
 		mat<4, 4, T, Q> Result;
 		Result[0] = SrcA0 * SrcB0[0] + SrcA1 * SrcB0[1] + SrcA2 * SrcB0[2] + SrcA3 * SrcB0[3];
@@ -676,19 +711,19 @@ ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_mul(ham_mat4 a, ham_ma
 	return result;
 }
 
-ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_translate(ham_mat4 m, ham_vec3 xyz){
+ham_constexpr ham_math_api ham_mat4 ham_mat4_translate(ham_mat4 m, ham_vec3 xyz){
 	m.cols[3] = ham_vec4_add(m.cols[3], ham_make_vec4(xyz.x, xyz.y, xyz.z, 0.f));
 	return m;
 }
 
-ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_scale(ham_mat4 m, ham_vec3 scale){
+ham_constexpr ham_math_api ham_mat4 ham_mat4_scale(ham_mat4 m, ham_vec3 scale){
 	m.data[0] *= scale.x;
 	m.data[5] *= scale.y;
 	m.data[10] *= scale.z;
 	return m;
 }
 
-ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_rotate(ham_mat4 m, ham_f32 angle, ham_vec3 axis){
+ham_constexpr ham_math_api ham_mat4 ham_mat4_rotate(ham_mat4 m, ham_f32 angle, ham_vec3 axis){
 	const ham_f32 c = cosf(angle);
 	const ham_f32 s = sinf(angle);
 
@@ -739,7 +774,7 @@ ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_rotate(ham_mat4 m, ham
 	return ret;
 }
 
-ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_inverse(ham_mat4 m){
+ham_constexpr ham_math_api ham_mat4 ham_mat4_inverse(ham_mat4 m){
 	const ham_f32 coef00 = m.cols[2].data[2] * m.cols[3].data[3] - m.cols[3].data[2] * m.cols[2].data[3];
 	const ham_f32 coef02 = m.cols[1].data[2] * m.cols[3].data[3] - m.cols[3].data[2] * m.cols[1].data[3];
 	const ham_f32 coef03 = m.cols[1].data[2] * m.cols[2].data[3] - m.cols[2].data[2] * m.cols[1].data[3];
@@ -801,7 +836,7 @@ ham_constexpr ham_nothrow static inline ham_mat4 ham_mat4_inverse(ham_mat4 m){
 	return ham_mat4_mul(inverse, ham_mat4_from_f32(inv_det));
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_from_mat3(ham_mat3 m){
+ham_constexpr ham_math_api ham_quat ham_quat_from_mat3(ham_mat3 m){
 	ham_f32 four_x_squared_minus_1 = m.cols[0].data[0] - m.cols[1].data[1] - m.cols[2].data[2];
 	ham_f32 four_y_squared_minus_1 = m.cols[1].data[1] - m.cols[0].data[0] - m.cols[2].data[2];
 	ham_f32 four_z_squared_minus_1 = m.cols[2].data[2] - m.cols[0].data[0] - m.cols[1].data[1];
@@ -842,7 +877,7 @@ ham_constexpr ham_nothrow static inline ham_quat ham_quat_from_mat3(ham_mat3 m){
 	}
 }
 
-ham_constexpr ham_nothrow static inline ham_quat ham_quat_look_at(ham_vec3 dir, ham_vec3 up){
+ham_constexpr ham_math_api ham_quat ham_quat_look_at(ham_vec3 dir, ham_vec3 up){
 	const ham_vec3 right = ham_vec3_cross(up, dir);
 
 	ham_mat3 rot;
@@ -872,26 +907,26 @@ typedef struct ham_aint{
 //
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_aint_init(ham_aint *aint){ mpz_init(aint->mpz); }
+ham_math_api void ham_aint_init(ham_aint *aint){ mpz_init(aint->mpz); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_aint_finish(ham_aint *aint){ mpz_clear(aint->mpz); }
+ham_math_api void ham_aint_finish(ham_aint *aint){ mpz_clear(aint->mpz); }
 
 //
 // Simultaneous init and set
 //
 
 ham_nonnull_args(1, 2)
-ham_nothrow static inline void ham_aint_init_set(ham_aint *aint, const ham_aint *other){ mpz_init_set(aint->mpz, other->mpz); }
+ham_math_api void ham_aint_init_set(ham_aint *aint, const ham_aint *other){ mpz_init_set(aint->mpz, other->mpz); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_aint_init_iptr(ham_aint *aint, ham_iptr val){ mpz_init_set_si(aint->mpz, val); }
+ham_math_api void ham_aint_init_iptr(ham_aint *aint, ham_iptr val){ mpz_init_set_si(aint->mpz, val); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_aint_init_uptr(ham_aint *aint, ham_uptr val){ mpz_init_set_ui(aint->mpz, val); }
+ham_math_api void ham_aint_init_uptr(ham_aint *aint, ham_uptr val){ mpz_init_set_ui(aint->mpz, val); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline bool ham_aint_init_str_utf8(ham_aint *aint, ham_str8 str, ham_u16 base){
+ham_math_api bool ham_aint_init_str_utf8(ham_aint *aint, ham_str8 str, ham_u16 base){
 	if(str.len > HAM_NAME_BUFFER_SIZE) return false;
 
 	ham_name_buffer_utf8 buf;
@@ -908,7 +943,7 @@ ham_nothrow static inline bool ham_aint_init_str_utf8(ham_aint *aint, ham_str8 s
 }
 
 ham_nonnull_args(1)
-ham_nothrow static inline bool ham_aint_init_str_utf16(ham_aint *aint, ham_str16 str, ham_u16 base){
+ham_math_api bool ham_aint_init_str_utf16(ham_aint *aint, ham_str16 str, ham_u16 base){
 	ham_name_buffer_utf8 buf;
 	if(ham_str_conv_utf16_utf8(str, buf, sizeof(buf)) == (ham_usize)-1){
 		return false;
@@ -924,7 +959,7 @@ ham_nothrow static inline bool ham_aint_init_str_utf16(ham_aint *aint, ham_str16
 }
 
 ham_nonnull_args(1)
-ham_nothrow static inline bool ham_aint_init_str_utf32(ham_aint *aint, ham_str32 str, ham_u16 base){
+ham_math_api bool ham_aint_init_str_utf32(ham_aint *aint, ham_str32 str, ham_u16 base){
 	ham_name_buffer_utf8 buf;
 	if(ham_str_conv_utf32_utf8(str, buf, sizeof(buf)) == (ham_usize)-1){
 		return false;
@@ -947,29 +982,29 @@ ham_nothrow static inline bool ham_aint_init_str_utf32(ham_aint *aint, ham_str32
 //
 
 ham_nonnull_args(1, 2)
-ham_nothrow static inline void ham_aint_set(ham_aint *ret, const ham_aint *other){ mpz_set(ret->mpz, other->mpz); }
+ham_math_api void ham_aint_set(ham_aint *ret, const ham_aint *other){ mpz_set(ret->mpz, other->mpz); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_aint_set_iptr(ham_aint *ret, ham_iptr val){ mpz_set_si(ret->mpz, val); }
+ham_math_api void ham_aint_set_iptr(ham_aint *ret, ham_iptr val){ mpz_set_si(ret->mpz, val); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_aint_set_uptr(ham_aint *ret, ham_uptr val){ mpz_set_ui(ret->mpz, val); }
+ham_math_api void ham_aint_set_uptr(ham_aint *ret, ham_uptr val){ mpz_set_ui(ret->mpz, val); }
 
 //
 // Arithmetic
 //
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_aint_add(ham_aint *ret, const ham_aint *lhs, const ham_aint *rhs){ mpz_add(ret->mpz, lhs->mpz, rhs->mpz); }
+ham_math_api void ham_aint_add(ham_aint *ret, const ham_aint *lhs, const ham_aint *rhs){ mpz_add(ret->mpz, lhs->mpz, rhs->mpz); }
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_aint_sub(ham_aint *ret, const ham_aint *lhs, const ham_aint *rhs){ mpz_sub(ret->mpz, lhs->mpz, rhs->mpz); }
+ham_math_api void ham_aint_sub(ham_aint *ret, const ham_aint *lhs, const ham_aint *rhs){ mpz_sub(ret->mpz, lhs->mpz, rhs->mpz); }
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_aint_mul(ham_aint *ret, const ham_aint *lhs, const ham_aint *rhs){ mpz_mul(ret->mpz, lhs->mpz, rhs->mpz); }
+ham_math_api void ham_aint_mul(ham_aint *ret, const ham_aint *lhs, const ham_aint *rhs){ mpz_mul(ret->mpz, lhs->mpz, rhs->mpz); }
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_aint_div(ham_aint *ret, const ham_aint *lhs, const ham_aint *rhs){ mpz_div(ret->mpz, lhs->mpz, rhs->mpz); }
+ham_math_api void ham_aint_div(ham_aint *ret, const ham_aint *lhs, const ham_aint *rhs){ mpz_div(ret->mpz, lhs->mpz, rhs->mpz); }
 
 /**
  * @}
@@ -989,23 +1024,23 @@ typedef struct ham_arat{
 //
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_arat_init(ham_arat *arat){ mpq_init(arat->mpq); }
+ham_math_api void ham_arat_init(ham_arat *arat){ mpq_init(arat->mpq); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_arat_finish(ham_arat *arat){ mpq_clear(arat->mpq); }
+ham_math_api void ham_arat_finish(ham_arat *arat){ mpq_clear(arat->mpq); }
 
 //
 // Simultaneous init and set
 //
 
 ham_nonnull_args(1, 2)
-ham_nothrow static inline void ham_arat_init_set(ham_arat *arat, const ham_arat *other){
+ham_math_api void ham_arat_init_set(ham_arat *arat, const ham_arat *other){
 	mpq_init(arat->mpq);
 	mpq_set(arat->mpq, other->mpq);
 }
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_arat_init_aint(ham_arat *arat, const ham_aint *numerator, const ham_aint *denominator){
+ham_math_api void ham_arat_init_aint(ham_arat *arat, const ham_aint *numerator, const ham_aint *denominator){
 	mpq_init(arat->mpq);
 	mpz_set(mpq_numref(arat->mpq), numerator->mpz);
 	mpz_set(mpq_denref(arat->mpq), denominator->mpz);
@@ -1013,7 +1048,7 @@ ham_nothrow static inline void ham_arat_init_aint(ham_arat *arat, const ham_aint
 }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_arat_init_iptr(ham_arat *arat, ham_iptr numerator, ham_uptr denominator){
+ham_math_api void ham_arat_init_iptr(ham_arat *arat, ham_iptr numerator, ham_uptr denominator){
 	mpq_init(arat->mpq);
 	mpz_set_si(mpq_numref(arat->mpq), numerator);
 	mpz_set_ui(mpq_denref(arat->mpq), denominator);
@@ -1021,7 +1056,7 @@ ham_nothrow static inline void ham_arat_init_iptr(ham_arat *arat, ham_iptr numer
 }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_arat_init_uptr(ham_arat *arat, ham_uptr numerator, ham_uptr denominator){
+ham_math_api void ham_arat_init_uptr(ham_arat *arat, ham_uptr numerator, ham_uptr denominator){
 	mpq_init(arat->mpq);
 	mpz_set_ui(mpq_numref(arat->mpq), numerator);
 	mpz_set_ui(mpq_denref(arat->mpq), denominator);
@@ -1033,24 +1068,24 @@ ham_nothrow static inline void ham_arat_init_uptr(ham_arat *arat, ham_uptr numer
 //
 
 ham_nonnull_args(1, 2)
-ham_nothrow static inline void ham_arat_set(ham_arat *ret, const ham_arat *other){ mpq_set(ret->mpq, other->mpq); }
+ham_math_api void ham_arat_set(ham_arat *ret, const ham_arat *other){ mpq_set(ret->mpq, other->mpq); }
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_arat_set_aint(ham_arat *ret, const ham_aint *num, const ham_aint *den){
+ham_math_api void ham_arat_set_aint(ham_arat *ret, const ham_aint *num, const ham_aint *den){
 	mpz_set(mpq_numref(ret->mpq), num->mpz);
 	mpz_set(mpq_denref(ret->mpq), den->mpz);
 	mpq_canonicalize(ret->mpq);
 }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_arat_set_iptr(ham_arat *ret, ham_iptr num, ham_uptr den){
+ham_math_api void ham_arat_set_iptr(ham_arat *ret, ham_iptr num, ham_uptr den){
 	mpz_set_si(mpq_numref(ret->mpq), num);
 	mpz_set_ui(mpq_denref(ret->mpq), den);
 	mpq_canonicalize(ret->mpq);
 };
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_arat_set_uptr(ham_arat *ret, ham_uptr num, ham_uptr den){
+ham_math_api void ham_arat_set_uptr(ham_arat *ret, ham_uptr num, ham_uptr den){
 	mpz_set_ui(mpq_numref(ret->mpq), num);
 	mpz_set_ui(mpq_denref(ret->mpq), den);
 	mpq_canonicalize(ret->mpq);
@@ -1061,16 +1096,16 @@ ham_nothrow static inline void ham_arat_set_uptr(ham_arat *ret, ham_uptr num, ha
 //
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_arat_add(ham_arat *ret, const ham_arat *lhs, const ham_arat *rhs){ mpq_add(ret->mpq, lhs->mpq, rhs->mpq); }
+ham_math_api void ham_arat_add(ham_arat *ret, const ham_arat *lhs, const ham_arat *rhs){ mpq_add(ret->mpq, lhs->mpq, rhs->mpq); }
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_arat_sub(ham_arat *ret, const ham_arat *lhs, const ham_arat *rhs){ mpq_sub(ret->mpq, lhs->mpq, rhs->mpq); }
+ham_math_api void ham_arat_sub(ham_arat *ret, const ham_arat *lhs, const ham_arat *rhs){ mpq_sub(ret->mpq, lhs->mpq, rhs->mpq); }
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_arat_mul(ham_arat *ret, const ham_arat *lhs, const ham_arat *rhs){ mpq_mul(ret->mpq, lhs->mpq, rhs->mpq); }
+ham_math_api void ham_arat_mul(ham_arat *ret, const ham_arat *lhs, const ham_arat *rhs){ mpq_mul(ret->mpq, lhs->mpq, rhs->mpq); }
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_arat_div(ham_arat *ret, const ham_arat *lhs, const ham_arat *rhs){ mpq_div(ret->mpq, lhs->mpq, rhs->mpq); }
+ham_math_api void ham_arat_div(ham_arat *ret, const ham_arat *lhs, const ham_arat *rhs){ mpq_div(ret->mpq, lhs->mpq, rhs->mpq); }
 
 /**
  * @}
@@ -1090,38 +1125,38 @@ typedef struct ham_areal{
 //
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_areal_init(ham_areal *areal){ mpfr_init(areal->mpfr); }
+ham_math_api void ham_areal_init(ham_areal *areal){ mpfr_init(areal->mpfr); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_areal_finish(ham_areal *areal){ mpfr_clear(areal->mpfr); }
+ham_math_api void ham_areal_finish(ham_areal *areal){ mpfr_clear(areal->mpfr); }
 
 //
 // Simultaneous init and set
 //
 
 ham_nonnull_args(1, 2)
-ham_nothrow static inline void ham_areal_init_set(ham_areal *areal, const ham_areal *other){ mpfr_init_set(areal->mpfr, other->mpfr, MPFR_RNDN); }
+ham_math_api void ham_areal_init_set(ham_areal *areal, const ham_areal *other){ mpfr_init_set(areal->mpfr, other->mpfr, MPFR_RNDN); }
 
 ham_nonnull_args(1, 2)
-ham_nothrow static inline void ham_areal_init_arat(ham_areal *areal, const ham_arat *arat){ mpfr_init_set_q(areal->mpfr, arat->mpq, MPFR_RNDN); }
+ham_math_api void ham_areal_init_arat(ham_areal *areal, const ham_arat *arat){ mpfr_init_set_q(areal->mpfr, arat->mpq, MPFR_RNDN); }
 
 ham_nonnull_args(1, 2)
-ham_nothrow static inline void ham_areal_init_aint(ham_areal *areal, const ham_aint *aint){ mpfr_init_set_z(areal->mpfr, aint->mpz, MPFR_RNDN); }
+ham_math_api void ham_areal_init_aint(ham_areal *areal, const ham_aint *aint){ mpfr_init_set_z(areal->mpfr, aint->mpz, MPFR_RNDN); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_areal_init_iptr(ham_areal *areal, ham_iptr val){ mpfr_init_set_si(areal->mpfr, val, MPFR_RNDN); }
+ham_math_api void ham_areal_init_iptr(ham_areal *areal, ham_iptr val){ mpfr_init_set_si(areal->mpfr, val, MPFR_RNDN); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_areal_init_uptr(ham_areal *areal, ham_uptr val){ mpfr_init_set_ui(areal->mpfr, val, MPFR_RNDN); }
+ham_math_api void ham_areal_init_uptr(ham_areal *areal, ham_uptr val){ mpfr_init_set_ui(areal->mpfr, val, MPFR_RNDN); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_areal_init_f32 (ham_areal *areal, ham_f32 val){ mpfr_init_set_d(areal->mpfr, val, MPFR_RNDN); }
+ham_math_api void ham_areal_init_f32 (ham_areal *areal, ham_f32 val){ mpfr_init_set_d(areal->mpfr, val, MPFR_RNDN); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_areal_init_f64 (ham_areal *areal, ham_f64 val){ mpfr_init_set_d(areal->mpfr, val, MPFR_RNDN); }
+ham_math_api void ham_areal_init_f64 (ham_areal *areal, ham_f64 val){ mpfr_init_set_d(areal->mpfr, val, MPFR_RNDN); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline bool ham_areal_init_str_utf8(ham_areal *areal, ham_str8 str, ham_u16 base){
+ham_math_api bool ham_areal_init_str_utf8(ham_areal *areal, ham_str8 str, ham_u16 base){
 	if(str.len >= HAM_NAME_BUFFER_SIZE) return false;
 
 	ham_name_buffer_utf8 buf;
@@ -1139,7 +1174,7 @@ ham_nothrow static inline bool ham_areal_init_str_utf8(ham_areal *areal, ham_str
 }
 
 ham_nonnull_args(1)
-ham_nothrow static inline bool ham_areal_init_str_utf16(ham_areal *areal, ham_str16 str, ham_u16 base){
+ham_math_api bool ham_areal_init_str_utf16(ham_areal *areal, ham_str16 str, ham_u16 base){
 	if(str.len >= HAM_NAME_BUFFER_SIZE) return false;
 
 	ham_name_buffer_utf8 buf;
@@ -1158,7 +1193,7 @@ ham_nothrow static inline bool ham_areal_init_str_utf16(ham_areal *areal, ham_st
 }
 
 ham_nonnull_args(1)
-ham_nothrow static inline bool ham_areal_init_str_utf32(ham_areal *areal, ham_str32 str, ham_u16 base){
+ham_math_api bool ham_areal_init_str_utf32(ham_areal *areal, ham_str32 str, ham_u16 base){
 	if(str.len >= HAM_NAME_BUFFER_SIZE) return false;
 
 	ham_name_buffer_utf8 buf;
@@ -1185,41 +1220,41 @@ ham_nothrow static inline bool ham_areal_init_str_utf32(ham_areal *areal, ham_st
 //
 
 ham_nonnull_args(1, 2)
-ham_nothrow static inline void ham_areal_set(ham_areal *ret, const ham_areal *other){ mpfr_set(ret->mpfr, other->mpfr, MPFR_RNDN); }
+ham_math_api void ham_areal_set(ham_areal *ret, const ham_areal *other){ mpfr_set(ret->mpfr, other->mpfr, MPFR_RNDN); }
 
 ham_nonnull_args(1, 2)
-ham_nothrow static inline void ham_areal_set_arat(ham_areal *ret, const ham_arat *val){ mpfr_set_q(ret->mpfr, val->mpq, MPFR_RNDN); }
+ham_math_api void ham_areal_set_arat(ham_areal *ret, const ham_arat *val){ mpfr_set_q(ret->mpfr, val->mpq, MPFR_RNDN); }
 
 ham_nonnull_args(1, 2)
-ham_nothrow static inline void ham_areal_set_aint(ham_areal *ret, const ham_aint *val){ mpfr_set_z(ret->mpfr, val->mpz, MPFR_RNDN); }
+ham_math_api void ham_areal_set_aint(ham_areal *ret, const ham_aint *val){ mpfr_set_z(ret->mpfr, val->mpz, MPFR_RNDN); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_areal_set_iptr(ham_areal *ret, ham_iptr val){ mpfr_set_si(ret->mpfr, val, MPFR_RNDN); }
+ham_math_api void ham_areal_set_iptr(ham_areal *ret, ham_iptr val){ mpfr_set_si(ret->mpfr, val, MPFR_RNDN); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_areal_set_uptr(ham_areal *ret, ham_uptr val){ mpfr_set_ui(ret->mpfr, val, MPFR_RNDN); }
+ham_math_api void ham_areal_set_uptr(ham_areal *ret, ham_uptr val){ mpfr_set_ui(ret->mpfr, val, MPFR_RNDN); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_areal_set_f32(ham_areal *ret, ham_f32 val){ mpfr_set_flt(ret->mpfr, val, MPFR_RNDN); }
+ham_math_api void ham_areal_set_f32(ham_areal *ret, ham_f32 val){ mpfr_set_flt(ret->mpfr, val, MPFR_RNDN); }
 
 ham_nonnull_args(1)
-ham_nothrow static inline void ham_areal_set_f64(ham_areal *ret, ham_f64 val){ mpfr_set_d(ret->mpfr, val, MPFR_RNDN); }
+ham_math_api void ham_areal_set_f64(ham_areal *ret, ham_f64 val){ mpfr_set_d(ret->mpfr, val, MPFR_RNDN); }
 
 //
 // Arithmetic
 //
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_areal_add(ham_areal *ret, const ham_areal *lhs, const ham_areal *rhs){ mpfr_add(ret->mpfr, lhs->mpfr, rhs->mpfr, MPFR_RNDN); }
+ham_math_api void ham_areal_add(ham_areal *ret, const ham_areal *lhs, const ham_areal *rhs){ mpfr_add(ret->mpfr, lhs->mpfr, rhs->mpfr, MPFR_RNDN); }
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_areal_sub(ham_areal *ret, const ham_areal *lhs, const ham_areal *rhs){ mpfr_sub(ret->mpfr, lhs->mpfr, rhs->mpfr, MPFR_RNDN); }
+ham_math_api void ham_areal_sub(ham_areal *ret, const ham_areal *lhs, const ham_areal *rhs){ mpfr_sub(ret->mpfr, lhs->mpfr, rhs->mpfr, MPFR_RNDN); }
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_areal_mul(ham_areal *ret, const ham_areal *lhs, const ham_areal *rhs){ mpfr_mul(ret->mpfr, lhs->mpfr, rhs->mpfr, MPFR_RNDN); }
+ham_math_api void ham_areal_mul(ham_areal *ret, const ham_areal *lhs, const ham_areal *rhs){ mpfr_mul(ret->mpfr, lhs->mpfr, rhs->mpfr, MPFR_RNDN); }
 
 ham_nonnull_args(1, 2, 3)
-ham_nothrow static inline void ham_areal_div(ham_areal *ret, const ham_areal *lhs, const ham_areal *rhs){ mpfr_div(ret->mpfr, lhs->mpfr, rhs->mpfr, MPFR_RNDN); }
+ham_math_api void ham_areal_div(ham_areal *ret, const ham_areal *lhs, const ham_areal *rhs){ mpfr_div(ret->mpfr, lhs->mpfr, rhs->mpfr, MPFR_RNDN); }
 
 /**
  * @}
