@@ -104,6 +104,7 @@ cmake --build . -j $(nproc)
 <p align="center"><a href="https://www.libsdl.org/">Simple DirectMedia Layer</a></p>
 <p align="center"><a href="https://github.com/ValveSoftware/GameNetworkingSockets">GameNetworkingSockets</a></p>
 <p align="center"><a href="https://github.com/ibireme/yyjson">yyjson</a></p>
+<p align="center"><a href="https://github.com/g-truc/glm">OpenGL Mathematics (GLM)</a></p>
 <p align="center"><a href="https://gmplib.org/">GNU MP</a></p>
 <p align="center"><a href="https://www.mpfr.org/">GNU MPFR</a></p>
 <p align="center"><a href="https://invisible-island.net/ncurses/">Ncurses</a></p>
