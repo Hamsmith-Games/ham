@@ -17,12 +17,14 @@
  */
 
 #include "main_window.hpp"
+#include "graph_editor.hpp"
 
 #include <QSettings>
 #include <QResizeEvent>
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QStackedLayout>
 #include <QPushButton>
 
 namespace editor = ham::engine::editor;
@@ -74,9 +76,26 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 
 	m_world_view = new editor::world_view(m_engine, m_world, this);
 
+
+	const auto inner_widget = new QWidget(this);
+	inner_widget->setContentsMargins(0, 0, 0, 0);
+
+	const auto inner_lay = new QStackedLayout(inner_widget);
+	inner_lay->setContentsMargins(0, 0, 0, 0);
+	inner_lay->setStackingMode(QStackedLayout::StackAll);
+
+	const auto graph_editor = new editor::graph_editor(inner_widget);
+
+	inner_lay->addWidget(graph_editor);
+	inner_lay->addWidget(m_world_view);
+
+	inner_widget->setLayout(inner_lay);
+
 	project_->setParent(this);
 
-	set_central_widget(m_world_view);
+	set_central_widget(inner_widget);
+
+	graph_editor->create_node(QPointF{0.f, 0.f}, "Hello, Graph!", {});
 
 	const auto settings_img = QImage("://images/cog.png").scaledToWidth(32, Qt::SmoothTransformation);
 	const auto settings_pix = QPixmap::fromImage(settings_img);

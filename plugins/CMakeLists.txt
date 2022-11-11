@@ -61,10 +61,10 @@ add_subdirectory(audio-oalsoft)
 if(HAM_PLUGINS_ENABLE_GL OR HAM_PLUGINS_ENABLE_VULKAN)
 	find_package(Vulkan REQUIRED COMPONENTS glslc)
 
-	function(ham_compile_shader INPUT OUTPUT)
+	function(ham_compile_shader_vk INPUT OUTPUT)
 		add_custom_command(
 			OUTPUT ${OUTPUT}
-			COMMAND Vulkan::glslc "${INPUT}" --target-env=vulkan1.2 -O $<$<CONFIG:Debug>:-g> -o "${OUTPUT}"
+			COMMAND ${Vulkan_GLSLC_EXECUTABLE} "${INPUT}" --target-env=vulkan1.2 -O $<$<CONFIG:Debug>:-g> -o "${OUTPUT}"
 			MAIN_DEPENDENCY "${INPUT}"
 		)
     endfunction()
@@ -72,10 +72,17 @@ if(HAM_PLUGINS_ENABLE_GL OR HAM_PLUGINS_ENABLE_VULKAN)
 	function(ham_compile_shader_gl INPUT OUTPUT)
 		add_custom_command(
 			OUTPUT ${OUTPUT}
-			COMMAND Vulkan::glslc -c "${INPUT}" --target-env=opengl -O -o "${OUTPUT}"
+			COMMAND ${Vulkan_GLSLC_EXECUTABLE} -c "${INPUT}" --target-env=opengl -O -o "${OUTPUT}"
 			MAIN_DEPENDENCY "${INPUT}"
 		)
     endfunction()
+
+	function(ham_compile_shader INPUT OUTPUT_DIR)
+		get_filename_component(ABS_PATH ${INPUT} ABSOLUTE)
+		get_filename_component(INPUT_NAME ${INPUT} NAME)
+		ham_compile_shader_vk(${ABS_PATH} ${OUTPUT_DIR}/${INPUT_NAME}.vk.spv)
+		ham_compile_shader_gl(${ABS_PATH} ${OUTPUT_DIR}/${INPUT_NAME}.gl.spv)
+	endfunction()
 endif()
 
 if(HAM_PLUGINS_ENABLE_GL)

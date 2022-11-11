@@ -42,9 +42,7 @@ uniform sampler2D diffuse_tex;
 layout(binding = 2)
 uniform sampler2D normal_tex;
 
-//layout(binding = 3) uniform sampler2D material_tex;
-
-layout(binding = 4)
+layout(binding = 3)
 uniform sampler2D scene_tex;
 
 layout(location = 0) in vec3 vert_f;
@@ -86,26 +84,11 @@ vec3 tonemap_aces(in vec3 x){
   return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
-vec4 screen_quadrants(in vec3 ldr){
-	const vec3 albedo = texture(diffuse_tex, uv_f).rgb;
-	const vec3 norm   = texture(normal_tex, uv_f).rgb;
-	const float d     = texture(depth_tex, uv_f).r;
-
-	const float x_coef = step(0.5, uv_f.x);
-	const float y_coef = step(0.5, 1.0 - uv_f.y);
-
-	const vec3 x_mix0 = mix(albedo, norm, x_coef);
-	const vec3 x_mix1 = mix(vec3(d), ldr, x_coef);
-
-	const vec3 y_mix = mix(x_mix0, x_mix1, y_coef);
-
-	return vec4(y_mix, 1.0);
-}
-
 void main(){
+//	const float t = globals.time;
+
 	const vec3 hdr = texture(scene_tex, uv_f).rgb;
 	const vec3 ldr = tonemap_aces(hdr);
 
-	//out_color = screen_quadrants(ldr);
 	out_color = vec4(ldr, 1.0);
 }

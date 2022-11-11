@@ -270,6 +270,104 @@ const ham_image *ham_renderer_default_image(const ham_renderer *renderer){
 	return renderer->default_img;
 }
 
+bool ham_renderer_add_shader_include(ham_renderer *r, ham_str8 name, ham_str8 src){
+	if(
+	   !ham_check(r != NULL) ||
+	   !ham_check(name.len && name.ptr) ||
+	   !ham_check(src.len && src.ptr) ||
+	   !ham_check(name.len < (HAM_NAME_BUFFER_SIZE - 1))
+	){
+		return false;
+	}
+
+	const auto vt = (const ham_renderer_vtable*)ham_super(r)->vptr;
+	return vt->add_shader_include(r, name, src);
+}
+
+//
+// Shaders
+//
+
+static inline ham_shader *ham_shader_create_ctor(ham_shader *shader, ...){
+	const auto vt  = ham_super(shader)->vptr;
+
+	va_list va;
+	va_start(va, shader);
+	const auto obj = vt->ctor(ham_super(shader), 1, va);
+	va_end(va);
+
+	return (ham_shader*)obj;
+}
+
+ham_shader *ham_shader_create(ham_renderer *r, ham_shader_kind kind){
+	if(!ham_check(r != NULL) || !ham_check(kind < HAM_SHADER_KIND_COUND)){
+		return nullptr;
+	}
+
+	const auto vt = ham_super(r)->vptr;
+	const auto vi = vt->info;
+
+	const auto allocator = r->allocator;
+
+	const auto shader_mem = ham_allocator_alloc(allocator, vi->alignment, vi->size);
+	if(!shader_mem) return nullptr;
+
+	const auto shader = new(shader_mem) ham_shader;
+
+	ham_super(shader)->vptr = vt;
+
+	shader->r    = r;
+	shader->kind = kind;
+
+	shader->compiled = false;
+
+	const auto ret = ham_shader_create_ctor(shader, (u32)kind);
+	if(!ret){
+		ham::logapierror("Failed to construct shader of type '{}'", vi->type_id);
+		ham_allocator_delete(allocator, shader);
+		return nullptr;
+	}
+
+	return ret;
+}
+
+void ham_shader_destroy(ham_shader *shader){
+	if(ham_unlikely(!shader)) return;
+
+	const auto allocator = shader->r->allocator;
+
+	const auto vt = ham_super(shader)->vptr;
+	vt->dtor(ham_super(shader));
+
+	std::destroy_at(shader);
+	ham_allocator_free(allocator, shader);
+}
+
+bool ham_shader_set_source(ham_shader *shader, ham_shader_source_kind kind, ham_str8 src){
+	if(!ham_check(shader != NULL) || !ham_check(src.len && src.ptr)){
+		return false;
+	}
+	else if(shader->compiled){
+		ham::logapierror("Shader already compiled");
+		return false;
+	}
+
+	const auto vt = (const ham_shader_vtable*)ham_super(shader)->vptr;
+	return vt->set_source(shader, kind, src);
+}
+
+bool ham_shader_compile(ham_shader *shader){
+	if(!ham_check(shader != NULL)) return false;
+	else if(shader->compiled){
+		ham::logapiwarn("Shader already compiled");
+		return true;
+	}
+
+	const auto vt = (const ham_shader_vtable*)ham_super(shader)->vptr;
+	shader->compiled = vt->compile(shader);
+	return shader->compiled;
+}
+
 //
 // Draw groups
 //

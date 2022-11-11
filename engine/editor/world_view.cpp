@@ -124,7 +124,7 @@ editor::world_view::world_view(ham_engine *engine, ham_world *world, QWidget *pa
 			light->pos = ham_make_vec3(0.f, 0.f, 0.f);
 			light->effective_radius = 20.f;
 			light->color = ham_make_vec3(1.f, 1.f, 1.f);
-			light->intensity = 1.f;
+			light->intensity = 4.f;
 		});
 	});
 

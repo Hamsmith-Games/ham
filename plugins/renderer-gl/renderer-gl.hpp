@@ -67,9 +67,11 @@ typedef struct ham_draw_group_gl ham_draw_group_gl;
 
 typedef struct ham_renderer_gl_global_ubo_data{
 	ham_mat4 view_proj, inv_view_proj;
-	ham_vec3 view_pos; float pad0;
+	ham_vec3 view_pos; ham_f32 _pad0; // vec3 aligned to vec4 boundary
 	ham_f32 near_z, far_z;
+	ham_vec2 uv_scale;
 	ham_f32 time;
+	ham_u32 voxel_resolution;
 } ham_renderer_gl_global_ubo_data;
 
 typedef struct ham_renderer_gl_api ham_renderer_gl{
@@ -78,6 +80,10 @@ typedef struct ham_renderer_gl_api ham_renderer_gl{
 	ham_u32
 		fbo,
 		fbo_attachments[HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT]
+	;
+
+	ham_u32
+		vox_grid
 	;
 
 	ham_u32 render_w, render_h;
@@ -90,7 +96,6 @@ typedef struct ham_renderer_gl_api ham_renderer_gl{
 	ham_u32 samplers[2];
 	ham_u32 noise_tex;
 
-	ham_i32 light_vert_uv_scale_loc;
 	ham_i32 light_frag_depth_tex_loc;
 	ham_i32 light_frag_diffuse_tex_loc;
 	ham_i32 light_frag_normal_tex_loc;
@@ -104,16 +109,29 @@ typedef struct ham_renderer_gl_api ham_renderer_gl{
 	ham_i32 screen_post_frag_scene_loc;
 
 	ham_draw_group_gl *screen_group;
-	ham_i32 screen_post_vert_uv_scale_loc;
 
 	ham_u32 global_ubo;
 	void *global_ubo_writep;
+	ham_vec2 uv_scale;
 
 	ham_f64 total_time;
 } ham_renderer_gl;
 
 ham_renderer_gl_api ham_u32 ham_renderer_gl_load_shader(ham_renderer_gl *r, ham_u32 shader_type, ham_str8 name);
 ham_renderer_gl_api ham_u32 ham_renderer_gl_create_pipeline(ham_renderer_gl *r, ham_u32 vert_prog, ham_u32 frag_prog);
+
+struct ham_renderer_gl_api ham_shader_gl{
+	ham_derive(ham_shader)
+
+	ham_shader_source_kind src_kind;
+
+	ham_u32 handle;
+
+	ham_u32 num_uniforms;
+
+	ham_buffer uniforms; //! buffer of ham_shader_uniform
+	ham_buffer uniform_names; //! buffer of char* allocated strings
+};
 
 struct ham_renderer_gl_api ham_draw_group_gl{
 	ham_derive(ham_draw_group)
@@ -137,5 +155,16 @@ struct ham_renderer_gl_api ham_light_group_gl{
 };
 
 HAM_C_API_END
+
+#include "ham/buffer.h"
+
+namespace ham::engine{
+	class shader_loader{
+		public:
+
+		private:
+			ham::basic_buffer<ham_u32> progs;
+	};
+}
 
 #endif // !HAM_RENDERER_GL_RENDERER_GL_HPP

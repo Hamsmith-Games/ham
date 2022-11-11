@@ -36,15 +36,42 @@ if(NOT assimp_content_POPULATED)
 	add_subdirectory(${assimp_content_SOURCE_DIR} ${assimp_content_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
+set(HAM_ENGINE_SHADER_DIR ${CMAKE_CURRENT_BINARY_DIR})
+
+ham_compile_shader(glsl/scene_info.vert ${HAM_ENGINE_SHADER_DIR})
+ham_compile_shader(glsl/scene_info.frag ${HAM_ENGINE_SHADER_DIR})
+ham_compile_shader(glsl/light.vert ${HAM_ENGINE_SHADER_DIR})
+ham_compile_shader(glsl/light.frag ${HAM_ENGINE_SHADER_DIR})
+ham_compile_shader(glsl/screen.vert ${HAM_ENGINE_SHADER_DIR})
+ham_compile_shader(glsl/screen.frag ${HAM_ENGINE_SHADER_DIR})
+
+set(
+	HAM_ENGINE_SHADERS
+	${HAM_ENGINE_SHADER_DIR}/scene_info.vert.gl.spv
+	${HAM_ENGINE_SHADER_DIR}/scene_info.vert.vk.spv
+	${HAM_ENGINE_SHADER_DIR}/scene_info.frag.gl.spv
+	${HAM_ENGINE_SHADER_DIR}/scene_info.frag.vk.spv
+	${HAM_ENGINE_SHADER_DIR}/light.vert.gl.spv
+	${HAM_ENGINE_SHADER_DIR}/light.vert.vk.spv
+	${HAM_ENGINE_SHADER_DIR}/light.frag.gl.spv
+	${HAM_ENGINE_SHADER_DIR}/light.frag.vk.spv
+	${HAM_ENGINE_SHADER_DIR}/screen.vert.gl.spv
+	${HAM_ENGINE_SHADER_DIR}/screen.vert.vk.spv
+	${HAM_ENGINE_SHADER_DIR}/screen.frag.gl.spv
+	${HAM_ENGINE_SHADER_DIR}/screen.frag.vk.spv
+)
+
 ham_add_library(
 	ham-engine SHARED
 	${HAM_ENGINE_HEADERS}
+	${HAM_ENGINE_SHADERS}
 	engine.cpp
 	argparse.cpp
 	sys.cpp
 	model.cpp
 	entity_component.cpp
 	world.cpp
+	graph.cpp
 )
 
 add_library(ham::engine ALIAS ham-engine)

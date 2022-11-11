@@ -1,6 +1,5 @@
 #version 450 core
 #extension GL_ARB_separate_shader_objects : require
-#extension GL_ARB_shader_draw_parameters : require
 
 /*
  * Ham Renderer OpenGL Shaders
@@ -20,10 +19,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#define gl_DrawID gl_DrawIDARB
-
-#define MAX_BONES 256
-
 out gl_PerVertex {
 	vec4 gl_Position;
 	float gl_PointSize;
@@ -35,6 +30,7 @@ layout(std140, binding = 0) uniform RenderData{
 	float near_z, far_z;
 	vec2 uv_scale;
 	float time;
+	uint voxel_resolution;
 } globals;
 
 layout(std140, binding = 1) uniform BoneData{
@@ -42,11 +38,11 @@ layout(std140, binding = 1) uniform BoneData{
 } bones;
 
 // Vertex attributes
-layout(location = 0) in vec3  vert;
-layout(location = 1) in vec3  norm;
-layout(location = 2) in vec2  uv;
+layout(location = 0) in vec3 vert;
+layout(location = 1) in vec3 norm;
+layout(location = 2) in vec2 uv;
 layout(location = 3) in ivec4 bone_indices;
-layout(location = 4) in vec4  bone_weights;
+layout(location = 4) in vec4 bone_weights;
 
 // Instance attributes
 layout(location = 5) in uint material_id;
@@ -54,11 +50,12 @@ layout(location = 6) in mat4 trans;
 layout(location = 10) in mat4 normal_mat;
 
 // Outputs
-layout(location = 0) out vec3 vert_f;
-layout(location = 1) out vec3 norm_f;
-layout(location = 2) out vec2 uv_f;
-layout(location = 3) flat out int draw_id_f;
-layout(location = 4) flat out uint material_id_f;
+layout(location = 0) out vec3 vert_v;
+layout(location = 1) out vec3 norm_v;
+layout(location = 2) out vec2 uv_v;
+layout(location = 3) flat out int draw_id_v;
+layout(location = 4) flat out uint material_id_v;
+layout(location = 5) out vec3 voxel_pos_v;
 
 void main(){
 	vec4 final_vert = vec4(0.0, 0.0, 0.0, 1.0);
@@ -76,11 +73,12 @@ void main(){
 		final_norm += bone_n * bone_w;
 	}
 
-	vert_f        = final_vert.xyz;
-	norm_f        = normalize((normal_mat * vec4(final_norm.xyz, 1.0)).xyz);
-	uv_f          = uv;
-	draw_id_f     = gl_DrawID;
-	material_id_f = material_id;
+	vert_v        = final_vert.xyz;
+	norm_v        = normalize((normal_mat * vec4(final_norm.xyz, 1.0)).xyz);
+	uv_v          = uv;
+	draw_id_v     = gl_DrawID;
+	material_id_v = material_id;
+	voxel_pos_v   = final_vert.xyz * float(globals.voxel_resolution);
 
 	const mat4 mvp = globals.view_proj * trans;
 

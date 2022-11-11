@@ -89,6 +89,9 @@ ham_add_executable(
 
 	world_view.hpp
 	world_view.cpp
+
+	graph_editor.hpp
+	graph_editor.cpp
 )
 
 set_target_properties(

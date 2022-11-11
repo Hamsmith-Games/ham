@@ -70,6 +70,6 @@ void main(){
 	const vec4 color = texture(diffuse_tex, vec3(uv_f, draw_id_f));
 
 	out_diffuse  = color * mat.albedo;
-	out_normal   = norm_f;
+	out_normal   = normalize(norm_f);
 	out_material = vec3(mat.metallic, mat.roughness, mat.rim);
 }

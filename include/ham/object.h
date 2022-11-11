@@ -208,6 +208,17 @@ struct ham_object{
 	ham_impl_def_dtor(object_type)
 
 //! @cond ignore
+#define ham_impl_def_method(object, name, ...) \
+	object##_##name(object *self __VA_OPT__(,) __VA_ARGS__)
+//! @endcond
+
+#define ham_def_method(object, name, ...) \
+	ham_impl_def_method(object, name __VA_OPT__(,) __VA_ARGS__)
+
+#define ham_def_cmethod(object, name, ...) \
+	ham_impl_def_method(const object, name __VA_OPT__(,) __VA_ARGS__)
+
+//! @cond ignore
 #define ham_impl_super_1(derived_ptr) (&(derived_ptr)->HAM_SUPER_NAME)
 #define ham_impl_super_2(derived_ptr) (&(derived_ptr)->HAM_SUPER_NAME.HAM_SUPER_NAME)
 #define ham_impl_super_3(derived_ptr) (&(derived_ptr)->HAM_SUPER_NAME.HAM_SUPER_NAME.HAM_SUPER_NAME)

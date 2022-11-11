@@ -77,7 +77,7 @@ void main(){
 	}
 
 	vert_f        = final_vert.xyz;
-	norm_f        = normalize((normal_mat * vec4(final_norm.xyz, 1.0)).xyz);
+	norm_f        = (normal_mat * vec4(final_norm.xyz, 1.0)).xyz;
 	uv_f          = uv;
 	draw_id_f     = gl_DrawID;
 	material_id_f = material_id;

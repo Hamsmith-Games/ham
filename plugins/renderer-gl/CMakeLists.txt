@@ -99,6 +99,7 @@ ham_add_plugin(
 	${HAM_RENDERER_GL_SHADERS}
 	renderer-gl.hpp
 	renderer-gl.cpp
+	shader-gl.cpp
 	draw-group-gl.cpp
 	light-group-gl.cpp
 )

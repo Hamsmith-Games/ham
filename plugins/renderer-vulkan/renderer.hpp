@@ -94,6 +94,15 @@ struct ham_renderer_vulkan{
 	ham_u32 frame_counter;
 };
 
+struct ham_shader_vulkan{
+	ham_derive(ham_shader)
+
+	ham_u32 handle;
+
+	ham_u32 num_uniforms;
+	ham_shader_uniform *uniforms;
+};
+
 struct ham_draw_group_vulkan{
 	ham_derive(ham_draw_group)
 

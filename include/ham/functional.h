@@ -32,6 +32,7 @@
 
 typedef bool(*ham_ptr_iterate_fn)(void *ptr, void *user);
 
+ham_used
 static inline ham_usize ham_ptr_iterate(
 	void *beg, void *end,
 	ham_usize byte_step,
@@ -80,7 +81,7 @@ typedef struct ham_signal{
 	//! @endcond
 } ham_signal;
 
-ham_nonnull_args(1)
+ham_nonnull_args(1) ham_used
 ham_nothrow static inline bool ham_signal_init(ham_signal *sig){
 	if(!ham_mutex_init(&sig->_impl_mut, HAM_MUTEX_NORMAL)){
 		ham_logapierrorf("Error in ham_mutex_init");
@@ -98,7 +99,7 @@ ham_nothrow static inline bool ham_signal_init(ham_signal *sig){
 	return true;
 }
 
-ham_nonnull_args(1)
+ham_nonnull_args(1) ham_used
 ham_nothrow static inline void ham_signal_finish(ham_signal *sig){
 	const bool mut_locked = ham_mutex_lock(&sig->_impl_mut);
 	if(!mut_locked){
@@ -117,7 +118,7 @@ ham_nothrow static inline void ham_signal_finish(ham_signal *sig){
 	std::memset(sig, 0, sizeof(ham_signal));
 }
 
-ham_nonnull_args(1, 2)
+ham_nonnull_args(1, 2) ham_used
 ham_nothrow static inline ham_uptr ham_signal_connect(ham_signal *sig, void(*fptr)(void *user, void *data), void *user){
 	if(!ham_mutex_lock(&sig->_impl_mut)){
 		ham_logapierrorf("Error in ham_mutex_lock");
@@ -150,7 +151,7 @@ ham_nothrow static inline ham_uptr ham_signal_connect(ham_signal *sig, void(*fpt
 	return conn.id;
 }
 
-ham_nonnull_args(1)
+ham_nonnull_args(1) ham_used
 ham_nothrow static inline void ham_signal_emit(ham_signal *sig, void *data){
 	const ham_signal_connection *const conns = (const ham_signal_connection*)ham_buffer_data(&sig->connections);
 	const ham_uptr n = ham_buffer_size(&sig->connections) / sizeof(ham_signal_connection);

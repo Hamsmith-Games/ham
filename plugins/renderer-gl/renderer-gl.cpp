@@ -286,8 +286,6 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 		return nullptr;
 	}
 
-	r->light_vert_uv_scale_loc = glGetUniformLocation(light_vert, "uv_scale");
-
 	r->light_frag_depth_tex_loc = glGetUniformLocation(light_frag, "depth_tex");
 	r->light_frag_diffuse_tex_loc = glGetUniformLocation(light_frag, "diffuse_tex");
 	r->light_frag_normal_tex_loc = glGetUniformLocation(light_frag, "normal_tex");
@@ -296,16 +294,12 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 
 	r->scene_info_frag_diffuse_tex_loc = glGetUniformLocation(scene_info_frag, "diffuse_tex");
 
-	r->screen_post_vert_uv_scale_loc = glGetUniformLocation(screen_vert, "uv_scale");
-
 	r->screen_post_frag_depth_loc = glGetUniformLocation(screen_frag, "depth_tex");
 	r->screen_post_frag_diffuse_loc = glGetUniformLocation(screen_frag, "diffuse_tex");
 	r->screen_post_frag_normal_loc = glGetUniformLocation(screen_frag, "normal_tex");
 	r->screen_post_frag_scene_loc = glGetUniformLocation(screen_frag, "scene_tex");
 
 	glProgramUniform1i(scene_info_frag, r->scene_info_frag_diffuse_tex_loc, HAM_DIFFUSE_TEXTURE_UNIT);
-
-	glProgramUniform2f(light_vert, r->light_vert_uv_scale_loc, 1.f, 1.f);
 
 	glProgramUniform1i(light_frag, r->light_frag_depth_tex_loc, HAM_GBO_DEPTH_TEXTURE_UNIT);
 	glProgramUniform1i(light_frag, r->light_frag_diffuse_tex_loc, HAM_GBO_DIFFUSE_TEXTURE_UNIT);
@@ -318,8 +312,6 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	glProgramUniform1i(screen_frag, r->screen_post_frag_diffuse_loc, HAM_GBO_DIFFUSE_TEXTURE_UNIT);
 	glProgramUniform1i(screen_frag, r->screen_post_frag_normal_loc, HAM_GBO_NORMAL_TEXTURE_UNIT);
 	glProgramUniform1i(screen_frag, r->screen_post_frag_scene_loc, HAM_GBO_SCENE_TEXTURE_UNIT);
-
-	glProgramUniform2f(screen_vert, r->screen_post_vert_uv_scale_loc, 1.f, 1.f);
 
 	const auto scene_info_pipeline = ham_renderer_gl_create_pipeline(r, scene_info_vert, scene_info_frag);
 	if(scene_info_pipeline == (u32)-1){
@@ -396,10 +388,16 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	glSamplerParameteri(samplers[1], GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glSamplerParameteri(samplers[1], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
+	GLuint vox_grid;
+	glCreateTextures(GL_TEXTURE_3D, 1, &vox_grid);
+	glTextureStorage3D(vox_grid, 1, GL_RG32UI, 256, 256, 256);
+
 	const auto ret = new(r) ham_renderer_gl;
 
 	ret->fbo = 0;
 	memset(ret->fbo_attachments, 0, sizeof(ret->fbo_attachments));
+
+	ret->vox_grid = vox_grid;
 
 	ret->render_w = 0;
 	ret->render_h = 0;
@@ -432,29 +430,45 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	return ret;
 }
 
-static inline void ham_renderer_gl_dtor(ham_renderer_gl *r){
-	glDeleteSamplers(std::size(r->samplers), r->samplers);
+ham_def_dtor(ham_renderer_gl){
+	glDeleteSamplers(std::size(self->samplers), self->samplers);
 
-	glDeleteTextures(1, &r->noise_tex);
+	glDeleteTextures(1, &self->noise_tex);
+	glDeleteTextures(1, &self->vox_grid);
 
-	glDeleteProgramPipelines(1, &r->scene_info_pipeline);
-	glDeleteProgram(r->scene_info_vert);
-	glDeleteProgram(r->scene_info_frag);
+	glDeleteProgramPipelines(1, &self->scene_info_pipeline);
+	glDeleteProgram(self->scene_info_vert);
+	glDeleteProgram(self->scene_info_frag);
 
-	glDeleteProgramPipelines(1, &r->light_pipeline);
-	glDeleteProgram(r->light_vert);
-	glDeleteProgram(r->light_frag);
+	glDeleteProgramPipelines(1, &self->light_pipeline);
+	glDeleteProgram(self->light_vert);
+	glDeleteProgram(self->light_frag);
 
-	glDeleteProgramPipelines(1, &r->screen_post_pipeline);
-	glDeleteProgram(r->screen_post_vert);
-	glDeleteProgram(r->screen_post_frag);
+	glDeleteProgramPipelines(1, &self->screen_post_pipeline);
+	glDeleteProgram(self->screen_post_vert);
+	glDeleteProgram(self->screen_post_frag);
 
-	glDeleteBuffers(1, &r->global_ubo);
+	glDeleteBuffers(1, &self->global_ubo);
 
-	glDeleteFramebuffers(1, &r->fbo);
-	glDeleteTextures(HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT, r->fbo_attachments);
+	glDeleteFramebuffers(1, &self->fbo);
+	glDeleteTextures(HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT, self->fbo_attachments);
 
-	std::destroy_at(r);
+	std::destroy_at(self);
+}
+
+static inline bool ham_def_method(ham_renderer_gl, add_shader_include, ham_str8 name, ham_str8 src){
+	ham_name_buffer_utf8 name_buf;
+	name_buf[0] = '/';
+	memcpy(name_buf + 1, name.ptr, name.len);
+	name_buf[name.len + 1] = '\0';
+
+	glNamedStringARB(
+		GL_SHADER_INCLUDE_ARB,
+		(GLint)name.len + 1, name_buf,
+		(GLint)src.len, src.ptr
+	);
+
+	return true;
 }
 
 static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32 h){
@@ -467,11 +481,11 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 			r->render_w = w;
 			r->render_h = h;
 
-			ham_f32 uv_scale_x = f64(w)/f64(old_w);
-			ham_f32 uv_scale_y = f64(h)/f64(old_h);
+			const ham_f32 uv_scale_x = f64(w)/f64(old_w);
+			const ham_f32 uv_scale_y = f64(h)/f64(old_h);
 
-			glProgramUniform2f(r->light_vert, r->light_vert_uv_scale_loc, uv_scale_x, uv_scale_y);
-			glProgramUniform2f(r->screen_post_vert, r->screen_post_vert_uv_scale_loc, uv_scale_x, uv_scale_y);
+			r->uv_scale = ham_make_vec2(uv_scale_x, uv_scale_y);
+
 			return true;
 		}
 	}
@@ -490,6 +504,8 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 		GL_COLOR_ATTACHMENT3,
 		GL_COLOR_ATTACHMENT4,
 		GL_COLOR_ATTACHMENT5,
+		GL_COLOR_ATTACHMENT6,
+		GL_COLOR_ATTACHMENT7,
 	};
 
 	for(u32 i = 0; i < HAM_RENDERER_GL_FBO_ATTACHMENT_COUNT; i++){
@@ -518,8 +534,7 @@ static inline bool ham_renderer_gl_resize(ham_renderer_gl *r, ham_u32 w, ham_u32
 	r->render_w = w;
 	r->render_h = h;
 
-	glProgramUniform2f(r->light_vert, r->light_vert_uv_scale_loc, 1.f, 1.f);
-	glProgramUniform2f(r->screen_post_vert, r->screen_post_vert_uv_scale_loc, 1.f, 1.f);
+	r->uv_scale = ham_make_vec2_scalar(1.f);
 
 	return true;
 }
@@ -536,9 +551,14 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	global_data.near_z        = cam.near_z();
 	global_data.far_z         = cam.far_z();
 	global_data.time          = (f32)r->total_time;
+	global_data.uv_scale      = r->uv_scale;
+
+	global_data.voxel_resolution = 512;
 
 	memcpy(r->global_ubo_writep, &global_data, sizeof(global_data));
 	glFlushMappedNamedBufferRange(r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));
+
+	const GLboolean screen_is_srgb = glIsEnabled(GL_FRAMEBUFFER_SRGB);
 
 	GLint screen_fbo, screen_viewport[4];
 	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &screen_fbo);
@@ -546,12 +566,33 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, r->fbo);
 	glViewport(0, 0, r->render_w, r->render_h);
-
 	glDisable(GL_FRAMEBUFFER_SRGB);
+
+	const ham_u32 empty_vox[2] = { 0, 0 };
+
+	glClearTexImage(r->vox_grid, 0, GL_RG_INTEGER, GL_UNSIGNED_INT, empty_vox);
+
+	//
+	// Do scene info
+	//
+
+	const GLenum scene_info_draw_bufs[] = {
+		GL_COLOR_ATTACHMENT0 + (HAM_RENDERER_GL_FBO_DIFFUSE - 1),
+		GL_COLOR_ATTACHMENT0 + (HAM_RENDERER_GL_FBO_NORMAL - 1),
+		GL_COLOR_ATTACHMENT0 + (HAM_RENDERER_GL_FBO_MATERIAL - 1),
+	};
+
+	glDrawBuffers((GLsizei)std::size(scene_info_draw_bufs), scene_info_draw_bufs);
+
+	glEnablei(GL_BLEND, 0); // Blend diffuse
+
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	//glEnable(GL_DEPTH_CLAMP);
 	glDepthMask(GL_TRUE);
+
+	glBlendEquationSeparatei(0, GL_FUNC_ADD, GL_FUNC_ADD);
+	glBlendFuncSeparatei(0, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
 
 	glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
 	glFrontFace(GL_CCW);
@@ -587,13 +628,29 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 		nullptr
 	);
 
+	//
+	// Do scene lighting
+	//
+
+	//glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT); // wait for entire scene first
+
+	const GLenum light_draw_bufs[] = {
+		GL_COLOR_ATTACHMENT0 + (HAM_RENDERER_GL_FBO_SCENE - 1),
+	};
+
+	glDrawBuffers((GLsizei)std::size(light_draw_bufs), light_draw_bufs);
+
+	glEnablei(GL_BLEND, 0); // Blend lighting
+
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 	glDepthMask(GL_FALSE);
 
-	//
-	// Do scene lighting
-	//
+	glClearColor(0.f, 0.f, 0.f, 0.f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+	glBlendEquationSeparatei(0, GL_FUNC_ADD, GL_FUNC_ADD);
+	glBlendFunci(0, GL_ONE, GL_ONE);
 
 	glBindTextureUnit(HAM_GBO_DEPTH_TEXTURE_UNIT,    r->fbo_attachments[HAM_RENDERER_GL_FBO_DEPTH_STENCIL]);
 	glBindTextureUnit(HAM_GBO_DIFFUSE_TEXTURE_UNIT,  r->fbo_attachments[HAM_RENDERER_GL_FBO_DIFFUSE]);
@@ -608,7 +665,7 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	glBindSampler(HAM_NOISE_TEXTURE_UNIT,        r->samplers[0]);
 
 	glBindProgramPipeline(r->light_pipeline);
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, r->global_ubo, 0, (GLsizeiptr)sizeof(global_data));
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, r->global_ubo);
 
 	ham_object_manager_iterate(
 		ham_super(r)->light_groups, [](ham_object *obj, void *user) -> bool{
@@ -630,13 +687,10 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 	//
 
 	glEnable(GL_FRAMEBUFFER_SRGB);
+	glDisable(GL_BLEND);
 
 	glBindTextureUnit(HAM_GBO_SCENE_TEXTURE_UNIT, r->fbo_attachments[HAM_RENDERER_GL_FBO_SCENE]);
-
 	glBindSampler(HAM_GBO_SCENE_TEXTURE_UNIT, r->samplers[0]);
-
-	//const ham_mat4 *const view_mat = ham_camera_view_matrix(data->common.cam);
-	//const ham_mat4 *const proj_mat = ham_camera_proj_matrix(data->common.cam);
 
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)screen_fbo);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, r->fbo);
@@ -653,12 +707,18 @@ static inline void ham_renderer_gl_frame(ham_renderer_gl *r, ham_f64 dt, const h
 
 	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_INT, nullptr);
 
+	glBindTextureUnit(HAM_GBO_SCENE_TEXTURE_UNIT,    0); // unbind scene texture
+
 	glViewport(screen_viewport[0], screen_viewport[1], screen_viewport[2], screen_viewport[3]);
+
+	if(!screen_is_srgb){
+		glDisable(GL_FRAMEBUFFER_SRGB);
+	}
 
 	r->total_time += dt;
 }
 
-ham_define_renderer(ham_renderer_gl, ham_draw_group_gl, ham_light_group_gl)
+ham_define_renderer(ham_renderer_gl, ham_shader_gl, ham_draw_group_gl, ham_light_group_gl)
 
 //
 // Shaders

@@ -18,9 +18,13 @@
 
 #include "ham/typesys.h"
 #include "ham/math.h"
-#include "ham/log.h"
-#include "ham/memory.h"
+#include "ham/check.h"
+#include "ham/buffer.h"
 #include "ham/colony.h"
+
+#include "ham/std_vector.hpp"
+
+#include "robin_hood.h"
 
 using namespace ham::typedefs;
 
@@ -31,12 +35,33 @@ struct ham_type{
 	const char *name;
 	u32 flags;
 	usize alignment, size;
-	const ham_type *nodes;
+	const void *data;
+	uptr n0, n1;
+};
+
+struct ham_type_member{
+	ham_str8 name;
+	const ham_type *type;
+};
+
+struct ham_type_method{
+	ham_str8 name;
+	ham::basic_buffer<ham_str8> param_names;
+	ham::basic_buffer<const ham_type*> param_types;
+};
+
+struct ham_type_object{
+	ham_derive(ham_type)
+	ham::std_vector<ham_type_member> members;
+	ham::std_vector<ham_type_method> methods;
 };
 
 struct ham_typeset{
 	const ham_allocator *allocator;
 	mutable ham::colony<ham_type> types;
+	mutable robin_hood::unordered_flat_map<ham::str8, const ham_type*> type_map;
+
+	robin_hood::unordered_node_map<ham::str8, ham_type_object> obj_types;
 
 	const ham_type *void_type;
 	const ham_type *unit_type;
@@ -63,6 +88,84 @@ struct ham_typeset{
 	const ham_type *vec_types[3];
 };
 
+//
+// Type introspection
+//
+
+ham_nothrow ham_u32 ham_type_get_flags(const ham_type *type){
+	if(!ham_check(type != NULL)) return (ham_u32)-1;
+	return type->flags;
+}
+
+ham_nothrow const ham_object_vtable *ham_type_vptr(const ham_type *type){
+	if(!ham_check(type != NULL) || !ham_check(ham_type_is_object(type))) return nullptr;
+	return reinterpret_cast<const ham_object_vtable*>(type->data);
+}
+
+ham_nothrow ham_usize ham_type_num_members(const ham_type *type){
+	if(!ham_check(type != NULL) || !ham_check(ham_type_is_object(type))) return (ham_usize)-1;
+	return type->n0;
+}
+
+ham_nothrow ham_usize ham_type_num_methods(const ham_type *type){
+	if(!ham_check(type != NULL) || !ham_check(ham_type_is_object(type))) return (ham_usize)-1;
+	return type->n1;
+}
+
+ham_usize ham_type_members_iterate(const ham_type *type, ham_type_members_iterate_fn fn, void *user){
+	if(!ham_check(type != NULL) || !ham_check(ham_type_is_object(type))) return (ham_usize)-1;
+
+	if(fn && type->n0 != (ham_uptr)-1){
+		const auto &obj_type_map = type->ts->obj_types;
+
+		const auto obj_res = obj_type_map.find(ham::str8(type->name));
+		if(obj_res == obj_type_map.end()){
+			ham::logapierror("Could not find object type within it's typeset");
+			return (ham_usize)-1;
+		}
+
+		const auto &members = obj_res->second.members;
+
+		for(ham_usize i = 0; i < type->n0; i++){
+			if(!fn(i, members[i].name, members[i].type, user)){
+				return i;
+			}
+		}
+	}
+
+	return type->n0;
+}
+
+ham_usize ham_type_methods_iterate(const ham_type *type, ham_type_methods_iterate_fn fn, void *user){
+	if(!ham_check(type != NULL) || !ham_check(ham_type_is_object(type))) return (ham_usize)-1;
+
+	if(fn && type->n1 != (ham_uptr)-1){
+		const auto &obj_type_map = type->ts->obj_types;
+
+		const auto obj_res = obj_type_map.find(ham::str8(type->name));
+		if(obj_res == obj_type_map.end()){
+			ham::logapierror("Could not find object type within it's typeset");
+			return (ham_usize)-1;
+		}
+
+		const auto &methods = obj_res->second.methods;
+
+		for(ham_usize i = 0; i < type->n1; i++){
+			const auto &param_names = methods[i].param_names;
+			const auto &param_types = methods[i].param_types;
+			if(!fn(i, methods[i].name, param_types.size(), param_names.data(), param_types.data(), user)){
+				return i;
+			}
+		}
+	}
+
+	return type->n1;
+}
+
+//
+// Typesets
+//
+
 ham_nonnull_args(1)
 static inline const ham_type *ham_impl_typeset_new_type(
 	ham_typeset *ts,
@@ -70,14 +173,33 @@ static inline const ham_type *ham_impl_typeset_new_type(
 	ham_type_kind_flag kind,
 	ham_type_info_flag info,
 	usize alignment,
-	usize size
+	usize size,
+	const void *data = nullptr,
+	uptr n0 = (uptr)-1,
+	uptr n1 = (uptr)-1
 ){
+	const auto name_str = ham::str8(name);
+
+	const auto name_res = ts->type_map.find(name_str);
+	if(name_res != ts->type_map.end()){
+		ham::logapierror("Type by name '{}' already exists in typeset", name);
+		return nullptr;
+	}
+
 	const auto new_type = ts->types.emplace();
 	new_type->ts = ts;
 	new_type->name = name;
 	new_type->flags = ham_make_type_flags(kind, info);
 	new_type->alignment = alignment;
 	new_type->size = size;
+	new_type->data = data;
+	new_type->n0 = n0;
+	new_type->n1 = n1;
+
+	if(!ts->type_map.try_emplace(name_str, new_type).second){
+		ham::logapiwarn("Type by name '{}' could not be emplaced in typeset map", name);
+	}
+
 	return new_type;
 }
 
@@ -165,6 +287,17 @@ void ham_typeset_destroy(ham_typeset *ts){
 	if(ham_unlikely(ts == NULL)) return;
 
 	ham_allocator_delete(ts->allocator, ts);
+}
+
+ham_nothrow const ham_type *ham_typeset_get(const ham_typeset *ts, ham_str8 name){
+	if(!ham_check(ts != NULL)) return nullptr;
+
+	const auto res = ts->type_map.find(name);
+	if(res != ts->type_map.end()){
+		return res->second;
+	}
+
+	return nullptr;
 }
 
 const ham_type *ham_typeset_void(const ham_typeset *ts){ return ts->void_type; }
@@ -263,6 +396,188 @@ const ham_type *ham_typeset_vec(const ham_typeset *ts, const ham_type *elem, ham
 			return nullptr;
 		}
 	}
+}
+
+const ham_type *ham_typeset_object(const ham_typeset *ts, ham_str8 name){
+	if(!ham_check(ts != NULL)) return nullptr;
+
+	const auto res = ts->obj_types.find(name);
+	if(res != ts->obj_types.end()){
+		return ham_super(&res->second);
+	}
+
+	return nullptr;
+}
+
+//
+// Type builders
+//
+
+struct ham_type_builder{
+	const ham_allocator *allocator;
+	ham_name_buffer_utf8 name_buf;
+	ham_type_kind_flag kind;
+	ham_type_info_flag info;
+	const ham_type *instance;
+	const ham_type *parent;
+	const ham_object_vtable *vptr;
+	ham::std_vector<ham_type_member> members;
+	ham::std_vector<ham_type_method> methods;
+};
+
+ham_type_builder *ham_type_builder_create(){
+	const auto allocator = ham_current_allocator();
+
+	const auto ptr = ham_allocator_new(allocator, ham_type_builder);
+	if(!ptr) return nullptr;
+
+	ptr->allocator = allocator;
+	memset(ptr->name_buf, 0, sizeof(ptr->name_buf));
+	ptr->kind = (ham_type_kind_flag)-1;
+	ptr->info = (ham_type_info_flag)-1;
+	ptr->instance = nullptr;
+
+	return ptr;
+}
+
+ham_nothrow void ham_type_builder_destroy(ham_type_builder *builder){
+	if(ham_unlikely(!builder)) return;
+
+	const auto allocator = builder->allocator;
+
+	ham_allocator_delete(allocator, builder);
+}
+
+ham_nothrow bool ham_type_builder_reset(ham_type_builder *builder){
+	if(!ham_check(builder != NULL)) return false;
+
+	memset(builder->name_buf, 0, sizeof(builder->name_buf));
+	builder->kind = (ham_type_kind_flag)-1;
+	builder->info = (ham_type_info_flag)-1;
+	builder->instance = nullptr;
+
+	return true;
+}
+
+const ham_type *ham_type_builder_instantiate(ham_type_builder *builder, ham_typeset *ts){
+	if(!ham_check(builder != NULL)) return nullptr;
+	else if(builder->instance) return builder->instance;
+
+	switch(builder->kind){
+		case HAM_TYPE_OBJECT:{
+			ham::logapierror("Object type builders currently unimplemented");
+			return nullptr;
+		}
+
+		default:{
+			ham::logapierror("Type builders currently unimplemented");
+			return nullptr;
+		}
+	}
+}
+
+ham_nothrow bool ham_type_builder_set_parent(ham_type_builder *builder, const ham_type *parent_type){
+	if(!ham_check(builder != NULL) || !ham_check(ham_type_is_object(parent_type))) return false;
+
+	if(builder->kind == (ham_type_kind_flag)-1){
+		builder->kind   = HAM_TYPE_OBJECT;
+		builder->info   = HAM_TYPE_INFO_OBJECT_POD;
+	}
+	else if(builder->kind != HAM_TYPE_OBJECT){
+		ham::logapierror("Type builder already contains non-object");
+		return false;
+	}
+	else if(builder->parent){
+		if(parent_type == builder->parent){
+			return true;
+		}
+
+		ham::logapiwarn("Type builder already has parent set (overwriting)");
+	}
+
+	builder->parent   = parent_type;
+	builder->instance = nullptr;
+
+	return true;
+}
+
+ham_nothrow bool ham_type_builder_set_vptr(ham_type_builder *builder, const ham_object_vtable *vptr){
+	if(!ham_check(builder != NULL) || !ham_check(vptr != NULL)) return false;
+
+	if(builder->kind == (ham_type_kind_flag)-1){
+		builder->kind   = HAM_TYPE_OBJECT;
+	}
+	else if(builder->kind != HAM_TYPE_OBJECT){
+		ham::logapierror("Type builder already contains non-object");
+		return false;
+	}
+	else if(builder->vptr){
+		if(vptr == builder->vptr){
+			return true;
+		}
+
+		ham::logapiwarn("Type builder already has vptr set (overwriting)");
+	}
+
+	builder->info     = HAM_TYPE_INFO_OBJECT_VIRTUAL;
+	builder->vptr     = vptr;
+	builder->instance = nullptr;
+
+	return true;
+}
+
+bool ham_type_builder_add_member(ham_type_builder *builder, ham_str8 name, const ham_type *type){
+	if(!ham_check(builder != NULL) || !ham_check(name.ptr && name.len) || !ham_check(type != NULL)) return false;
+
+	if(builder->kind != (ham_type_kind_flag)-1){
+		if(builder->kind != HAM_TYPE_OBJECT){
+			ham::logapierror("Can not add members to non-object types");
+			return false;
+		}
+	}
+	else{
+		builder->kind = HAM_TYPE_OBJECT;
+		builder->info = HAM_TYPE_INFO_OBJECT_POD;
+	}
+
+	auto &&member = builder->members.emplace_back();
+	member.name = name;
+	member.type = type;
+
+	builder->instance = nullptr;
+	return true;
+}
+
+bool ham_type_builder_add_method(ham_type_builder *builder, ham_str8 name, ham_usize num_params, const ham_str8 *param_names, const ham_type *const *param_types){
+	if(
+	   !ham_check(builder != NULL) ||
+	   !ham_check(builder->info == HAM_TYPE_INFO_OBJECT_VIRTUAL) ||
+	   !ham_check(name.ptr && name.len) ||
+	   !ham_check(num_params == 0 || (param_names && param_types))
+	){
+		return false;
+	}
+
+	for(usize i = 0; i < num_params; i++){
+		const auto param_type  = param_types[i];
+
+		if(!param_type){
+			ham::logapierror("NULL passed for parameter type {}", i);
+			return false;
+		}
+	}
+
+	auto &&method = builder->methods.emplace_back();
+	method.name = name;
+
+	method.param_names.resize(num_params);
+	method.param_types.resize(num_params);
+
+	memcpy(method.param_names.data(), param_names, num_params * sizeof(ham_str8));
+	memcpy(method.param_types.data(), param_types, num_params * sizeof(const ham_type*));
+
+	builder->instance = nullptr;
+	return true;
 }
 
 HAM_C_API_END

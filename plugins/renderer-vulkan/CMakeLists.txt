@@ -33,8 +33,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	target_compile_options(VulkanMemoryAllocator PRIVATE "-fPIC")
 endif()
 
-ham_compile_shader(${CMAKE_CURRENT_LIST_DIR}/screen.vert ${HAM_PLUGIN_BINARY_DIR}/shaders/screen.vert.spv)
-ham_compile_shader(${CMAKE_CURRENT_LIST_DIR}/screen.frag ${HAM_PLUGIN_BINARY_DIR}/shaders/screen.frag.spv)
+ham_compile_shader_vk(${CMAKE_CURRENT_LIST_DIR}/screen.vert ${HAM_PLUGIN_BINARY_DIR}/shaders/screen.vert.spv)
+ham_compile_shader_vk(${CMAKE_CURRENT_LIST_DIR}/screen.frag ${HAM_PLUGIN_BINARY_DIR}/shaders/screen.frag.spv)
 
 set(
 	HAM_RENDERER_VULKAN_SHADERS
@@ -47,6 +47,7 @@ ham_add_plugin(
 	${HAM_RENDERER_VULKAN_SHADERS}
 	renderer.hpp
 	renderer.cpp
+	shader_vulkan.cpp
 	draw_group.cpp
 	light_group_vulkan.cpp
 )

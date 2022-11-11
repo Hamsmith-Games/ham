@@ -463,6 +463,7 @@ if(HAM_BUILD_ENGINE)
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/entity/transform-component.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/world.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/vm.h
+		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/graph.h
 	)
 
     list(APPEND HAM_ALL_HEADERS ${HAM_ENGINE_HEADERS})

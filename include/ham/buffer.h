@@ -39,8 +39,8 @@ struct ham_buffer{
 	ham_usize alignment, allocated, capacity;
 };
 
-ham_constexpr static inline ham_u32 ham_bit_ceil32(ham_u32 x){ return x == 1 ? 1 : 1 << (32UL - ham_lzcnt32(x - 1UL)); }
-ham_constexpr static inline ham_u64 ham_bit_ceil64(ham_u64 x){ return x == 1 ? 1 : 1 << (64UL - ham_lzcnt64(x - 1UL)); }
+ham_used ham_constexpr static inline ham_u32 ham_bit_ceil32(ham_u32 x){ return x == 1 ? 1 : 1 << (32UL - ham_lzcnt32(x - 1UL)); }
+ham_used ham_constexpr static inline ham_u64 ham_bit_ceil64(ham_u64 x){ return x == 1 ? 1 : 1 << (64UL - ham_lzcnt64(x - 1UL)); }
 //! @endcond
 
 static inline bool ham_buffer_init_allocator(ham_buffer *buf, const ham_allocator *allocator, ham_usize alignment, ham_usize initial_capacity){
@@ -74,11 +74,13 @@ static inline bool ham_buffer_init_allocator(ham_buffer *buf, const ham_allocato
 	return true;
 }
 
+ham_used
 static inline bool ham_buffer_init(ham_buffer *buf, ham_usize alignment, ham_usize initial_capacity){
 	return ham_buffer_init_allocator(buf, ham_current_allocator(), alignment, initial_capacity);
 }
 
-static inline void ham_buffer_finish(ham_buffer *buf){
+ham_used
+ham_nothrow static inline void ham_buffer_finish(ham_buffer *buf){
 	if(ham_unlikely(!buf) || ham_unlikely(!buf->allocator)) return;
 
 	if(buf->mem) ham_allocator_free(buf->allocator, buf->mem);
@@ -90,8 +92,8 @@ static inline void ham_buffer_finish(ham_buffer *buf){
 	buf->capacity  = 0;
 }
 
-ham_nonnull_args(1)
-static inline const ham_allocator *ham_buffer_allocator(const ham_buffer *buf){
+ham_nonnull_args(1) ham_used
+ham_nothrow static inline const ham_allocator *ham_buffer_allocator(const ham_buffer *buf){
 	return buf->allocator;
 }
 
@@ -124,6 +126,7 @@ static inline bool ham_buffer_reserve(ham_buffer *buf, ham_usize req_size){
 	return true;
 }
 
+ham_used
 static inline bool ham_buffer_resize(ham_buffer *buf, ham_usize req_size){
 	if(!buf) return false;
 
@@ -136,10 +139,13 @@ static inline bool ham_buffer_resize(ham_buffer *buf, ham_usize req_size){
 	return true;
 }
 
+ham_used
 static inline ham_usize ham_buffer_size(const ham_buffer *buf){ return buf ? buf->allocated : 0; }
 
+ham_used
 static inline void *ham_buffer_data(ham_buffer *buf){ return buf ? buf->mem : ham_null; }
 
+ham_used
 static inline bool ham_buffer_erase(ham_buffer *buf, ham_usize from, ham_usize len){
 	if(!buf || !buf->mem || from >= buf->allocated) return false;
 
@@ -159,6 +165,7 @@ static inline bool ham_buffer_erase(ham_buffer *buf, ham_usize from, ham_usize l
 	return true;
 }
 
+ham_used
 static inline bool ham_buffer_insert(ham_buffer *buf, ham_usize offset, const void *data, ham_usize len){
 	if(!buf || !buf->mem) return false;
 
@@ -180,7 +187,12 @@ static inline bool ham_buffer_insert(ham_buffer *buf, ham_usize offset, const vo
 	return true;
 }
 
+#define ham_buffer_foreach(buf, t, it) \
+	for(t *it = (t*)ham_buffer_data(buf); it < ((t*)ham_buffer_data(buf) + (ham_buffer_size(buf)/sizeof(t))); ++it)
+
 HAM_C_API_END
+
+#ifdef __cplusplus
 
 #include "str_buffer.h"
 
@@ -420,6 +432,8 @@ namespace ham{
 			ham_buffer m_buf;
 	};
 }
+
+#endif // __cplusplus
 
 /**
  * @}

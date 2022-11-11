@@ -90,12 +90,84 @@ ham_api void ham_renderer_frame(ham_renderer *renderer, ham_f64 dt, const ham_re
 
 ham_api const ham_image *ham_renderer_default_image(const ham_renderer *renderer);
 
+ham_api bool ham_renderer_add_shader_include(ham_renderer *r, ham_str8 name, ham_str8 src);
+
 /**
  * @defgroup HAM_RENDERER_TEXTURE Textures
  * @{
  */
 
 typedef struct ham_texture ham_texture;
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup HAM_RENDERER_SHADER Shaders
+ * @{
+ */
+
+typedef enum ham_shader_source_kind{
+	HAM_SHADER_SOURCE_GLSL,
+	HAM_SHADER_SOURCE_SPIRV,
+
+	HAM_SHADER_SOURCE_KIND_COUNT
+} ham_shader_source_kind;
+
+typedef enum ham_shader_kind{
+	HAM_SHADER_VERTEX,
+	HAM_SHADER_GEOMETRY,
+	HAM_SHADER_FRAGMENT,
+
+	HAM_SHADER_KIND_COUND,
+} ham_shader_kind;
+
+typedef enum ham_shader_type{
+	HAM_SHADER_INT,
+	HAM_SHADER_UINT,
+	HAM_SHADER_FLOAT,
+	HAM_SHADER_VEC2,
+	HAM_SHADER_VEC3,
+	HAM_SHADER_VEC4,
+	HAM_SHADER_MAT2,
+	HAM_SHADER_MAT3,
+	HAM_SHADER_MAT4,
+
+	HAM_SHADER_TYPE_COUNT
+} ham_shader_type;
+
+typedef struct ham_shader ham_shader;
+
+//typedef struct ham_shader_input{
+//	ham_u32 location;
+//	ham_str8 name;
+//	ham_shader_type type;
+//} ham_shader_input;
+
+//typedef struct ham_shader_output{
+//	ham_u32 location;
+//	ham_str8 name;
+//	ham_shader_type type;
+//} ham_shader_output;
+
+typedef struct ham_shader_uniform{
+	ham_u32 location;
+	ham_str8 name; // not guaranteed to contain anything
+	ham_shader_type type;
+} ham_shader_uniform;
+
+ham_api ham_shader *ham_shader_create(ham_renderer *r, ham_shader_kind kind);
+
+ham_api void ham_shader_destroy(ham_shader *shader);
+
+ham_api bool ham_shader_set_source(ham_shader *shader, ham_shader_source_kind kind, ham_str8 src);
+
+ham_api bool ham_shader_compile(ham_shader *shader);
+
+ham_api ham_u32 ham_shader_num_uniforms(const ham_shader *shader);
+
+ham_api const ham_shader_uniform *ham_shader_uniforms(const ham_shader *shader);
 
 /**
  * @}

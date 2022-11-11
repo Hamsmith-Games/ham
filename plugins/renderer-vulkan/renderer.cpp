@@ -1702,6 +1702,11 @@ static inline void ham_renderer_vulkan_frame(ham_renderer_vulkan *r, ham_f64 dt,
 	}
 }
 
-ham_define_renderer(ham_renderer_vulkan, ham_draw_group_vulkan, ham_light_group_vulkan)
+static inline bool ham_def_method(ham_renderer_vulkan, add_shader_include, ham_str8 name, ham_str8 src){
+	(void)name; (void)src;
+	return false;
+}
+
+ham_define_renderer(ham_renderer_vulkan, ham_shader_vulkan, ham_draw_group_vulkan, ham_light_group_vulkan)
 
 HAM_C_API_END

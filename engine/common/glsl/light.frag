@@ -20,10 +20,6 @@
 
 #define MAX_MATERIALS 256
 
-//
-// Uniforms
-//
-
 layout(std140, binding = 0) uniform RenderData{
 	mat4 view_proj, inv_view_proj;
 	vec3 view_pos;
@@ -47,9 +43,11 @@ uniform sampler2D material_tex;
 layout(binding = 5)
 uniform sampler2D noise_tex;
 
-//
-// Inputs
-//
+vec3 reconstruct_world_pos(in vec2 uv, in float z){
+	const vec4 xyzw = vec4(uv * 2.0 - 1.0, z, 1.0);
+	const vec4 projected = globals.inv_view_proj * xyzw;
+	return projected.xyz / projected.w;
+}
 
 layout(location = 0) in vec3  light_pos_f;
 layout(location = 1) in float light_radius_f;
@@ -58,23 +56,9 @@ layout(location = 3) in float light_intensity_f;
 
 layout(location = 4) in vec2 uv_f;
 
-//
-// Outputs
-//
-
-layout(location = 0) out vec3 out_scene;
-
-//
-// Functions
-//
+layout(location = 3) out vec3 out_scene;
 
 const float PI = 3.14159265358979323846;
-
-vec3 reconstruct_world_pos(in vec2 uv, in float z){
-	const vec4 xyzw = vec4(uv * 2.0 - 1.0, z, 1.0);
-	const vec4 projected = globals.inv_view_proj * xyzw;
-	return projected.xyz / projected.w;
-}
 
 float geometry_schlick_ggx(in float N_dot_V, float roughness){
 	const float r = roughness + 1.0;
@@ -113,14 +97,16 @@ float calculate_attenuation(in float d){
 
 vec3 calculate_lighting(
     in vec3 V, in vec3 N, in vec3 L,
-    in float atten,
+    in float d,
     in float metalness,
     in float roughness,
     in vec3 albedo
 ){
 	const vec3 H = normalize(V + L);
 
-	const vec3 radiance = light_color_f * log2(light_intensity_f + 1.0) * atten;
+	const float atten = calculate_attenuation(d);
+
+	const vec3 radiance = light_color_f * atten;
 
 	const vec3 F0 = mix(vec3(0.04), albedo, metalness);
 	const vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
@@ -143,11 +129,6 @@ vec3 calculate_lighting(
 	return kA + lit;
 }
 
-vec4 rand_rgba(in float x){
-	const vec2 noise_uv = uv_f + (vec2(sin(globals.time), cos(globals.time)) + vec2(x)) * 1000.0;
-	return texture(noise_tex, noise_uv);
-}
-
 void main(){
 	const float depth = texture(depth_tex, uv_f).r;
 	const vec3 pos = reconstruct_world_pos(uv_f, depth);
@@ -164,12 +145,10 @@ void main(){
 	const vec3 albedo = texture(diffuse_tex, uv_f).rgb;
 	const vec3 material = texture(material_tex, uv_f).rgb;
 
-	const float atten = calculate_attenuation(d);
+	const vec3 lit_color = calculate_lighting(V, N, L, d, material.r, material.g, albedo);
 
-	const vec3 lit_color = calculate_lighting(V, N, L, atten, material.r, material.g, albedo);
+	const vec2 noise_uv = uv_f + (vec2(sin(globals.time), cos(globals.time)) * 1000.0);
+	const vec3 rgb_noise = texture(noise_tex, noise_uv).rgb * 0.03125;
 
-	const vec3 rgb_noise = rand_rgba(atten).rgb * (1.0/10.0) * atten;
-
-	//out_scene = vec3(N);
-	out_scene = lit_color * (1.0 - rgb_noise);
+	out_scene = pow(lit_color * (1.0 - rgb_noise), vec3(max(light_intensity_f, 1.0)));
 }
