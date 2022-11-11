@@ -1,6 +1,6 @@
 #
 # The Ham Runtime
-# Copyright (C) 2022 Hamsmith Ltd.
+# Copyright (C) 2022 Keith Hammond
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by

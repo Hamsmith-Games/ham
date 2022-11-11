@@ -1,6 +1,6 @@
 #
-# The Hamsmith Development Environment
-# Copyright (C) 2022 Hamsmith Ltd.
+# The Ham Development Environment
+# Copyright (C) 2022 Keith Hammond
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -25,7 +25,7 @@ cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 project(
 	ham
 	VERSION 0.0.1
-	DESCRIPTION "The Hamsmith Programming Language"
+	DESCRIPTION "The Ham Development Environment"
 	LANGUAGES C CXX
 )
 

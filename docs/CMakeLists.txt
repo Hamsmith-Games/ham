@@ -13,7 +13,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(doxygen_awesome_css)
 
 set(DOXYGEN_PROJECT_NAME "Ham")
-set(DOXYGEN_PROJECT_BRIEF "The Hamsmith devlopment environment.")
+set(DOXYGEN_PROJECT_BRIEF "The Ham devlopment environment.")
 set(DOXYGEN_PROJECT_LOGO "${PROJECT_SOURCE_DIR}/engine/editor/images/logo.png")
 
 set(DOXYGEN_JAVADOC_AUTOBRIEF YES)

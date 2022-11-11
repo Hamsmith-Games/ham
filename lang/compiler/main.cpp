@@ -1,6 +1,6 @@
 /**
  * Ham Programming Language Compiler
- * Copyright (C) 2022 Hamsmith Ltd.
+ * Copyright (C) 2022 Keith Hammond
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ static inline void display_help(const char *argv0){
 	printf(
 		"Ham Compiler v" HAM_VERSION_STR "\n"
 		"\n"
-		"hamc  Copyright (C) 2022  Hamsmith Ltd.\n"
+		"hamc  Copyright (C) 2022 Keith Hammond\n"
 		"This program comes with ABSOLUTELY NO WARRANTY.\n"
 		"This is free software, and you are welcome to redistribute it\n"
 		"under the conditions of the GNU General Public License version 3 or later.\n"

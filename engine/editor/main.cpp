@@ -1,6 +1,6 @@
 /*
  * Ham World Engine Editor
- * Copyright (C) 2022 Hamsmith Ltd.
+ * Copyright (C) 2022 Keith Hammond
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,8 +37,8 @@ int main(int argc, char *argv[]){
 	QApplication::setApplicationDisplayName("Ham World Editor");
 	QApplication::setApplicationName("ham-engine-editor");
 	QApplication::setApplicationVersion(HAM_ENGINE_VERSION_STR);
-	QApplication::setOrganizationName("Hamsmith");
-	QApplication::setOrganizationDomain("https://hamsmith.dev/");
+	QApplication::setOrganizationName("Keith Hammond");
+	QApplication::setOrganizationDomain("https://ramblingmad.xyz/");
 
 //	QSurfaceFormat surfaceFmt;
 //	surfaceFmt.setRenderableType(QSurfaceFormat::OpenGL);

@@ -3,7 +3,7 @@
 		"id": 480,
 		"name": "test-game",
 		"display-name": "TestGame",
-		"author": "Hamsmith Ltd.",
+		"author": "Keith Hammond",
 		"version": [0, 0, 1],
 		"license": "GPLv3+",
 		"desc": "Testing game for the Ham World Engine."

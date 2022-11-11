@@ -1,6 +1,6 @@
 /*
  * Ham Runtime Plugins
- * Copyright (C) 2022  Hamsmith Ltd.
+ * Copyright (C) 2022 Keith Hammond
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -98,7 +98,7 @@ HAM_PLUGIN(
 	HAM_NET_GNS_PLUGIN_NAME,
 	HAM_VERSION,
 	"GameNetworkingSockets",
-	"Hamsmith Ltd.",
+	"Keith Hammond",
 	"GPLv3+",
 	HAM_NET_PLUGIN_CATEGORY,
 	"Networking using Valve's GameNetworkingSockets",

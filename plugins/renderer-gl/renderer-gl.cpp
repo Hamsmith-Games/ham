@@ -1,6 +1,6 @@
 /*
  * Ham Runtime Plugins
- * Copyright (C) 2022 Hamsmith Ltd.
+ * Copyright (C) 2022 Keith Hammond
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -37,7 +37,7 @@ HAM_PLUGIN(
 	HAM_RENDERER_GL_PLUGIN_NAME,
 	HAM_VERSION,
 	"OpenGL Rendering",
-	"Hamsmith Ltd.",
+	"Keith Hammond",
 	"LGPLv3+",
 	HAM_RENDERER_PLUGIN_CATEGORY,
 	"Rendering using OpenGL 4.3+",
