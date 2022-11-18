@@ -28,6 +28,9 @@
 #include "renderer_widget.hpp"
 
 Q_DECLARE_METATYPE(ham::engine::world_view)
+Q_DECLARE_METATYPE(ham::engine::const_world_view)
+Q_DECLARE_METATYPE(ham::camera_view)
+Q_DECLARE_METATYPE(ham::const_camera_view)
 
 namespace ham::engine::editor{
 	class world_view;
@@ -46,6 +49,20 @@ namespace ham::engine::editor{
 
 		private:
 			class world_view *m_view;
+	};
+
+	class camera_options_widget: public QWidget{
+		Q_OBJECT
+
+		public:
+			explicit camera_options_widget(ham::camera_view camera, QWidget *parent = nullptr);
+
+			~camera_options_widget();
+
+			ham::camera_view camera() const noexcept{ return m_cam; }
+
+		private:
+			ham::camera_view m_cam;
 	};
 
 	class world_view: public QWidget{
@@ -82,6 +99,8 @@ namespace ham::engine::editor{
 			void resizeEvent(QResizeEvent *ev) override;
 
 		private:
+			QWidget *createOverlay();
+
 			ham_engine *m_engine;
 			ham_world *m_world;
 			renderer_widget *m_r_widget;

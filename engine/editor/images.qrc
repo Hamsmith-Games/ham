@@ -9,5 +9,7 @@
         <file>images/ham.png</file>
         <file>images/cog.png</file>
         <file>images/default-tex.png</file>
+        <file>images/camera.png</file>
+        <file>images/settings.png</file>
     </qresource>
 </RCC>

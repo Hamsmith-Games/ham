@@ -24,11 +24,14 @@
 #include <QFile>
 #include <QMouseEvent>
 #include <QKeyEvent>
+#include <QPainter>
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <QStackedLayout>
 #include <QMenu>
 #include <QLabel>
+#include <QPushButton>
 
 namespace editor = ham::engine::editor;
 
@@ -53,6 +56,17 @@ editor::world_context_menu::world_context_menu(editor::world_view *world, QWidge
 editor::world_context_menu::~world_context_menu(){}
 
 //
+// Camera options widget
+//
+
+editor::camera_options_widget::camera_options_widget(ham::camera_view camera, QWidget *parent)
+	: QWidget(parent)
+	, m_cam(camera)
+{}
+
+editor::camera_options_widget::~camera_options_widget(){}
+
+//
 // World editor main view
 //
 
@@ -68,10 +82,18 @@ editor::world_view::world_view(ham_engine *engine, ham_world *world, QWidget *pa
 	m_r_widget = new editor::renderer_widget_gl(this);
 	m_r_widget->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
 
+	const auto view_stack = new QStackedLayout(this);
+
+	view_stack->setContentsMargins(0, 0, 0, 0);
+	view_stack->setStackingMode(QStackedLayout::StackAll);
+	view_stack->addWidget(createOverlay());
+	view_stack->addWidget(m_r_widget);
+
 	const auto lay = new QHBoxLayout(this);
 
 	lay->setContentsMargins(0, 0, 0, 0);
-	lay->addWidget(m_r_widget, 1);
+	lay->addLayout(view_stack, 1);
+	//lay->addWidget(m_r_widget, 1);
 
 	m_r_widget->installEventFilter(this);
 
@@ -169,6 +191,54 @@ editor::world_view::~world_view(){}
 void editor::world_view::show_context_menu(const QPoint &pos){
 	editor::world_context_menu ctx_menu(this);
 	ctx_menu.exec(mapToGlobal(pos));
+}
+
+QWidget *editor::world_view::createOverlay(){
+	const auto lay = new QGridLayout;
+
+	QImage cog_img("://images/settings.png");
+	QImage cam_img("://images/camera.png");
+
+	const auto cog_pix = QPixmap::fromImage(cog_img);
+	const auto cam_pix = QPixmap::fromImage(cam_img);
+
+	const auto cog_btn = new QPushButton;
+	const auto cam_btn = new QPushButton;
+
+	QPixmap cog_icon_pix(cog_pix.size());
+	QPixmap cam_icon_pix(cam_pix.size());
+
+	cog_icon_pix.fill(Qt::transparent);
+	cam_icon_pix.fill(Qt::transparent);
+
+	{
+		QPainter icon_painter;
+		icon_painter.begin(&cam_icon_pix);
+		icon_painter.setOpacity(0.66f);
+		icon_painter.drawPixmap(0, 0, cam_pix);
+		icon_painter.end();
+
+		icon_painter.begin(&cog_icon_pix);
+		icon_painter.setOpacity(0.66f);
+		icon_painter.drawPixmap(0, 0, cog_pix);
+		icon_painter.end();
+	}
+
+	cog_btn->setIcon(cog_icon_pix);
+	cog_btn->setIconSize(QSize{48, 48});
+
+	cam_btn->setIcon(cam_icon_pix);
+	cam_btn->setIconSize(QSize{48, 48});
+
+	lay->setContentsMargins(0, 0, 0, 0);
+	lay->addWidget(cog_btn, 0, 0, Qt::AlignLeft | Qt::AlignTop);
+	lay->addWidget(cam_btn, 0, 1, Qt::AlignRight | Qt::AlignTop);
+
+	const auto ret = new QWidget;
+	ret->setContentsMargins(10, 10, 10, 10);
+	ret->setLayout(lay);
+
+	return ret;
 }
 
 bool editor::world_view::eventFilter(QObject *watched, QEvent *ev){
