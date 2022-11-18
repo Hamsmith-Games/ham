@@ -218,10 +218,10 @@ namespace ham{
 
 			template<usize N>
 			basic_str_buffer(const Char(&arr)[N], const ham_allocator *allocator_ = ham_current_allocator())
-				: basic_str_buffer(str_type(arr, arr + (N-1)), allocator_){}
+				: basic_str_buffer(str_type((const Char*)arr), allocator_){}
 
 			basic_str_buffer(const Char *c_str_, const ham_allocator *allocator_ = ham_current_allocator())
-				: basic_str_buffer(str_type(c_str_, detail::strlen_utf(c_str_)), allocator_){}
+				: basic_str_buffer(str_type(c_str_), allocator_){}
 
 			basic_str_buffer(basic_str_buffer&&) noexcept = default;
 
@@ -332,9 +332,9 @@ namespace ham{
 			unique_handle<ctype*, detail::str_buffer_ctype_destroy<Char>> m_handle;
 	};
 
-	using str_buffer_utf8  = basic_str_buffer<char8>;
-	using str_buffer_utf16 = basic_str_buffer<char16>;
-	using str_buffer_utf32 = basic_str_buffer<char32>;
+	using str_buffer8  = basic_str_buffer<char8>;
+	using str_buffer16 = basic_str_buffer<char16>;
+	using str_buffer32 = basic_str_buffer<char32>;
 
 	template<typename ... Args>
 	str8 format_buffered(
@@ -354,8 +354,8 @@ namespace ham{
 	}
 
 	template<typename ... Args>
-	str_buffer_utf8 format(const fmt::format_string<Args...> &fmt_str, Args &&... args){
-		str_buffer_utf8 ret;
+	str_buffer8 format(const fmt::format_string<Args...> &fmt_str, Args &&... args){
+		str_buffer8 ret;
 		fmt::format_to(
 			std::back_inserter(ret),
 			fmt_str, std::forward<Args>(args)...
@@ -365,9 +365,9 @@ namespace ham{
 
 	using str_buffer = basic_str_buffer<uchar>;
 
-	template<> struct hash_functor<str_buffer_utf8>: hash_functor<str8>{};
-	template<> struct hash_functor<str_buffer_utf16>: hash_functor<str16>{};
-	template<> struct hash_functor<str_buffer_utf32>: hash_functor<str32>{};
+	template<> struct hash_functor<str_buffer8>: hash_functor<str8>{};
+	template<> struct hash_functor<str_buffer16>: hash_functor<str16>{};
+	template<> struct hash_functor<str_buffer32>: hash_functor<str32>{};
 }
 
 namespace std{

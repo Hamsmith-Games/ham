@@ -115,7 +115,7 @@ ham_nothrow static inline void ham_signal_finish(ham_signal *sig){
 	ham_mutex_finish(&sig->_impl_mut);
 
 	// TODO: only in debug builds?
-	std::memset(sig, 0, sizeof(ham_signal));
+	memset(sig, 0, sizeof(ham_signal));
 }
 
 ham_nonnull_args(1, 2) ham_used
@@ -153,10 +153,19 @@ ham_nothrow static inline ham_uptr ham_signal_connect(ham_signal *sig, void(*fpt
 
 ham_nonnull_args(1) ham_used
 ham_nothrow static inline void ham_signal_emit(ham_signal *sig, void *data){
+	if(!ham_mutex_lock(&sig->_impl_mut)){
+		ham_logapierrorf("Error in ham_mutex_lock");
+		return;
+	}
+
 	const ham_signal_connection *const conns = (const ham_signal_connection*)ham_buffer_data(&sig->connections);
 	const ham_uptr n = ham_buffer_size(&sig->connections) / sizeof(ham_signal_connection);
 	for(ham_uptr i = 0; i < n; i++){
 		conns[i].fptr(conns[i].user, data);
+	}
+
+	if(!ham_mutex_unlock(&sig->_impl_mut)){
+		ham_logapiwarnf("Error in ham_mutex_unlock");
 	}
 }
 

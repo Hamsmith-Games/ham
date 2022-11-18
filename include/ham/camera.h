@@ -49,7 +49,7 @@ typedef struct ham_camera{
 } ham_camera;
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_camera_init(ham_camera *cam){
+ham_constexpr ham_math_api void ham_camera_init(ham_camera *cam){
 	cam->kind = HAM_CAMERA_IDENTITY;
 
 	cam->near_z = 0.f;
@@ -64,7 +64,7 @@ ham_constexpr ham_nothrow static inline void ham_camera_init(ham_camera *cam){
 	ham_transform_reset(&cam->_impl_trans);
 }
 
-ham_constexpr ham_nothrow static inline void ham_camera_reset_transform(ham_camera *cam){
+ham_constexpr ham_math_api void ham_camera_reset_transform(ham_camera *cam){
 	cam->_impl_forward = ham_make_vec3(0.f, 0.f, 1.f);
 	cam->_impl_right   = ham_make_vec3(1.f, 0.f, 0.f);
 	cam->_impl_up      = ham_make_vec3(0.f, 1.f, 0.f);
@@ -74,7 +74,7 @@ ham_constexpr ham_nothrow static inline void ham_camera_reset_transform(ham_came
 
 //! @cond ignore
 
-ham_constexpr ham_nothrow static inline void ham_impl_camera_update(const ham_camera *cam){
+ham_constexpr ham_math_api void ham_impl_camera_update(const ham_camera *cam){
 	if(!cam->_impl_trans._impl_dirty) return;
 
 #ifdef __cplusplus
@@ -90,9 +90,9 @@ ham_constexpr ham_nothrow static inline void ham_impl_camera_update(const ham_ca
 
 	mut_ptr->_impl_trans._impl_rot = ham_quat_normalize(qpyr);
 
-	mut_ptr->_impl_forward = ham_vec3_normalize(ham_quat_mul_vec3(cam->_impl_trans._impl_rot, (ham_vec3){0.f, 0.f, 1.f}));
-	mut_ptr->_impl_right   = ham_vec3_normalize(ham_quat_mul_vec3(cam->_impl_trans._impl_rot, (ham_vec3){1.f, 0.f, 0.f}));
-	mut_ptr->_impl_up      = ham_vec3_normalize(ham_quat_mul_vec3(cam->_impl_trans._impl_rot, (ham_vec3){0.f, 1.f, 0.f}));
+	mut_ptr->_impl_forward = ham_vec3_normalize(ham_quat_mul_vec3(cam->_impl_trans._impl_rot, (ham_vec3){ .data = { 0.f, 0.f, 1.f} }));
+	mut_ptr->_impl_right   = ham_vec3_normalize(ham_quat_mul_vec3(cam->_impl_trans._impl_rot, (ham_vec3){ .data = { 1.f, 0.f, 0.f} }));
+	mut_ptr->_impl_up      = ham_vec3_normalize(ham_quat_mul_vec3(cam->_impl_trans._impl_rot, (ham_vec3){ .data = { 0.f, 1.f, 0.f} }));
 
 	const ham_mat4 trans_m = ham_mat4_translate(ham_mat4_identity(), ham_vec3_neg(cam->_impl_trans.pos));
 
@@ -124,7 +124,7 @@ ham_constexpr ham_nothrow static inline void ham_impl_camera_update(const ham_ca
  * @param far_z far clip plane distance
  */
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_camera_set_perspective(ham_camera *cam, ham_f32 aspect, ham_f32 fov_y, ham_f32 near_z, ham_f32 far_z){
+ham_constexpr ham_math_api void ham_camera_set_perspective(ham_camera *cam, ham_f32 aspect, ham_f32 fov_y, ham_f32 near_z, ham_f32 far_z){
 	const ham_f32 tan_fov_2 = tan(fov_y * 0.5f);
 
 	cam->kind = HAM_CAMERA_PERSPECTIVE;
@@ -170,7 +170,7 @@ ham_constexpr ham_nothrow static inline void ham_camera_set_perspective(ham_came
  * @param far_z far clip plane distance
  */
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_camera_set_perspective_rev(ham_camera *cam, ham_f32 aspect, ham_f32 fov_y, ham_f32 near_z, ham_f32 far_z){
+ham_constexpr ham_math_api void ham_camera_set_perspective_rev(ham_camera *cam, ham_f32 aspect, ham_f32 fov_y, ham_f32 near_z, ham_f32 far_z){
 	const ham_f32 tan_fov_2 = tan(fov_y * 0.5f);
 
 	cam->kind = HAM_CAMERA_PERSPECTIVE_REV;
@@ -218,7 +218,7 @@ ham_constexpr ham_nothrow static inline void ham_camera_set_perspective_rev(ham_
  * @param far_z far clip plane distance
  */
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_camera_set_orthographic(ham_camera *cam, ham_f32 top, ham_f32 bottom, ham_f32 left, ham_f32 right, ham_f32 near_z, ham_f32 far_z){
+ham_constexpr ham_math_api void ham_camera_set_orthographic(ham_camera *cam, ham_f32 top, ham_f32 bottom, ham_f32 left, ham_f32 right, ham_f32 near_z, ham_f32 far_z){
 	cam->kind = HAM_CAMERA_ORTHOGRAPHIC;
 
 	cam->near_z = near_z;
@@ -236,24 +236,24 @@ ham_constexpr ham_nothrow static inline void ham_camera_set_orthographic(ham_cam
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_mat4 ham_camera_proj_matrix(const ham_camera *cam){
+ham_constexpr ham_math_api ham_mat4 ham_camera_proj_matrix(const ham_camera *cam){
 	return cam->proj;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_mat4 ham_camera_view_matrix(const ham_camera *cam){
+ham_constexpr ham_math_api ham_mat4 ham_camera_view_matrix(const ham_camera *cam){
 	ham_impl_camera_update(cam);
 	return cam->_impl_trans._impl_trans;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_f32 ham_camera_near_z(const ham_camera *cam){ return cam->near_z; }
+ham_constexpr ham_math_api ham_f32 ham_camera_near_z(const ham_camera *cam){ return cam->near_z; }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_f32 ham_camera_far_z(const ham_camera *cam){ return cam->far_z; }
+ham_constexpr ham_math_api ham_f32 ham_camera_far_z(const ham_camera *cam){ return cam->far_z; }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_camera_rotate(ham_camera *cam, ham_f32 rads, ham_vec3 axis){
+ham_constexpr ham_math_api void ham_camera_rotate(ham_camera *cam, ham_f32 rads, ham_vec3 axis){
 	ham_transform_rotate(&cam->_impl_trans, rads, axis);
 
 	ham_constexpr const ham_f32 max_angle = M_PI_2 - 0.0001f;
@@ -276,45 +276,50 @@ ham_constexpr ham_nothrow static inline void ham_camera_rotate(ham_camera *cam, 
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_camera_translate(ham_camera *cam, ham_vec3 amnt){
+ham_constexpr ham_math_api void ham_camera_translate(ham_camera *cam, ham_vec3 amnt){
 	ham_transform_translate(&cam->_impl_trans, amnt);
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_camera_set_rotation(ham_camera *cam, ham_vec3 pyr){
+ham_constexpr ham_math_api void ham_camera_set_rotation(ham_camera *cam, ham_vec3 pyr){
 	ham_transform_set_rotation(&cam->_impl_trans, pyr);
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_camera_set_position(ham_camera *cam, ham_vec3 pos){
+ham_constexpr ham_math_api void ham_camera_set_position(ham_camera *cam, ham_vec3 pos){
 	ham_transform_set_position(&cam->_impl_trans, pos);
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_vec3 ham_camera_position(const ham_camera *cam){
+ham_constexpr ham_math_api ham_vec3 ham_camera_position(const ham_camera *cam){
 	return ham_transform_position(&cam->_impl_trans);
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_quat ham_camera_rotation(const ham_camera *cam){
+ham_constexpr ham_math_api ham_quat ham_camera_rotation(const ham_camera *cam){
 	ham_impl_camera_update(cam);
 	return cam->_impl_trans._impl_rot;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_vec3 ham_camera_forward(const ham_camera *cam){
+ham_constexpr ham_math_api ham_vec3 ham_camera_pyr(const ham_camera *cam){
+	return ham_transform_pyr(&cam->_impl_trans);
+}
+
+ham_nonnull_args(1)
+ham_constexpr ham_math_api ham_vec3 ham_camera_forward(const ham_camera *cam){
 	ham_impl_camera_update(cam);
 	return cam->_impl_forward;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_vec3 ham_camera_right(const ham_camera *cam){
+ham_constexpr ham_math_api ham_vec3 ham_camera_right(const ham_camera *cam){
 	ham_impl_camera_update(cam);
 	return cam->_impl_right;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_vec3 ham_camera_up(const ham_camera *cam){
+ham_constexpr ham_math_api ham_vec3 ham_camera_up(const ham_camera *cam){
 	ham_impl_camera_update(cam);
 	return cam->_impl_up;
 }
@@ -368,6 +373,7 @@ namespace ham{
 
 			constexpr vec3 position() const noexcept{ return ham_camera_position(m_ptr); }
 			constexpr quat rotation() const noexcept{ return ham_camera_rotation(m_ptr); }
+			constexpr vec3 pyr() const noexcept{ return ham_camera_pyr(m_ptr); }
 
 			constexpr void translate(const vec3 &amnt) noexcept requires is_mutable{ ham_camera_translate(m_ptr, amnt); }
 			constexpr void rotate(f32 angle, const vec3 &axis) noexcept requires is_mutable{ ham_camera_rotate(m_ptr, angle, axis); }
@@ -433,8 +439,17 @@ namespace ham{
 			constexpr vec3 right() const noexcept{ return ham_camera_right(&m_cam); }
 			constexpr vec3 up() const noexcept{ return ham_camera_up(&m_cam); }
 
+			constexpr void set_position(const vec3 &pos){
+				ham_camera_set_position(&m_cam, pos);
+			}
+
+			constexpr void set_pyr(const vec3 &pyr){
+				ham_camera_set_rotation(&m_cam, pyr);
+			}
+
 			constexpr vec3 position() const noexcept{ return ham_camera_position(&m_cam); }
 			constexpr quat rotation() const noexcept{ return ham_camera_rotation(&m_cam); }
+			constexpr vec3 pyr() const noexcept{ return ham_camera_pyr(&m_cam); }
 
 			constexpr void translate(const vec3 &amnt) noexcept{ ham_camera_translate(&m_cam, amnt); }
 			constexpr void rotate(f32 angle, const vec3 &axis) noexcept{ ham_camera_rotate(&m_cam, angle, axis); }

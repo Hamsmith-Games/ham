@@ -52,7 +52,7 @@ struct ham_world_partition{
 struct ham_world{
 	const ham_allocator *allocator;
 
-	ham::str_buffer_utf8 name;
+	ham::str_buffer8 name;
 
 	ham::mutex mut;
 	robin_hood::unordered_flat_map<const ham_entity_vtable*, ham_object_manager*> obj_mans;

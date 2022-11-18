@@ -20,264 +20,361 @@
 #define HAM_ENGINE_GRAPH_EDITOR_HPP 1
 
 #include "ham/typesys.h"
+#include "ham/hash.h"
+#include "ham/engine/graph.h"
 
 #include <QVector2D>
 #include <QWidget>
 #include <QGraphicsView>
-#include <QHash>
+#include <QGraphicsWidget>
+#include <QLabel>
 
 Q_DECLARE_METATYPE(ham::type)
 
+class QLabel;
+
 class QGraphicsScene;
 class QGraphicsView;
+class QGraphicsLinearLayout;
 
 namespace ham::engine::editor{
-	class node_pin: public QObject{
+	static inline QColor string_color(ham::str8 str){
+		if(str.is_empty()){
+			return Qt::white;
+		}
+
+		const auto str_hash  = f64(ham::hash(str));
+		const auto color_hue = 1.0 - (str_hash / f64(HAM_UPTR_MAX));
+
+		return QColor::fromHsvF(color_hue, 1.f, 1.f);
+	}
+
+	ham_used
+	static inline QColor string_color(const QString &str){
+		const auto utf8_str = str.toUtf8();
+		return string_color(str8(utf8_str.data(), utf8_str.size()-1));
+	}
+
+	class graph_node;
+
+	class graph_node_pin: public QGraphicsWidget{
 		Q_OBJECT
 
 		Q_PROPERTY(QString name READ name WRITE set_name NOTIFY name_changed)
-		Q_PROPERTY(ham::type type READ type WRITE set_type NOTIFY type_changed)
+		Q_PROPERTY(ham::type pin_type READ pin_type WRITE set_pin_type NOTIFY pin_type_changed)
+		Q_PROPERTY(QColor color READ color WRITE set_color NOTIFY color_changed)
 
 		public:
-			explicit node_pin(QString name_, ham::type type_, QObject *parent = nullptr)
-				: QObject(parent), m_name(std::move(name_)), m_type(type_){}
+			class pin_dot: public QGraphicsEllipseItem, public QGraphicsLayoutItem{
+				public:
+					pin_dot(qreal x, qreal y, qreal width, qreal height, QGraphicsItem *parent = nullptr)
+						: QGraphicsEllipseItem(x, y, width, height, parent){}
 
-			const QString &name() const noexcept{ return m_name; }
+					QSizeF sizeHint(Qt::SizeHint which, const QSizeF &constraint = QSizeF()) const override{
+						Q_UNUSED(which);
+						Q_UNUSED(constraint);
+						return boundingRect().size();
+					}
 
-			ham::type type() const noexcept{ return m_type; }
+					void setGeometry(const QRectF &rect) override{
+						setPos(rect.topLeft());
+					}
+			};
 
-			void set_name(QAnyStringView new_name){
-				if(m_name != new_name){
-					m_name = new_name.toString();
-					Q_EMIT name_changed(m_name);
+			class connection_curve: public QGraphicsItem{
+				public:
+					explicit connection_curve(const QPointF &begin_pos, bool is_output, const QColor &color = Qt::white, QGraphicsItem *parent = nullptr)
+						: QGraphicsItem(parent), m_beg(begin_pos), m_end(begin_pos), m_color(color), m_is_out(is_output)
+					{
+						(void)m_is_out;
+					}
+
+					const QPointF &begin_pos() const noexcept{ return m_beg; }
+					const QPointF &end_pos() const noexcept{ return m_end; }
+
+					void set_end_pos(const QPointF &pos){
+						m_end = pos;
+						update();
+					}
+
+					QRectF boundingRect() const override{
+						const QPointF min_xy = {qMin(m_beg.x(), m_end.x()), qMin(m_beg.y(), m_end.y())};
+						const QPointF max_xy = {qMax(m_beg.y(), m_end.y()), qMax(m_beg.y(), m_end.y())};
+
+						const QPointF d_xy = max_xy - min_xy;
+
+						return QRectF({0.f, 0.f}, d_xy);
+
+//						if(m_beg.x() < m_end.x()){
+//							// begin is on left
+//							if(m_beg.y() < m_end.y()){
+//								// begin is top left
+//								return QRectF(m_beg, m_end);
+//							}
+//							else{
+//								// bottom left
+//								const QPointF top_left = {m_beg.x(), m_end.y()};
+//								return QRectF(top_left, m_beg);
+//							}
+//						}
+//						else{
+//							// begin is on right
+//							if(m_beg.y() < m_end.y()){
+//								// begin is top right
+//								const QPointF top_left = {m_end.x(), m_beg.y()};
+//								const QPointF bot_right = {m_beg.x(), m_end.y()};
+//								return QRectF(top_left, bot_right);
+//							}
+//							else{
+//								// bottom right
+//								return QRectF(m_end, m_beg);
+//							}
+//						}
+					}
+
+					void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override{
+						const auto loc_beg = mapFromScene(m_beg);
+						const auto loc_end = mapFromScene(m_end);
+
+						QPainterPath path(loc_beg);
+
+						const QPointF min_xy = {qMin(loc_beg.x(), loc_end.x()), qMin(loc_beg.y(), loc_end.y())};
+						const QPointF max_xy = {qMax(loc_beg.y(), loc_end.y()), qMax(loc_beg.y(), loc_end.y())};
+
+						const QPointF d_xy = max_xy - min_xy;
+
+						if(loc_beg.x() < loc_end.x()){
+							// start on left
+							if(loc_beg.y() < loc_end.y()){
+								// start top left
+							}
+							else{
+								// bottom left
+							}
+
+							path.cubicTo(min_xy, max_xy, loc_end);
+						}
+						else{
+							// start on right
+							if(loc_beg.y() < loc_end.y()){
+								// start top right
+								path.cubicTo(min_xy, max_xy, loc_end);
+							}
+							else{
+								// bottom right
+								path.cubicTo(max_xy, min_xy, loc_end);
+							}
+						}
+
+						auto new_pen = painter->pen();
+
+						QColor color = m_color;
+						color.setAlpha(128);
+
+						new_pen.setColor(color);
+						new_pen.setWidthF(5.f);
+
+						painter->setPen(new_pen);
+						painter->drawPath(path);
+					}
+
+				private:
+					QPointF m_beg, m_end;
+					QColor m_color;
+					bool m_is_out;
+			};
+
+			explicit graph_node_pin(
+				engine::graph_node_view node,
+				ham_graph_node_pin_direction direction,
+				const QString &name_,
+				ham::type type_,
+				QGraphicsItem *parent = nullptr
+			);
+
+			~graph_node_pin();
+
+			QString name() const noexcept{ return m_name_lbl->text(); }
+
+			const QColor &color() const noexcept{ return m_color; }
+
+			ham_graph_node_pin_direction direction() const noexcept{ return m_pin.direction(); }
+
+			bool is_input() const noexcept{ return direction() == HAM_GRAPH_NODE_PIN_IN; }
+			bool is_output() const noexcept{ return direction() == HAM_GRAPH_NODE_PIN_OUT; }
+
+			ham::type pin_type() const noexcept{ return m_pin.type(); }
+
+			void set_name(const QString &new_name);
+
+			void set_color(const QColor &new_color){
+				if(!m_user_color || (m_color != new_color)){
+					m_color = new_color;
+					m_user_color = true;
+
+					Q_EMIT color_changed(new_color);
 				}
 			}
 
-			void set_type(ham::type new_type){
-				if(m_type != new_type){
-					m_type = new_type;
-					Q_EMIT type_changed(m_type);
+			void set_pin_type(ham::type new_type){
+				if(pin_type() != new_type){
+					m_pin.set_type(new_type);
+					Q_EMIT pin_type_changed(new_type);
+
+					if(!m_user_color){
+						m_color = string_color(new_type.name());
+						Q_EMIT color_changed(m_color);
+					}
+				}
+			}
+
+			void reset_color(){
+				if(m_user_color){
+					m_color = string_color(m_pin.type().name());
+					m_user_color = false;
+					Q_EMIT color_changed(m_color);
 				}
 			}
 
 		Q_SIGNALS:
 			void name_changed(const QString&);
-			void type_changed(ham::type);
+			void pin_type_changed(ham::type);
+			void color_changed(const QColor&);
+
+		protected:
+			void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
+			void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
+			void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
 
 		private:
-			QString m_name;
-			ham::type m_type;
+			QLabel *m_name_lbl;
+			engine::graph_node_pin_view m_pin;
+			QColor m_color;
+			pin_dot *m_dot;
+			connection_curve *m_curve;
+
+			bool m_user_color = false;
 	};
 
-	class node: public QObject{
+	class graph_node: public QGraphicsWidget{
 		Q_OBJECT
 
 		Q_PROPERTY(QString name READ name WRITE set_name NOTIFY name_changed)
-		Q_PROPERTY(QList<ham::engine::editor::node_pin*> pins READ pins WRITE set_pins NOTIFY pins_changed)
+		Q_PROPERTY(QList<ham::engine::editor::graph_node_pin*> inputs READ inputs CONSTANT)
+		Q_PROPERTY(QList<ham::engine::editor::graph_node_pin*> outputs READ outputs CONSTANT)
 
 		public:
-			node(QString name, QList<node_pin*> pins, QObject *parent = nullptr)
-				: QObject(parent), m_name(std::move(name)), m_pins(std::move(pins)){}
+			graph_node(engine::graph *graph, const QString &name, QGraphicsItem *parent = nullptr);
 
-			explicit node(QString name, QObject *parent = nullptr)
-				: node(std::move(name), {}, parent){}
+			~graph_node(){
+				for(auto pin : m_inputs){
+					delete pin;
+				}
 
-			const QString &name() const noexcept{ return m_name; }
-			const QList<node_pin*> &pins() const noexcept{ return m_pins; }
-
-			void set_name(QAnyStringView new_name){
-				if(new_name != m_name){
-					m_name = new_name.toString();
-					Q_EMIT name_changed(m_name);
+				for(auto pin : m_outputs){
+					delete pin;
 				}
 			}
 
-			void set_pins(const QList<node_pin*> &new_pins){
-				if(new_pins != m_pins){
-					m_pins = new_pins;
-					Q_EMIT pins_changed(m_pins);
+			engine::const_graph_node_view node() const noexcept{ return m_node.ptr(); }
+
+			QString name() const noexcept{ return m_name_lbl->text(); }
+
+			const QList<graph_node_pin*> &inputs() const noexcept{ return m_inputs; }
+			const QList<graph_node_pin*> &outputs() const noexcept{ return m_outputs; }
+
+			void set_name(const QString &new_name){
+				if(m_name_lbl->text() != new_name){
+					const auto name_utf8 = new_name.toUtf8();
+					m_name_lbl->setText(new_name);
+					m_node.set_name(name_utf8.data());
+					Q_EMIT name_changed(new_name);
 				}
 			}
 
-			node_pin *create_pin(QString name_, ham::type type){
-				const auto pin = new node_pin(std::move(name_), type, this);
-				m_pins.emplaceBack(pin);
-				Q_EMIT pins_changed(m_pins);
-				return pin;
-			}
+			graph_node_pin *new_pin(ham_graph_node_pin_direction direction, const QString &name_, ham::type type);
 
-			bool destroy_pin(node_pin *pin){
-				const auto res = std::find(m_pins.cbegin(), m_pins.cend(), pin);
-				if(res == m_pins.end()){
-					return false;
-				}
-
-				m_pins.erase(res);
-				Q_EMIT pins_changed(m_pins);
-				return true;
-			}
+			void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
 		Q_SIGNALS:
 			void name_changed(const QString&);
-			void pins_changed(const QList<ham::engine::editor::node_pin*>&);
-
-		private:
-			QString m_name;
-			QList<node_pin*> m_pins;
-	};
-
-	class graph_node: public QObject{
-		Q_OBJECT
-
-		Q_PROPERTY(ham::engine::editor::node* node READ node WRITE set_node NOTIFY node_changed)
-		Q_PROPERTY(QPointF pos READ pos WRITE set_pos NOTIFY pos_changed)
-
-		public:
-			graph_node(editor::node *node, QPointF pos, QObject *parent = nullptr)
-				: QObject(parent), m_node(node), m_pos(pos)
-			{
-				node->setParent(this);
-			}
-
-			graph_node(QString name, QList<node_pin*> pins, QPointF pos, QObject *parent = nullptr)
-				: graph_node(new editor::node(std::move(name), std::move(pins)), pos, parent){}
-
-			graph_node(QString name, QPointF pos, QObject *parent = nullptr)
-				: graph_node(new editor::node(std::move(name), {}, parent), pos, parent){}
-
-			editor::node *node() const noexcept{ return m_node; }
-
-			const QPointF &pos() const noexcept{ return m_pos; }
-
-			void set_node(editor::node *new_node){
-				if(m_node != new_node){
-					m_node = new_node;
-					Q_EMIT node_changed(new_node);
-				}
-			}
-
-			void set_pos(QPointF new_pos){
-				if(m_pos != new_pos){
-					m_pos = new_pos;
-					Q_EMIT pos_changed(new_pos);
-				}
-			}
-
-			void translate(QVector2D amnt){
-				if(amnt.lengthSquared() > 0){
-					m_pos += QPointF(amnt.x(), amnt.y());
-					Q_EMIT pos_changed(m_pos);
-				}
-			}
-
-			node_pin *create_pin(QString name_, ham::type type){
-				const auto pin = m_node->create_pin(std::move(name_), type);
-				return pin;
-			}
-
-			bool destroy_pin(node_pin *pin){
-				return m_node->destroy_pin(pin);
-			}
-
-		Q_SIGNALS:
-			void node_changed(ham::engine::editor::node*);
 			void pos_changed(QPointF);
 
+			void pin_added(ham::engine::editor::graph_node_pin*);
+			void pin_removed(ham::engine::editor::graph_node_pin*);
+
 		private:
-			editor::node *m_node;
-			QPointF m_pos;
+			QLabel *m_name_lbl;
+			engine::graph_node_view m_node;
+			QList<graph_node_pin*> m_inputs, m_outputs;
+			QGraphicsLinearLayout *m_in_lay, *m_out_lay;
 	};
 
 	class graph: public QObject{
 		Q_OBJECT
 
-		Q_PROPERTY(QList<ham::engine::editor::graph_node*> nodes READ nodes WRITE set_nodes NOTIFY nodes_changed)
+		Q_PROPERTY(QGraphicsScene* scene READ scene CONSTANT)
+
+		Q_PROPERTY(QString name READ name WRITE set_name NOTIFY name_changed)
+		Q_PROPERTY(QList<ham::engine::editor::graph_node*> nodes READ nodes CONSTANT)
 
 		public:
-			explicit graph(QObject *parent = nullptr)
-				: QObject(parent){}
+			explicit graph(QString name, QObject *parent = nullptr);
+			~graph();
+
+			QGraphicsScene *scene() const noexcept{ return m_scene; }
+
+			const QString &name() const noexcept{ return m_name; }
 
 			const QList<graph_node*> &nodes() const noexcept{ return m_nodes; }
 
-			void set_nodes(QList<graph_node*> new_nodes){
-				if(new_nodes != m_nodes){
-					m_nodes = std::move(new_nodes);
-					for(auto node : m_nodes){
-						node->setParent(this);
-					}
+			graph_node *new_node(QPointF pos, const QString &name);
 
-					Q_EMIT nodes_changed(m_nodes);
+			void set_name(const QString &new_name){
+				if(m_name != new_name){
+					const auto name_utf8 = new_name.toUtf8();
+					m_graph.set_name(name_utf8.data());
+					m_name = new_name;
+					Q_EMIT name_changed(new_name);
 				}
 			}
 
-			graph_node *create_node(QPointF pos, QString name, QList<node_pin*> pins){
-				const auto inner = new node(name, std::move(pins), this);
-				const auto ret   = new graph_node(inner, pos, this);
-
-				m_nodes.append(ret);
-				Q_EMIT nodes_changed(m_nodes);
-
-				return ret;
-			}
-
 		Q_SIGNALS:
-			void nodes_changed(const QList<ham::engine::editor::graph_node*>&);
+			void name_changed(const QString&);
 
-		private:
-			QList<graph_node*> m_nodes;
-	};
-
-	class graph_scene: public QObject{
-		Q_OBJECT
-
-		Q_PROPERTY(QGraphicsScene* graphics_scene READ graphics_scene CONSTANT)
-		Q_PROPERTY(editor::graph* graph READ graph CONSTANT)
-
-		public:
-			explicit graph_scene(editor::graph *graph, QObject *parent = nullptr);
-
-			explicit graph_scene(QObject *parent = nullptr)
-				: graph_scene(new editor::graph, parent){}
-
-			~graph_scene();
-
-			QGraphicsScene *graphics_scene() noexcept{ return m_scene; }
-			const QGraphicsScene *graphics_scene() const noexcept{ return m_scene; }
-
-			editor::graph *graph() noexcept{ return m_graph; }
-			const editor::graph *graph() const noexcept{ return m_graph; }
-
-			graph_node *create_node(QPointF pos, QString name, QList<node_pin*> pins);
+			void node_added(ham::engine::editor::graph_node*);
+			void node_removed(ham::engine::editor::graph_node*);
 
 		private:
 			QGraphicsScene *m_scene;
-			editor::graph *m_graph;
-			QHash<node_pin*, QGraphicsItem*> m_pin_items;
+			QString m_name;
+			ham::engine::graph m_graph;
+			QList<graph_node*> m_nodes;
 	};
 
 	class graph_editor: public QWidget{
 		Q_OBJECT
 
-		Q_PROPERTY(ham::engine::editor::graph_scene* scene READ scene CONSTANT)
+		Q_PROPERTY(ham::engine::editor::graph* graph READ graph CONSTANT)
 		Q_PROPERTY(QGraphicsView* graphics_view READ graphics_view CONSTANT)
 
 		public:
-			explicit graph_editor(graph_scene *scene = nullptr, QWidget *parent = nullptr);
+			explicit graph_editor(editor::graph *graph = nullptr, QWidget *parent = nullptr);
 
-			explicit graph_editor(QWidget *parent = nullptr)
-				: graph_editor(new graph_scene, parent){}
+			explicit graph_editor(const QString &name, QWidget *parent = nullptr)
+				: graph_editor(new editor::graph(name), parent){}
 
 			~graph_editor();
 
-			graph_scene *scene() const noexcept{ return m_scene; }
+			editor::graph *graph() const noexcept{ return m_graph; }
 			QGraphicsView *graphics_view() const noexcept{ return m_view; }
 
-			graph_node *create_node(QPointF pos, QString name, QList<node_pin*> pins){
-				return m_scene->create_node(pos, std::move(name), std::move(pins));
+			graph_node *new_node(QPointF pos, const QString &name){
+				return m_graph->new_node(pos, name);
 			}
 
 		private:
-			graph_scene *m_scene;
+			editor::graph *m_graph;
 			QGraphicsView *m_view;
 	};
 }

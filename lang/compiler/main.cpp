@@ -33,7 +33,7 @@ namespace ham{
 		bool verbose = false;
 		bool quiet = false;
 		str8 output_file = "hamc-out";
-		std_vector<str_buffer_utf8> input_files;
+		std_vector<str_buffer8> input_files;
 	};
 }
 
@@ -170,7 +170,7 @@ int main(int argc, char *argv[]){
 		// TODO: check file encoding
 		// default to utf-8 for now
 
-		ham::str_buffer_utf8 file_content_buf;
+		ham::str_buffer8 file_content_buf;
 		if(!file_content_buf.resize(file_size-1)){
 			if(!comp_options.quiet) fprintf(stderr, "Failed to allocate memory for file contents: %s\n", path_buf.c_str());
 			return 3;

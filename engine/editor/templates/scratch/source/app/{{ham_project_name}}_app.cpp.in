@@ -1,0 +1,9 @@
+#include "{{ham_project_name}}_app.h"
+
+ham_def_ctor({{ham_project_name}}_app){
+	return self;
+}
+
+ham_def_dtor({{ham_project_name}}_app){}
+
+ham_def_app({{ham_project_name}}_app)

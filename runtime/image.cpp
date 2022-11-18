@@ -94,7 +94,7 @@ static inline int ham_fif_load_flags(FREE_IMAGE_FORMAT fif){
 	}
 }
 
-ham_image *ham_image_create(ham_color_format format, ham_u32 w, ham_u32 h, const void *data){
+ham_image *ham_image_create_alloc(const ham_allocator *allocator, ham_color_format format, ham_u32 w, ham_u32 h, const void *data){
 	if(!ham_check(format < HAM_COLOR_FORMAT_COUNT) || !ham_check(w != 0) || !ham_check(h != 0)){
 		return nullptr;
 	}
@@ -102,8 +102,6 @@ ham_image *ham_image_create(ham_color_format format, ham_u32 w, ham_u32 h, const
 	const auto num_components = ham_color_format_num_components(format);
 	const auto component_size = ham_color_format_component_size(format);
 	const auto texture_size = w * h * num_components * component_size;
-
-	const auto allocator = ham_current_allocator();
 
 	const auto pixels = ham_allocator_alloc(allocator, alignof(void*), texture_size);
 	if(!pixels){

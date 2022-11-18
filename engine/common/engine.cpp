@@ -31,6 +31,9 @@ HAM_C_API_BEGIN
 struct ham_engine{
 	const ham_allocator *allocator;
 	ham_engine_app app;
+
+	ham_typeset *ts;
+
 	ham_image *default_tex;
 
 	std::atomic<usize> num_subsystems;
@@ -40,7 +43,7 @@ struct ham_engine{
 	std::atomic<int> status;
 	std::atomic<f64> min_dt;
 
-	ham::std_vector<ham::str_buffer_utf8> interned;
+	ham::std_vector<ham::str_buffer8> interned;
 };
 
 ham::mutex ham_impl_gengine_mut;
@@ -217,7 +220,7 @@ static inline void ham_image_buf_fill_rgba8(
 	}
 }
 
-ham_engine *ham_engine_create(const ham_engine_app *app){
+ham_engine *ham_engine_create_alloc(const ham_allocator *allocator, const ham_engine_app *app){
 	ham::scoped_lock lock(ham_impl_gengine_mut);
 
 	if(
@@ -237,6 +240,12 @@ ham_engine *ham_engine_create(const ham_engine_app *app){
 		return nullptr;
 	}
 
+	const auto ts = ham_typeset_create_alloc(allocator);
+	if(!ts){
+		ham::logapierror("Could not create typeset");
+		return nullptr;
+	}
+
 	ham_u8 default_tex_pixels[512*512*4];
 	constexpr ham_color_u8 pixel_color = { .data = { 0xff, 0x78, 0x0, 0xff } };
 	constexpr ham_color_u8 pixel_color_grey = { .data = { 0x69, 0x69, 0x69, 0xff } };
@@ -247,17 +256,17 @@ ham_engine *ham_engine_create(const ham_engine_app *app){
 	ham_image_buf_fill_rgba8(default_tex_pixels, 512, 512, pixel_color_grey, 256, 0, 256, 256);
 	ham_image_buf_fill_rgba8(default_tex_pixels, 512, 512, pixel_color_grey, 0, 256, 256, 256);
 
-	const auto default_tex = ham_image_create(HAM_RGBA8U, 512, 512, default_tex_pixels);
+	const auto default_tex = ham_image_create_alloc(allocator, HAM_RGBA8U, 512, 512, default_tex_pixels);
 	if(!default_tex){
 		ham::logapierror("Could not create default texture");
+		ham_typeset_destroy(ts);
 		return nullptr;
 	}
-
-	const auto allocator = ham_current_allocator();
 
 	const auto engine = ham_allocator_new(allocator, ham_engine);
 	if(!engine){
 		ham_image_destroy(default_tex);
+		ham_typeset_destroy(ts);
 		return nullptr;
 	}
 
@@ -282,6 +291,7 @@ ham_engine *ham_engine_create(const ham_engine_app *app){
 	engine->app.user = app->user;
 
 	engine->allocator = allocator;
+	engine->ts = ts;
 	engine->default_tex = default_tex;
 
 	engine->num_subsystems.store(0, std::memory_order_relaxed);
@@ -293,6 +303,8 @@ ham_engine *ham_engine_create(const ham_engine_app *app){
 
 	if(!app->init(engine, app->user)){
 		ham::logapierror("Failed to initialize app '{}'", app->name);
+		ham_image_destroy(default_tex);
+		ham_typeset_destroy(ts);
 		ham_allocator_delete(allocator, engine);
 		return nullptr;
 	}
@@ -333,9 +345,16 @@ ham_nothrow void ham_engine_destroy(ham_engine *engine){
 
 	ham_image_destroy(engine->default_tex);
 
+	ham_typeset_destroy(engine->ts);
+
 	ham_allocator_delete(allocator, engine);
 
 	ham_impl_gengine = nullptr;
+}
+
+ham_nothrow ham_typeset *ham_engine_ts(ham_engine *engine){
+	if(!ham_check(engine != NULL)) return nullptr;
+	return engine->ts;
 }
 
 ham_nothrow const ham_engine_app *ham_engine_get_app(const ham_engine *engine){
@@ -351,6 +370,14 @@ ham_nothrow ham_usize ham_engine_num_subsystems(const ham_engine *engine){
 }
 
 ham_nothrow ham_engine_subsys *ham_engine_get_subsystem(ham_engine *engine, ham_usize idx){
+	if(!ham_check(engine != NULL) || !ham_check(idx < engine->num_subsystems)){
+		return nullptr;
+	}
+
+	return engine->subsystems[idx];
+}
+
+ham_nothrow const ham_engine_subsys *ham_engine_get_const_subsystem(const ham_engine *engine, ham_usize idx){
 	if(!ham_check(engine != NULL) || !ham_check(idx < engine->num_subsystems)){
 		return nullptr;
 	}
@@ -411,7 +438,7 @@ int ham_engine_exec(ham_engine *engine){
 
 struct ham_engine_subsys{
 	ham_engine *engine;
-	ham::str_buffer_utf8 name;
+	ham::str_buffer8 name;
 
 	ham_engine_subsys_init_fn init_fn;
 	ham_engine_subsys_fini_fn fini_fn;

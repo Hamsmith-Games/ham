@@ -25,6 +25,7 @@
  * @{
  */
 
+#include "memory.h"
 #include "object.h"
 
 HAM_C_API_BEGIN
@@ -36,6 +37,8 @@ typedef enum ham_type_kind_flag{
 	HAM_TYPE_OBJECT,
 	HAM_TYPE_STRING,
 	HAM_TYPE_NUMERIC,
+
+	HAM_TYPE_KIND_FLAG_COUNT,
 
 	HAM_TYPE_KIND_MAX_VALUE = 0x7,
 } ham_type_kind_flag;
@@ -93,7 +96,10 @@ ham_constexpr ham_nothrow static inline ham_type_info_flag ham_type_flags_info(h
 	return (ham_type_info_flag)((flags & HAM_TYPE_FLAGS_INFO_MASK) >> HAM_TYPE_FLAGS_INFO_SHIFT);
 }
 
-ham_api const char *ham_type_name(const ham_type *type);
+ham_api ham_nothrow const char *ham_type_name(const ham_type *type);
+
+ham_api ham_nothrow ham_usize ham_type_alignment(const ham_type *type);
+ham_api ham_nothrow ham_usize ham_type_size(const ham_type *type);
 
 /**
  * @defgroup HAM_TYPESYS_OBJECT Object type introspection
@@ -128,7 +134,13 @@ ham_api ham_usize ham_type_methods_iterate(const ham_type *type, ham_type_method
  * @{
  */
 
-ham_api ham_typeset *ham_typeset_create();
+ham_nonnull_args(1)
+ham_api ham_typeset *ham_typeset_create_alloc(const ham_allocator *allocator);
+
+ham_used
+static inline ham_typeset *ham_typeset_create(){
+	return ham_typeset_create_alloc(ham_current_allocator());
+}
 
 ham_api void ham_typeset_destroy(ham_typeset *ts);
 
@@ -162,7 +174,11 @@ ham_api const ham_type *ham_typeset_vec(const ham_typeset *ts, const ham_type *e
 
 typedef struct ham_type_builder ham_type_builder;
 
-ham_api ham_type_builder *ham_type_builder_create();
+ham_api ham_type_builder *ham_type_builder_create_alloc(const ham_allocator *allocator);
+
+static inline ham_type_builder *ham_type_builder_create(){
+	return ham_type_builder_create_alloc(ham_current_allocator());
+}
 
 ham_api ham_nothrow void ham_type_builder_destroy(ham_type_builder *builder);
 
@@ -170,6 +186,8 @@ ham_api ham_nothrow bool ham_type_builder_reset(ham_type_builder *builder);
 
 ham_api const ham_type *ham_type_builder_instantiate(ham_type_builder *builder, ham_typeset *ts);
 
+ham_api ham_nothrow bool ham_type_builder_set_kind(ham_type_builder *builder, ham_type_kind_flag kind);
+ham_api ham_nothrow bool ham_type_builder_set_name(ham_type_builder *builder, ham_str8 name);
 ham_api ham_nothrow bool ham_type_builder_set_parent(ham_type_builder *builder, const ham_type *parent_type);
 ham_api ham_nothrow bool ham_type_builder_set_vptr(ham_type_builder *builder, const ham_object_vtable *vptr);
 
@@ -198,6 +216,11 @@ namespace ham{
 			constexpr bool operator!=(type other) const noexcept{ return m_ptr != other.m_ptr; }
 
 			constexpr pointer ptr() const noexcept{ return m_ptr; }
+
+			usize alignment() const noexcept{ return ham_type_alignment(m_ptr); }
+			usize size() const noexcept{ return ham_type_size(m_ptr); }
+
+			str8 name() const noexcept{ return ham_type_name(m_ptr); }
 
 		private:
 			pointer m_ptr;
@@ -228,10 +251,13 @@ namespace ham{
 
 	class typeset{
 		public:
-			typeset(): m_handle(ham_typeset_create()){}
+			explicit typeset(const ham_allocator *allocator = ham_current_allocator())
+				: m_handle(ham_typeset_create_alloc(allocator)){}
 
 			operator typeset_view() noexcept{ return m_handle.get(); }
 			operator const_typeset_view() const noexcept{ return m_handle.get(); }
+
+			type get(str8 name) const noexcept{ return ham_typeset_get(m_handle.get(), name); }
 
 		private:
 			unique_handle<ham_typeset*, ham_typeset_destroy> m_handle;
@@ -239,7 +265,16 @@ namespace ham{
 
 	class type_builder{
 		public:
-			type_builder(): m_handle(ham_type_builder_create()){}
+			explicit type_builder(): m_handle(ham_type_builder_create()){}
+
+			type instantiate(typeset_view ts){ return ham_type_builder_instantiate(m_handle.get(), ts); }
+
+			bool set_kind(ham_type_kind_flag kind){ return ham_type_builder_set_kind(m_handle.get(), kind); }
+			bool set_name(str8 name){ return ham_type_builder_set_name(m_handle.get(), name); }
+			bool set_parent(type parent){ return ham_type_builder_set_parent(m_handle.get(), parent); }
+			bool set_vptr(const ham_object_vtable *vptr){ return ham_type_builder_set_vptr(m_handle.get(), vptr); }
+
+			bool add_member(str8 name, type type){ return ham_type_builder_add_member(m_handle.get(), name, type); }
 
 		private:
 			unique_handle<ham_type_builder*, ham_type_builder_destroy> m_handle;

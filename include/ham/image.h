@@ -7,13 +7,20 @@
  * @{
  */
 
-#include "ham/typedefs.h"
+#include "ham/memory.h"
 
 HAM_C_API_BEGIN
 
 typedef struct ham_image ham_image;
 
-ham_api ham_image *ham_image_create(ham_color_format format, ham_u32 w, ham_u32 h, const void *data);
+ham_nonnull_args(1)
+ham_api ham_image *ham_image_create_alloc(const ham_allocator *allocator, ham_color_format format, ham_u32 w, ham_u32 h, const void *data);
+
+ham_used
+static inline ham_image *ham_image_create(ham_color_format format, ham_u32 w, ham_u32 h, const void *data){
+	return ham_image_create_alloc(ham_current_allocator(), format, w, h, data);
+}
+
 ham_api ham_image *ham_image_create_view(const ham_image *img);
 
 ham_api void ham_image_destroy(ham_image *img);

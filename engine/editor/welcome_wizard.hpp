@@ -149,6 +149,9 @@ namespace ham::engine::editor{
 			explicit welcome_window(QWidget *parent = nullptr);
 			~welcome_window();
 
+		public Q_SLOTS:
+			void load_project(const QDir &project_dir);
+
 		protected:
 			void new_proj_pressed();
 			void open_proj_pressed();

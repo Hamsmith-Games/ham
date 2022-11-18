@@ -37,6 +37,8 @@
 #include <QSplitter>
 #include <QFileDialog>
 #include <QStandardPaths>
+#include <QStringListModel>
+#include <QTableView>
 
 namespace editor = ham::engine::editor;
 
@@ -393,6 +395,15 @@ editor::welcome_window::welcome_window(QWidget *parent)
 
 editor::welcome_window::~welcome_window(){}
 
+void editor::welcome_window::load_project(const QDir &project_dir){
+	Q_ASSERT(project_dir.exists());
+
+	const auto proj = new editor::project(project_dir);
+	const auto main_win = new editor::main_window(proj);
+	main_win->show();
+	this->close();
+}
+
 void editor::welcome_window::new_proj_pressed(){
 	setWindowTitle(tr("New Project"));
 	set_central_widget(m_wizard);
@@ -404,10 +415,7 @@ void editor::welcome_window::open_proj_pressed(){
 	const auto proj_dir = QFileDialog::getExistingDirectory(this, tr("Project Directory"), editor::default_project_path());
 	if(proj_dir.isEmpty()) return;
 
-	const auto proj = new editor::project(QDir(proj_dir));
-	const auto main_win = new editor::main_window(proj);
-	main_win->show();
-	this->close();
+	load_project(QDir(proj_dir));
 }
 
 QWidget *editor::welcome_window::createWelcomeSplash(){
@@ -430,7 +438,28 @@ QWidget *editor::welcome_window::createWelcomeSplash(){
 	proj_btns_layout->addWidget(new_proj_btn);
 	proj_btns_layout->addWidget(open_proj_btn);
 
-	projs_box->setLayout(proj_btns_layout);
+	const auto recent_projs_list = new QListView;
+	const auto recent_projs_model = new recent_projects_model(recent_projs_list);
+
+	recent_projs_list->setContentsMargins(0, 0, 0, 0);
+	recent_projs_list->setSpacing(0);
+	recent_projs_list->setModel(recent_projs_model);
+	recent_projs_list->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+
+	connect(recent_projs_list, &QAbstractItemView::doubleClicked, recent_projs_model, [this, recent_projs_model](const QModelIndex &index){
+		if(!index.isValid()) return;
+
+		const auto proj_dir = recent_projs_model->data(index, Qt::ToolTipRole).toString();
+		load_project(proj_dir);
+	});
+
+	const auto proj_box_lay = new QVBoxLayout;
+
+	proj_box_lay->setContentsMargins(0, 0, 0, 0);
+	proj_box_lay->addLayout(proj_btns_layout);
+	proj_box_lay->addWidget(recent_projs_list, 1);
+
+	projs_box->setLayout(proj_box_lay);
 
 	const auto layout = new QVBoxLayout;
 	layout->addWidget(logo_lbl, 0, Qt::AlignCenter);

@@ -61,6 +61,8 @@ struct ham_typeset{
 	mutable ham::colony<ham_type> types;
 	mutable robin_hood::unordered_flat_map<ham::str8, const ham_type*> type_map;
 
+	ham::std_vector<ham::str_buffer8> interned;
+
 	robin_hood::unordered_node_map<ham::str8, ham_type_object> obj_types;
 
 	const ham_type *void_type;
@@ -88,6 +90,11 @@ struct ham_typeset{
 	const ham_type *vec_types[3];
 };
 
+ham_nonnull_args(1)
+static inline ham::str8 ham_typeset_intern_str(ham_typeset *ts, ham::str8 str_){
+	return ts->interned.emplace_back(str_);
+}
+
 //
 // Type introspection
 //
@@ -95,6 +102,21 @@ struct ham_typeset{
 ham_nothrow ham_u32 ham_type_get_flags(const ham_type *type){
 	if(!ham_check(type != NULL)) return (ham_u32)-1;
 	return type->flags;
+}
+
+ham_nothrow const char *ham_type_name(const ham_type *type){
+	if(!ham_check(type != NULL)) return nullptr;
+	return type->name;
+}
+
+ham_nothrow ham_usize ham_type_alignment(const ham_type *type){
+	if(!ham_check(type != NULL)) return (usize)-1;
+	return type->alignment;
+}
+
+ham_nothrow ham_usize ham_type_size(const ham_type *type){
+	if(!ham_check(type != NULL)) return (usize)-1;
+	return type->size;
 }
 
 ham_nothrow const ham_object_vtable *ham_type_vptr(const ham_type *type){
@@ -203,9 +225,7 @@ static inline const ham_type *ham_impl_typeset_new_type(
 	return new_type;
 }
 
-ham_typeset *ham_typeset_create(){
-	const auto allocator = ham_current_allocator();
-
+ham_typeset *ham_typeset_create_alloc(const ham_allocator *allocator){
 	const auto ptr = ham_allocator_new(allocator, ham_typeset);
 	if(!ptr) return nullptr;
 
@@ -213,8 +233,8 @@ ham_typeset *ham_typeset_create(){
 
 	ptr->void_type   = ham_impl_typeset_new_type(ptr, "void",       HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_VOID,    0, 0);
 	ptr->unit_type   = ham_impl_typeset_new_type(ptr, "ham_unit",   HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_UNIT,    1, 1);
-	ptr->top_type    = ham_impl_typeset_new_type(ptr, "HAM_TOP",    HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_TOP,     0, 0);
-	ptr->bottom_type = ham_impl_typeset_new_type(ptr, "HAM_BOTTOM", HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_BOTTOM,  0, 0);
+	ptr->top_type    = ham_impl_typeset_new_type(ptr, "ham_top",    HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_TOP,     0, 0);
+	ptr->bottom_type = ham_impl_typeset_new_type(ptr, "ham_bottom", HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_BOTTOM,  0, 0);
 	ptr->bool_type   = ham_impl_typeset_new_type(ptr, "bool",       HAM_TYPE_NUMERIC,   HAM_TYPE_INFO_NUMERIC_BOOLEAN,   alignof(bool), sizeof(bool));
 
 	constexpr const char *nat_names[] = { "u8", "u16", "u32", "u64", "u128" };
@@ -425,9 +445,7 @@ struct ham_type_builder{
 	ham::std_vector<ham_type_method> methods;
 };
 
-ham_type_builder *ham_type_builder_create(){
-	const auto allocator = ham_current_allocator();
-
+ham_type_builder *ham_type_builder_create_alloc(const ham_allocator *allocator){
 	const auto ptr = ham_allocator_new(allocator, ham_type_builder);
 	if(!ptr) return nullptr;
 
@@ -460,20 +478,136 @@ ham_nothrow bool ham_type_builder_reset(ham_type_builder *builder){
 }
 
 const ham_type *ham_type_builder_instantiate(ham_type_builder *builder, ham_typeset *ts){
-	if(!ham_check(builder != NULL)) return nullptr;
-	else if(builder->instance) return builder->instance;
+	if(!ham_check(builder != NULL)){
+		return nullptr;
+	}
+	else if(builder->instance){
+		return builder->instance;
+	}
+	else if(builder->name_buf[0] == '\0'){
+		ham::logapierror("Builder has no name set");
+		return nullptr;
+	}
+	else if(builder->kind == (ham_type_kind_flag)-1 || builder->info == (ham_type_info_flag)-1){
+		ham::logapierror("Builder does not contain a valid type");
+		return nullptr;
+	}
+
+	const auto existing = ham_typeset_get(ts, ham::str8((const char*)builder->name_buf));
+	if(existing){
+		ham::logapierror("Typeset already contains type by name '{}'", ham::str8((const char*)builder->name_buf));
+		return nullptr;
+	}
+
+	const auto type_name = ham_typeset_intern_str(ts, (const char*)builder->name_buf);
 
 	switch(builder->kind){
 		case HAM_TYPE_OBJECT:{
-			ham::logapierror("Object type builders currently unimplemented");
-			return nullptr;
+			const auto obj_emplace = ts->obj_types.try_emplace(type_name);
+			if(!obj_emplace.second){
+				ham::logapierror("Failed to create new object type '{}' in typeset", type_name);
+				return nullptr;
+			}
+
+			auto obj_type = &obj_emplace.first->second;
+			auto type = ham_super(obj_type);
+
+			const auto emplace_res = ts->type_map.try_emplace(type_name, type);
+			if(!emplace_res.second){
+				ham::logapierror("failed to emplace type '{}' in typeset type map");
+				ts->obj_types.erase(obj_emplace.first);
+				return nullptr;
+			}
+
+			type->ts        = ts;
+			type->name      = ham_typeset_intern_str(ts, type_name).ptr();
+			type->flags     = ham_make_type_flags(builder->kind, builder->info);
+			type->alignment = 1;
+			type->size      = 0;
+			type->data      = nullptr;
+			type->n0        = builder->members.size();
+			type->n1        = builder->methods.size();
+
+			obj_type->members.reserve(type->n0);
+			obj_type->methods.reserve(type->n1);
+
+			for(auto &&member : builder->members){
+				type->size += type->size % member.type->alignment;
+
+				type->alignment = ham_max(type->alignment, member.type->alignment);
+
+				type->size += member.type->size;
+
+				auto &new_member = obj_type->members.emplace_back();
+
+				new_member.name = ham_typeset_intern_str(ts, member.name);
+				new_member.type = member.type;
+			}
+
+			if(type->size){
+				type->size += (type->size % type->alignment);
+			}
+
+			for(auto &&method : builder->methods){
+				auto &new_method = obj_type->methods.emplace_back();
+
+				new_method.name = ham_typeset_intern_str(ts, method.name);
+				new_method.param_types = method.param_types;
+
+				const auto num_params = method.param_types.size();
+
+				new_method.param_names.resize(num_params);
+
+				for(usize i = 0; i < num_params; i++){
+					new_method.param_names[i] = ham_typeset_intern_str(ts, method.param_names[i]);
+				}
+			}
+
+			builder->instance = type;
+
+			return type;
 		}
 
 		default:{
-			ham::logapierror("Type builders currently unimplemented");
+			ham::logapierror("Only object type builders currently implemented");
 			return nullptr;
 		}
 	}
+}
+
+ham_nothrow bool ham_type_builder_set_kind(ham_type_builder *builder, ham_type_kind_flag kind){
+	if(
+		!ham_check(builder != NULL) ||
+		!ham_check(builder->kind == (ham_type_kind_flag)-1) ||
+		!ham_check(kind < HAM_TYPE_KIND_FLAG_COUNT)
+	){
+		return false;
+	}
+
+	if(kind != HAM_TYPE_OBJECT){
+		ham::logapierror("Only object type builders currently supported");
+		return false;
+	}
+
+	builder->kind = kind;
+	builder->info = HAM_TYPE_INFO_OBJECT_POD;
+
+	return true;
+}
+
+ham_nothrow bool ham_type_builder_set_name(ham_type_builder *builder, ham_str8 name){
+	if(
+	   !ham_check(builder != NULL) ||
+	   !ham_check(name.len && name.ptr) ||
+	   !ham_check(name.len < (HAM_NAME_BUFFER_SIZE-1))
+	){
+		return false;
+	}
+
+	memcpy(builder->name_buf, name.ptr, name.len);
+	builder->name_buf[name.len] = '\0';
+
+	return true;
 }
 
 ham_nothrow bool ham_type_builder_set_parent(ham_type_builder *builder, const ham_type *parent_type){

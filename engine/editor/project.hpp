@@ -20,9 +20,13 @@
 #define HAM_ENGINE_EDITOR_PROJECT_HPP 1
 
 #include <QException>
+#include <QGuiApplication>
 #include <QObject>
+#include <QFont>
+#include <QFontMetrics>
 #include <QDir>
 #include <QVersionNumber>
+#include <QAbstractListModel>
 
 #define HAM_ENGINE_EDITOR_TEMPLATE_JSON_PATH ".ham/engine-template.json"
 
@@ -39,6 +43,47 @@ namespace ham::engine::editor{
 		public:
 			void raise() const override{ throw *this; }
 			project_json_error *clone() const override{ return new project_json_error; }
+	};
+
+	class recent_projects_model: public QAbstractListModel{
+		Q_OBJECT
+
+		public:
+			explicit recent_projects_model(QObject *parent = nullptr)
+				: QAbstractListModel(parent)
+			{
+				update_list();
+			}
+
+			int rowCount(const QModelIndex &parent = QModelIndex()) const override{
+				Q_UNUSED(parent);
+				return m_projs.size();
+			}
+
+			QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override{
+				if(index.row() >= rowCount()){
+					return QVariant();
+				}
+
+				switch(role){
+					case Qt::DisplayRole: return m_projs[index.row()].first;
+					case Qt::ToolTipRole: return m_projs[index.row()].second;
+
+					case Qt::SizeHintRole:{
+						const auto fnt = QGuiApplication::font();
+						QFontMetrics fnt_metrics(fnt);
+						const auto text_size = fnt_metrics.boundingRect(m_projs[index.row()].first).size();
+						return QSize{text_size.width(), text_size.height() + 20};
+					}
+
+					default: return QVariant();
+				}
+			}
+
+			void update_list();
+
+		private:
+			QList<QPair<QString, QString>> m_projs;
 	};
 
 	class project: public QObject{
@@ -131,6 +176,7 @@ namespace ham::engine::editor{
 			quint32 m_id;
 			QVersionNumber m_ver;
 			QString m_name, m_display_name, m_author, m_license, m_desc;
+
 	};
 
 	class project_template: public QObject{

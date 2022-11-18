@@ -205,6 +205,7 @@ typedef enum ham_color_format{
 	HAM_COLOR_FORMAT_COUNT
 } ham_color_format;
 
+ham_used
 ham_constexpr ham_nothrow static inline ham_u32 ham_color_format_component_size(ham_color_format format){
 	switch(format){
 		case HAM_R8U:
@@ -248,6 +249,7 @@ ham_constexpr ham_nothrow static inline ham_u32 ham_color_format_component_size(
 	}
 }
 
+ham_used
 ham_constexpr ham_nothrow static inline ham_u32 ham_color_format_num_components(ham_color_format format){
 	switch(format){
 		case HAM_R8U:
@@ -350,6 +352,7 @@ typedef struct alignas(ham_u32) ham_color_d24_s8{
 typedef ham_color_u8  ham_color;
 typedef ham_color_f32 ham_colorf;
 
+ham_used
 ham_constexpr static inline ham_color_f32 ham_color_u8_to_f32(ham_color_u8 col){
 	return (ham_color_f32){
 		.data = {
@@ -361,6 +364,7 @@ ham_constexpr static inline ham_color_f32 ham_color_u8_to_f32(ham_color_u8 col){
 	};
 }
 
+ham_used
 ham_constexpr static inline ham_color_u8 ham_color_f32_to_u8(ham_color_f32 col){
 	return (ham_color_u8){
 		.data = {
@@ -487,6 +491,7 @@ typedef ham_u32 ham_utf_cp;
 /**
  * Check for unicode property ``White_Space``.
  */
+ham_used
 ham_constexpr ham_nothrow static inline bool ham_utf_is_whitespace(ham_utf_cp cp){
 	return
 		(cp > 0x8 && cp < 0xE) || // basic latin spaces
@@ -507,6 +512,7 @@ ham_constexpr ham_nothrow static inline bool ham_utf_is_whitespace(ham_utf_cp cp
  * Check for numeric digit codepoints.
  * @note currently only supports ASCII subset
  */
+ham_used
 ham_constexpr ham_nothrow static inline bool ham_utf_is_digit(ham_utf_cp cp){
 	return
 		(cp > 0x2F && cp < 0x3A) // ASCII
@@ -517,6 +523,7 @@ ham_constexpr ham_nothrow static inline bool ham_utf_is_digit(ham_utf_cp cp){
  * Check for quote codepoints.
  * @note currently only supports ASCII subset
  */
+ham_used
 ham_constexpr ham_nothrow static inline bool ham_utf_is_quote(ham_utf_cp cp){
 	switch(cp){
 		case U'\'':
@@ -531,6 +538,7 @@ ham_constexpr ham_nothrow static inline bool ham_utf_is_quote(ham_utf_cp cp){
  * Check for alphabetic codepoints.
  * @note currently only supports ASCII subset
  */
+ham_used
 ham_constexpr ham_nothrow static inline bool ham_utf_is_alpha(ham_utf_cp cp){
 	return
 		(cp > 0x40 && cp < 0x5B) || (cp > 0x60 && cp < 0x7B) // ASCII
@@ -541,6 +549,7 @@ ham_constexpr ham_nothrow static inline bool ham_utf_is_alpha(ham_utf_cp cp){
  * Check whether a codepoint is considered an "operator" codepoint
  * @note currently only supports ASCII subset
  */
+ham_used
 ham_constexpr ham_nothrow static inline bool ham_utf_is_op(ham_utf_cp cp){
 	switch(cp){
 		case U'!':
@@ -566,6 +575,7 @@ ham_constexpr ham_nothrow static inline bool ham_utf_is_op(ham_utf_cp cp){
  * Check whether a codepoint is considered a bracket
  * @note currently only supports ASCII subset
  */
+ham_used
 ham_constexpr ham_nothrow static inline bool ham_utf_is_bracket(ham_utf_cp cp){
 	switch(cp){
 		case U'(':
@@ -580,26 +590,31 @@ ham_constexpr ham_nothrow static inline bool ham_utf_is_bracket(ham_utf_cp cp){
 	}
 }
 
+ham_used
 ham_constexpr ham_nothrow static inline ham_utf_cp ham_utf_to_lower(ham_utf_cp cp){
 	if(cp < 91 && cp > 64) return cp + 33;
 	else return cp;
 }
 
+ham_used
 ham_constexpr ham_nothrow static inline ham_utf_cp ham_utf_to_upper(ham_utf_cp cp){
 	if(cp < 123 && cp > 96) return cp - 33;
 	else return cp;
 }
 
+ham_used
 ham_constexpr ham_nothrow static inline char ham_to_lower(char c){
 	if(c < 91 && c > 64) return c + 33;
 	else return c;
 }
 
+ham_used
 ham_constexpr ham_nothrow static inline char ham_to_upper(char c){
 	if(c < 123 && c > 96) return c - 33;
 	else return c;
 }
 
+ham_used
 ham_constexpr ham_nothrow static inline ham_u32 ham_char_hex_value(char c){
 	c = ham_to_upper(c);
 	if(c > 47 && c < 58) return (ham_u32)(c - 48);
@@ -612,6 +627,7 @@ ham_constexpr ham_nothrow static inline ham_u32 ham_char_hex_value(char c){
 #define HAM_UTF16_SURROGATE_HIGH_MIN 0xD800
 #define HAM_UTF16_SURROGATE_HIGH_MAX 0xDBFF
 
+ham_used
 ham_constexpr ham_nothrow static inline ham_usize ham_codepoint_num_chars_utf8(const ham_char8 *cp, ham_usize max_len){
 	if(!cp || max_len == 0){
 		return 0;
@@ -626,6 +642,7 @@ ham_constexpr ham_nothrow static inline ham_usize ham_codepoint_num_chars_utf8(c
 	}
 }
 
+ham_used
 ham_constexpr ham_nothrow static inline ham_usize ham_codepoint_num_chars_utf16(const ham_char16 *cp, ham_usize max_len){
 	if(!cp || max_len == 0) return 0;
 
@@ -640,6 +657,7 @@ ham_constexpr ham_nothrow static inline ham_usize ham_codepoint_num_chars_utf16(
 	}
 }
 
+ham_used
 ham_constexpr ham_nothrow static inline ham_usize ham_codepoint_num_chars_utf32(const ham_char32 *cp, ham_usize max_len){
 	return (!cp || max_len == 0) ? 0 : 1;
 }
@@ -934,6 +952,7 @@ ham_constexpr ham_nothrow static inline ham_uuid ham_str_to_uuid_utf8(ham_str8 u
 	return ret;
 }
 
+ham_used
 ham_nothrow static inline ham_usize ham_str_conv_utf16_utf8(ham_str16 str, ham_char8 *buf, ham_usize buf_len){
 	if(!buf || buf_len == 0){
 		return (ham_usize)-1;
@@ -970,6 +989,7 @@ ham_nothrow static inline ham_usize ham_str_conv_utf16_utf8(ham_str16 str, ham_c
 	return written;
 }
 
+ham_used
 ham_nothrow static inline ham_usize ham_str_conv_utf32_utf8(ham_str32 str, ham_char8 *buf, ham_usize buf_len){
 	if(!buf || buf_len == 0){
 		return (ham_usize)-1;
@@ -1147,6 +1167,25 @@ namespace ham{
 
 		private:
 			Handle m_handle;
+	};
+
+	template<typename T>
+	class basic_pointer_view{
+		public:
+			constexpr static bool is_mutable = std::is_const_v<T>;
+
+			using pointer = T*;
+
+			basic_pointer_view(pointer ptr) noexcept: m_ptr(ptr){}
+
+			operator pointer() const noexcept{ return m_ptr; }
+
+			pointer operator->() const noexcept{ return m_ptr; }
+
+			pointer ptr() const noexcept{ return m_ptr; }
+
+		private:
+			pointer m_ptr;
 	};
 
 	namespace meta{
@@ -1330,7 +1369,7 @@ namespace ham{
 			constexpr basic_str(const Char *ptr, usize len) noexcept: m_val{ ptr, len }{}
 			constexpr basic_str(const ctype &str_) noexcept: m_val(str_){}
 
-			constexpr explicit basic_str(const Char *c_str) noexcept: m_val{ c_str, detail::strlen_utf<Char>(c_str) }{}
+			constexpr basic_str(const Char *c_str) noexcept: m_val{ c_str, detail::strlen_utf<Char>(c_str) }{}
 
 			template<usize N>
 			constexpr basic_str(const Char(&lit)[N]) noexcept: m_val{ lit, N-1 }{}

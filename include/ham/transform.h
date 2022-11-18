@@ -29,7 +29,6 @@
 
 HAM_C_API_BEGIN
 
-
 typedef struct ham_transform{
 	ham_vec3 pos, scale, pyr;
 
@@ -41,7 +40,7 @@ typedef struct ham_transform{
 } ham_transform;
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_transform_reset(ham_transform *trans){
+ham_constexpr ham_math_api void ham_transform_reset(ham_transform *trans){
 	trans->pos   = ham_make_vec3(0.f, 0.f, 0.f);
 	trans->scale = ham_make_vec3(1.f, 1.f, 1.f);
 	trans->pyr   = ham_make_vec3(0.f, 0.f, 0.f);
@@ -53,7 +52,7 @@ ham_constexpr ham_nothrow static inline void ham_transform_reset(ham_transform *
 
 //! @cond ignore
 
-ham_constexpr ham_nothrow static inline void ham_impl_transform_update(const ham_transform *trans){
+ham_constexpr ham_math_api void ham_impl_transform_update(const ham_transform *trans){
 	// :/
 #ifdef __cplusplus
 #	define mut_ptr trans
@@ -86,47 +85,52 @@ ham_constexpr ham_nothrow static inline void ham_impl_transform_update(const ham
 //! @endcond
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_vec3 ham_transform_position(const ham_transform *trans){
+ham_constexpr ham_math_api ham_vec3 ham_transform_position(const ham_transform *trans){
 	return trans->pos;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_quat ham_transform_rotation(const ham_transform *trans){
+ham_constexpr ham_math_api ham_quat ham_transform_rotation(const ham_transform *trans){
 	if(trans->_impl_dirty) ham_impl_transform_update(trans);
 	return trans->_impl_rot;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_vec3 ham_transform_scaling(const ham_transform *trans){
+ham_constexpr ham_math_api ham_vec3 ham_transform_pyr(const ham_transform *trans){
+	return trans->pyr;
+}
+
+ham_nonnull_args(1)
+ham_constexpr ham_math_api ham_vec3 ham_transform_scaling(const ham_transform *trans){
 	return trans->scale;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline ham_mat4 ham_transform_matrix(const ham_transform *trans){
+ham_constexpr ham_math_api ham_mat4 ham_transform_matrix(const ham_transform *trans){
 	if(trans->_impl_dirty) ham_impl_transform_update(trans);
 	return trans->_impl_trans;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_transform_set_position(ham_transform *trans, ham_vec3 pos){
+ham_constexpr ham_math_api void ham_transform_set_position(ham_transform *trans, ham_vec3 pos){
 	trans->pos    = pos;
 	trans->_impl_dirty = true;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_transform_translate(ham_transform *trans, ham_vec3 dP){
+ham_constexpr ham_math_api void ham_transform_translate(ham_transform *trans, ham_vec3 dP){
 	trans->pos    = ham_vec3_add(trans->pos, dP);
 	trans->_impl_dirty = true;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_transform_set_rotation(ham_transform *trans, ham_vec3 pyr){
+ham_constexpr ham_math_api void ham_transform_set_rotation(ham_transform *trans, ham_vec3 pyr){
 	trans->pyr = pyr;
 	trans->_impl_dirty = true;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_transform_rotate(ham_transform *trans, ham_f32 angle, ham_vec3 axis){
+ham_constexpr ham_math_api void ham_transform_rotate(ham_transform *trans, ham_f32 angle, ham_vec3 axis){
 	trans->pyr = ham_vec3_add(trans->pyr, ham_vec3_mul(ham_make_vec3_scalar(angle), axis));
 
 	trans->pyr.x = fmodf(trans->pyr.x, M_PI * 2.f);
@@ -137,13 +141,13 @@ ham_constexpr ham_nothrow static inline void ham_transform_rotate(ham_transform 
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_transform_set_scale(ham_transform *trans, ham_vec3 scale){
+ham_constexpr ham_math_api void ham_transform_set_scale(ham_transform *trans, ham_vec3 scale){
 	trans->scale = scale;
 	trans->_impl_dirty = true;
 }
 
 ham_nonnull_args(1)
-ham_constexpr ham_nothrow static inline void ham_transform_scale(ham_transform *trans, ham_vec3 coef){
+ham_constexpr ham_math_api void ham_transform_scale(ham_transform *trans, ham_vec3 coef){
 	trans->scale = ham_vec3_mul(trans->scale, coef);
 	trans->_impl_dirty = true;
 }
@@ -168,6 +172,7 @@ namespace ham{
 			constexpr vec3 position() const noexcept{ return m_trans.pos; }
 			constexpr vec3 scaling() const noexcept{ return m_trans.scale; }
 			constexpr quat rotation() const noexcept{ return ham_transform_rotation(&m_trans); }
+			constexpr vec3 pyr() const noexcept{ return ham_transform_pyr(&m_trans); }
 
 			constexpr mat4 matrix() const noexcept{ return ham_transform_matrix(&m_trans); }
 

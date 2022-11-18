@@ -40,6 +40,7 @@ int main(int argc, char *argv[]){
 		{"quaternion", ham_test_quat,      check_true},
 		{"transform",  ham_test_transform, check_true},
 		{"camera",     ham_test_camera,    check_true},
+		{"typesys",    ham_test_typesys,   check_true},
 	};
 
 	constexpr usize num_tests = std::size(tests);

@@ -77,6 +77,16 @@ editor::world_view::world_view(ham_engine *engine, ham_world *world, QWidget *pa
 
 	setLayout(lay);
 
+	QSettings settings;
+
+	settings.beginGroup(QString("%1/editor/camera").arg(app_name()));
+
+	const auto cam_pos = settings.value("pos", QVector3D(0.f, 0.f, 0.f)).value<QVector3D>();
+	const auto cam_pyr = settings.value("pyr", QVector3D(0.f, 0.f, 0.f)).value<QVector3D>();
+
+	m_cam.set_position({ cam_pos.x(), cam_pos.y(), cam_pos.z() });
+	m_cam.set_pyr({ cam_pyr.x(), cam_pyr.y(), cam_pyr.z() });
+
 	m_r_widget->do_work([this]{
 		auto test_mdl_file = QFile("://models/xyz_test.glb");
 		if(!test_mdl_file.open(QFile::ReadOnly)){
@@ -120,8 +130,8 @@ editor::world_view::world_view(ham_engine *engine, ham_world *world, QWidget *pa
 			data->normal_mat = ham_mat4_transpose(ham_mat4_inverse(data->trans));
 		});
 
-		ham::light_group_instance_visit(m_cam_light_group, 0, [](ham_light *light){
-			light->pos = ham_make_vec3(0.f, 0.f, 0.f);
+		ham::light_group_instance_visit(m_cam_light_group, 0, [this](ham_light *light){
+			light->pos = m_cam.position();
 			light->effective_radius = 20.f;
 			light->color = ham_make_vec3(1.f, 1.f, 1.f);
 			light->intensity = 4.f;
@@ -222,6 +232,17 @@ void editor::world_view::mouseReleaseEvent(QMouseEvent *ev){
 		m_cam_dir = {0.f, 0.f, 0.f};
 		releaseKeyboard();
 		//releaseMouse();
+
+		QSettings settings;
+
+		settings.beginGroup(QString("%1/editor/camera").arg(app_name()));
+
+		const auto cam_pos = m_cam.position();
+		const auto cam_pyr = m_cam.pyr();
+
+		settings.setValue("pos", QVector3D(cam_pos.x(), cam_pos.y(), cam_pos.z()));
+		settings.setValue("pyr", QVector3D(cam_pyr.x(), cam_pyr.y(), cam_pyr.z()));
+
 		return;
 	}
 
@@ -314,10 +335,23 @@ void editor::world_view::keyReleaseEvent(QKeyEvent *ev){
 void editor::world_view::resizeEvent(QResizeEvent *ev){
 	QWidget::resizeEvent(ev);
 
+	//settings.setValue(QString("%1/editor/size").arg(app_name()), ev->size());
+
 	QSettings settings;
-	settings.setValue("engine/size", ev->size());
+	settings.beginGroup(QString("%1/editor/camera").arg(app_name()));
 
 	const auto new_size = ev->size();
 
-	m_cam.set_perspective_rev(f64(new_size.width())/f64(new_size.height()), M_PI_2 - 0.001f, 0.001f, 100.f);
+	// a == aspect
+	// fov_x = 2 * atan(tan(fov_y * 0.5) * aspect)
+	// fov_y = (2 * tan(fov_x * 0.5)) / a
+
+	const qreal aspect = f64(new_size.width())/f64(new_size.height());
+
+	const qreal fov_x = settings.value("fov", qreal(M_PI_2 - 0.001)).toReal();
+	const qreal fov_y = (2.0 * qTan(fov_x * 0.5)) / aspect;
+
+	const auto cam_zlimits = settings.value("zlimits", QVector2D(0.001f, 1000.f)).value<QVector2D>();
+
+	m_cam.set_perspective_rev(aspect, fov_y, cam_zlimits.x(), cam_zlimits.y());
 }

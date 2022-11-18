@@ -189,7 +189,7 @@ static inline ham_renderer_gl *ham_renderer_gl_ctor(ham_renderer_gl *r, ham_u32 
 	}
 
 	if(!required_exts.empty()){
-		ham::str_buffer_utf8 ext_lines;
+		ham::str_buffer8 ext_lines;
 
 		for(const auto &ext : required_exts){
 			ext_lines += ham::format("\n    {}", ext);
@@ -809,7 +809,7 @@ ham_renderer_gl_api ham_u32 ham_renderer_gl_load_shader(ham_renderer_gl *r, ham_
 	if(status != GL_TRUE){
 		glGetShaderiv(shad, GL_INFO_LOG_LENGTH, &status);
 
-		ham::str_buffer_utf8 buf;
+		ham::str_buffer8 buf;
 		buf.resize((usize)status + 1, '\0');
 
 		glGetShaderInfoLog(shad, status, &status, buf.ptr());
@@ -833,7 +833,7 @@ ham_renderer_gl_api ham_u32 ham_renderer_gl_load_shader(ham_renderer_gl *r, ham_
 	if(status != GL_TRUE){
 		glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &status);
 
-		ham::str_buffer_utf8 buf;
+		ham::str_buffer8 buf;
 		buf.resize((usize)status + 1, '\0');
 
 		glGetProgramInfoLog(prog, status, &status, buf.ptr());
@@ -851,7 +851,7 @@ ham_renderer_gl_api ham_u32 ham_renderer_gl_load_shader(ham_renderer_gl *r, ham_
 	if(status != GL_TRUE){
 		glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &status);
 
-		ham::str_buffer_utf8 buf;
+		ham::str_buffer8 buf;
 		buf.resize((usize)status + 1, '\0');
 
 		glGetProgramInfoLog(prog, status, &status, buf.ptr());
@@ -885,7 +885,7 @@ ham_u32 ham_renderer_gl_create_pipeline(ham_renderer_gl *r, ham_u32 vert_prog, h
 	if(status != GL_TRUE){
 		glGetProgramPipelineiv(ret, GL_INFO_LOG_LENGTH, &status);
 
-		ham::str_buffer_utf8 buf;
+		ham::str_buffer8 buf;
 		buf.resize((usize)status + 1, '\0');
 
 		glGetProgramPipelineInfoLog(ret, status, &status, buf.ptr());

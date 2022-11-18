@@ -26,6 +26,7 @@
 
 #include "engine/world.h" // IWYU pragma: keep
 
+#include "ham/typesys.h"
 #include "ham/json.h"
 #include "ham/image.h"
 
@@ -57,6 +58,7 @@ typedef struct ham_engine_subsys ham_engine_subsys;
 ham_engine_api extern ham_engine *ham_impl_gengine;
 //! @endcond
 
+ham_used
 ham_nothrow static inline ham_engine *ham_gengine(){
 	return ham_impl_gengine;
 }
@@ -79,12 +81,26 @@ typedef struct ham_engine_app{
 ham_engine_api ham_nothrow bool ham_engine_app_load_json(ham_engine_app *ret, const ham_json_value *json);
 
 /**
- * @brief Create a new engine.
+ * @brief Create a new engine instance using a given allocator.
+ * @pre \f$allocator \neq NULL\f$
+ * @warning You can not create multiple engine instances in the same _process_.
+ * @param allocator allocator to use
+ * @param app engine application information
+ * @returns newly created engine or ``NULL`` on error
+ */
+ham_nonnull_args(1)
+ham_engine_api ham_engine *ham_engine_create_alloc(const ham_allocator *allocator, const ham_engine_app *app);
+
+/**
+ * @brief Create a new engine instance.
  * @warning You can not create multiple engine instances in the same _process_.
  * @param app engine application information
  * @returns newly created engine or ``NULL`` on error
  */
-ham_engine_api ham_engine *ham_engine_create(const ham_engine_app *app);
+ham_used
+static inline ham_engine *ham_engine_create(const ham_engine_app *app){
+	return ham_engine_create_alloc(ham_current_allocator(), app);
+}
 
 /**
  * @brief Destroy an engine.
@@ -93,11 +109,14 @@ ham_engine_api ham_engine *ham_engine_create(const ham_engine_app *app);
  */
 ham_engine_api ham_nothrow void ham_engine_destroy(ham_engine *engine);
 
+ham_engine_api ham_nothrow ham_typeset *ham_engine_ts(ham_engine *engine);
+
 ham_engine_api ham_nothrow const ham_engine_app *ham_engine_get_app(const ham_engine *engine);
 
 ham_engine_api ham_nothrow ham_usize ham_engine_num_subsystems(const ham_engine *engine);
 
 ham_engine_api ham_nothrow ham_engine_subsys *ham_engine_get_subsystem(ham_engine *engine, ham_usize idx);
+ham_engine_api ham_nothrow const ham_engine_subsys *ham_engine_get_const_subsystem(const ham_engine *engine, ham_usize idx);
 
 ham_engine_api ham_nothrow const ham_image *ham_engine_get_default_tex_image(const ham_engine *engine);
 
@@ -109,25 +128,27 @@ ham_engine_api ham_nothrow const ham_image *ham_engine_get_default_tex_image(con
 ham_engine_api ham_nothrow bool ham_engine_request_exit(ham_engine *engine);
 
 /**
- * @brief Execute an engine, destroy it and return an exit code.
+ * @brief Execute an engine and return an exit code.
+ * @note Multiple calls of this function on the same \p engine is not supported.
+ * @pre \f$engine \neq NULL\f$
  * @param engine engine to execute
  * @return exit status as if returned from ``main``
  * @see ham_engine_main
  */
+ham_nonnull_args(1)
 ham_engine_api int ham_engine_exec(ham_engine *engine);
 
 /**
  * @brief Execute an engine, destroy it and return an exit code.
  * @note This function calls \ref ham_engine_destroy on the \p engine .
+ * @pre \f$engine \neq NULL\f$
  * @param engine engine to execute
  * @return exit status as if returned from ``main``
  */
+ham_nonnull_args(1) ham_used
 static inline int ham_engine_main(ham_engine *engine){
-	int result = -1;
-	if(engine){
-		result = ham_engine_exec(engine);
-		ham_engine_destroy(engine);
-	}
+	const int result = ham_engine_exec(engine);
+	ham_engine_destroy(engine);
 	return result;
 }
 
@@ -287,9 +308,13 @@ namespace ham::engine{
 			const char *what() const noexcept{ return "Error in ham_engine_subsys_create"; }
 	};
 
-	template<typename Derived>
+	template<typename Super>
 	class subsystem_base{
 		public:
+			using this_type = subsystem_base<Super>;
+
+			static_assert(std::is_base_of_v<Super, this_type>);
+
 			str8 name() const noexcept{ return ham_engine_subsys_name(m_subsys); }
 
 			bool running() const noexcept{ return ham_engine_subsys_running(m_subsys); }
@@ -304,9 +329,9 @@ namespace ham::engine{
 				: m_subsys(
 					ham_engine_subsys_create(
 						engine,
-						str8(Derived::name()),
+						str8(Super::name()),
 						init_impl, fini_impl, loop_impl,
-						static_cast<Derived*>(this)
+						static_cast<Super*>(this)
 					)
 				){
 					if(!m_subsys){
@@ -316,17 +341,17 @@ namespace ham::engine{
 
 		private:
 			static bool init_impl(ham_engine *engine, void *user){
-				const auto self = reinterpret_cast<Derived*>(user);
+				const auto self = reinterpret_cast<Super*>(user);
 				return self->init(engine);
 			}
 
 			static void fini_impl(ham_engine *engine, void *user) noexcept{
-				const auto self = reinterpret_cast<Derived*>(user);
+				const auto self = reinterpret_cast<Super*>(user);
 				self->fini(engine);
 			}
 
 			static void loop_impl(ham_engine *engine, ham_f64 dt, void *user){
-				const auto self = reinterpret_cast<Derived*>(user);
+				const auto self = reinterpret_cast<Super*>(user);
 				self->loop(engine, dt);
 			}
 
@@ -338,10 +363,12 @@ namespace ham::engine{
 		class subsystem_interface{};
 	}
 
-	template<bool Mutable = true, class Interface = detail::subsystem_interface<void>>
-	class basic_subsystem_view: public Interface{
+	template<typename Subsys, typename ... Attribs>
+	class basic_subsystem_view: public detail::subsystem_interface<Subsys>{
 		public:
-			using pointer = std::conditional_t<Mutable, ham_engine_subsys*, const ham_engine_subsys*>;
+			constexpr static bool is_mutable = meta::type_list_contains_v<meta::type_list<Attribs...>, mutable_tag>;
+
+			using pointer = std::conditional_t<is_mutable, ham_engine_subsys*, const ham_engine_subsys*>;
 
 			basic_subsystem_view(pointer ptr_) noexcept
 				: m_ptr(ptr_){}
@@ -353,21 +380,23 @@ namespace ham::engine{
 
 			f64 min_dt() const noexcept{ return ham_engine_subsys_min_dt(m_ptr); }
 
-			template<
-				bool IsMutable = Mutable,
-				std::enable_if_t<IsMutable, int> = 0
-			>
-			bool set_min_dt(f64 new_min_dt) const noexcept{ return ham_engine_subsys_set_min_dt(m_ptr, new_min_dt); }
+			bool set_min_dt(f64 new_min_dt) const noexcept
+				requires is_mutable
+			{
+				return ham_engine_subsys_set_min_dt(m_ptr, new_min_dt);
+			}
 
-			template<
-				bool IsMutable = Mutable,
-				std::enable_if_t<IsMutable, int> = 0
-			>
 			bool launch() const noexcept{ return ham_engine_subsys_launch(m_ptr); }
 
 		private:
 			pointer m_ptr;
 	};
+
+	template<typename Subsys>
+	using subsystem_view = basic_subsystem_view<Subsys, mutable_tag>;
+
+	template<typename Subsys>
+	using const_subsystem_view = basic_subsystem_view<Subsys>;
 
 	namespace detail{
 		template<typename T, typename...>
@@ -395,7 +424,7 @@ namespace ham::engine{
 
 			basic_engine()
 				: m_app()
-				, m_engine(ham_engine_create2(m_app.ptr()))
+				, m_engine(ham_engine_create(m_app.ptr()))
 				, m_subsystems(detail::id_map_v<Subsystems>(m_engine)...)
 			{}
 
@@ -418,28 +447,28 @@ namespace ham::engine{
 
 			template<usize Idx>
 			auto subsystem() noexcept
-				-> basic_subsystem_view<true, detail::subsystem_interface<std::tuple_element_t<Idx, subsystem_tuple>>>
+				-> subsystem_view<std::tuple_element_t<Idx, subsystem_tuple>>
 			{
 				return std::get<Idx>(m_subsystems).ptr();
 			}
 
 			template<usize Idx>
 			auto subsystem() const noexcept
-				-> basic_subsystem_view<false, detail::subsystem_interface<std::tuple_element_t<Idx, subsystem_tuple>>>
+				-> const_subsystem_view<std::tuple_element_t<Idx, subsystem_tuple>>
 			{
 				return std::get<Idx>(m_subsystems).ptr();
 			}
 
 			template<typename Subsys>
 			auto subsystem() noexcept
-				-> basic_subsystem_view<true, detail::subsystem_interface<Subsys>>
+				-> subsystem_view<Subsys>
 			{
 				return std::get<Subsys>(m_subsystems).ptr();
 			}
 
 			template<typename Subsys>
 			auto subsystem() const noexcept
-				-> basic_subsystem_view<false, detail::subsystem_interface<Subsys>>
+				-> const_subsystem_view<Subsys>
 			{
 				return std::get<Subsys>(m_subsystems).ptr();
 			}
@@ -461,6 +490,28 @@ namespace ham::engine{
 			ham_engine *m_engine;
 			subsystem_tuple m_subsystems;
 	};
+
+	namespace detail{
+		template<typename T, typename Tup>
+		struct index_in_tuple_functor{
+			template<usize I = 0>
+			static constexpr usize call() noexcept{
+				static_assert(I < std::tuple_size_v<Tup>);
+
+				using element = std::tuple_element_t<I, Tup>;
+
+				if constexpr(std::is_same_v<T, element>){
+					return I;
+				}
+				else{
+					return index_in_tuple_functor<T, Tup>::call<I+1>();
+				}
+			}
+		};
+
+		template<typename T, typename Tup>
+		constexpr inline usize index_in_tuple_v = index_in_tuple_functor<T, Tup>::call();
+	}
 
 	template<typename App, typename ... Subsystems>
 	class basic_engine_view{
@@ -485,16 +536,32 @@ namespace ham::engine{
 
 			template<usize Idx>
 			auto subsystem() noexcept
-				-> basic_subsystem_view<true, detail::subsystem_interface<std::tuple_element_t<Idx, subsystem_tuple>>>
+				-> subsystem_view<std::tuple_element_t<Idx, subsystem_tuple>>
 			{
 				return ham_engine_get_subsystem(m_engine, Idx);
 			}
 
 			template<usize Idx>
 			auto subsystem() const noexcept
-				-> basic_subsystem_view<false, detail::subsystem_interface<std::tuple_element_t<Idx, subsystem_tuple>>>
+				-> const_subsystem_view<std::tuple_element_t<Idx, subsystem_tuple>>
 			{
-				return ham_engine_get_subsystem(m_engine, Idx);
+				return ham_engine_get_const_subsystem(m_engine, Idx);
+			}
+
+			template<typename Subsys>
+			auto subsystem() noexcept
+				-> subsystem_view<Subsys>
+			{
+				constexpr usize idx = detail::index_in_tuple_v<Subsys, subsystem_tuple>;
+				return ham_engine_get_subsystem(m_engine, idx);
+			}
+
+			template<typename Subsys>
+			auto subsystem() const noexcept
+				-> const_subsystem_view<Subsys>
+			{
+				constexpr usize idx = detail::index_in_tuple_v<Subsys, subsystem_tuple>;
+				return ham_engine_get_const_subsystem(m_engine, idx);
 			}
 
 		private:

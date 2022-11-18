@@ -43,6 +43,7 @@ ham_add_executable(
 	test-quat.cpp
 	test-transform.cpp
 	test-camera.cpp
+	test-typesys.cpp
 	main.cpp
 )
 

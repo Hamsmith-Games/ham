@@ -1,0 +1,5 @@
+#pragma once
+
+#include "ham/engine.h"
+
+ham_declare_app({{ham_project_name}}_app)

@@ -37,6 +37,7 @@ set(
 	"__attribute__()="
 	"HAM_C_API_BEGIN="
 	"HAM_C_API_END="
+	"ham_used="
 	"ham_api="
 	"ham_engine_api="
 	#"ham_nothrow="

@@ -138,7 +138,7 @@ static inline bool ham_def_method(ham_shader_gl, compile){
 	if(res != GL_TRUE){
 		glGetShaderiv(self->handle, GL_INFO_LOG_LENGTH, &res);
 
-		ham::str_buffer_utf8 msg_buf;
+		ham::str_buffer8 msg_buf;
 		msg_buf.resize(res, '\0');
 
 		glGetShaderInfoLog(self->handle, res, &res, msg_buf.ptr());
@@ -161,7 +161,7 @@ static inline bool ham_def_method(ham_shader_gl, compile){
 	if(res != GL_TRUE){
 		glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &res);
 
-		ham::str_buffer_utf8 msg_buf;
+		ham::str_buffer8 msg_buf;
 		msg_buf.resize(res, '\0');
 
 		glGetProgramInfoLog(prog, res, &res, msg_buf.ptr());

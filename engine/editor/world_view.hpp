@@ -66,6 +66,11 @@ namespace ham::engine::editor{
 
 			bool eventFilter(QObject *watched, QEvent *ev) override;
 
+			QString app_name() const noexcept{
+				const auto app = ham_engine_get_app(m_engine);
+				return QString::fromUtf8(app->name.ptr, app->name.len);
+			}
+
 		protected:
 			void mouseMoveEvent(QMouseEvent *ev) override;
 			void mousePressEvent(QMouseEvent *ev) override;

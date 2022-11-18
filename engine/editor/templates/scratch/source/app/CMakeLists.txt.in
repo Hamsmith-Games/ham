@@ -1,0 +1,14 @@
+set(
+	PROJECT_SOURCES
+	{{ham_project_name}}_app.cpp
+)
+
+add_ham_engine_app(
+	{{ham_project_name}}_app
+	${PROJECT_SOURCES}
+)
+
+target_include_directories(
+	{{ ham_project_name }}_app PUBLIC
+	${PROJECT_INCLUDE_DIR}
+)

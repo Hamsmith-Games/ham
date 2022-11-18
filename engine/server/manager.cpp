@@ -48,7 +48,7 @@ constexpr char ham_engine_server_manager_version_fancy_str[] =
 struct ham_engine_server_manager{
 	const ham_allocator *allocator;
 
-	ham::str_buffer_utf8 server_exec_path;
+	ham::str_buffer8 server_exec_path;
 	int server_argc;
 	char **server_argv;
 
@@ -57,8 +57,8 @@ struct ham_engine_server_manager{
 	WINDOW *nc_win, *input_win, *log_win;
 	int w, h;
 
-	ham::str_buffer_utf8 input_line;
-	ham::str_buffer_utf8 log_buf;
+	ham::str_buffer8 input_line;
+	ham::str_buffer8 log_buf;
 
 	ham_f64 startup_delay = 1.0;
 	ham_f64 startup_counter = 0.0;

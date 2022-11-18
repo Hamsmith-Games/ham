@@ -31,6 +31,7 @@ extern "C" {
 #include <QDebug>
 #include <QHash>
 #include <QStandardPaths>
+#include <QSettings>
 
 namespace editor = ham::engine::editor;
 
@@ -41,6 +42,29 @@ namespace editor = ham::engine::editor;
 QString editor::default_project_path(){
 	const auto docs_path = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
 	return QString("%1/Ham Projects").arg(docs_path);
+}
+
+//
+// Recent project list model
+//
+
+void editor::recent_projects_model::update_list(){
+	m_projs.clear();
+
+	QSettings settings;
+
+	settings.beginGroup("editor");
+
+	const int num_projs = settings.beginReadArray("recent-projs");
+
+	for(int i = 0; i < num_projs; i++){
+		settings.setArrayIndex(i);
+
+		auto name = settings.value("name").toString();
+		auto dir  = settings.value("dir").toString();
+
+		m_projs.emplaceBack(std::move(name), std::move(dir));
+	}
 }
 
 //
@@ -276,8 +300,23 @@ static bool ham_impl_write_project_template_path(const QDir &tmpl_dir, const QDi
 
 		const auto tmpl_file_path = QString("%1/%2").arg(tmpl_dir_path, tmpl_file_name);
 
+		char *mustach_out = nullptr;
+		size_t mustach_out_size = 0;
+
+		const auto tmpl_name_utf8 = tmpl_file_name.toUtf8();
+
+		QString dst_file_name = tmpl_file_name;
+
+		const int dst_name_mustach_res = mustach_mem(tmpl_name_utf8.constData(), tmpl_name_utf8.size(), &mustach_fns, (void*)&vars, 0, &mustach_out, &mustach_out_size);
+		if(dst_name_mustach_res != 0){
+			qWarning() << "Error in mustach_mem(" << tmpl_file_name << ")";
+		}
+		else{
+			dst_file_name = QString::fromUtf8(mustach_out, mustach_out_size);
+		}
+
 		if(!tmpl_file_name.endsWith(".in")){
-			const auto proj_file_path = QString("%1/%2").arg(proj_dir_path, tmpl_file_name);
+			const auto proj_file_path = QString("%1/%2").arg(proj_dir_path, dst_file_name);
 			if(!QFile::copy(tmpl_file_path, proj_file_path)){
 				//const auto tmpl_file_utf8 = tmpl_file_path.toUtf8();
 				//const auto proj_file_utf8 = proj_file_path.toUtf8();
@@ -285,6 +324,8 @@ static bool ham_impl_write_project_template_path(const QDir &tmpl_dir, const QDi
 				qWarning() << "Failed to copy template file" << tmpl_file_path << "to" << proj_file_path;
 				return false;
 			}
+
+			continue;
 		}
 
 		QFile tmpl_file(tmpl_file_path);
@@ -298,16 +339,13 @@ static bool ham_impl_write_project_template_path(const QDir &tmpl_dir, const QDi
 
 		tmpl_file.close();
 
-		char *mustach_out = nullptr;
-		size_t mustach_out_size = 0;
-
 		const int mustach_res = mustach_mem(tmpl_file_data.constData(), qMax(tmpl_file_data.size()-1, 0), &mustach_fns, (void*)&vars, 0, &mustach_out, &mustach_out_size);
 		if(mustach_res != 0){
 			qWarning() << "Error in mustach_mem(" << tmpl_file_path << ")";
 			continue;
 		}
 
-		const auto proj_file_path = QString("%1/%2").arg(proj_dir.path(), tmpl_file_path.mid(0, tmpl_file_path.size()-3)); // filename.size()-3 == without .in ext
+		const auto proj_file_path = QString("%1/%2").arg(proj_dir.path(), dst_file_name.mid(0, dst_file_name.size()-3)); // filename.size()-3 == without .in ext
 
 		QFile out_file(proj_file_path);
 		if(!out_file.open(QFile::WriteOnly)){

@@ -220,7 +220,7 @@ namespace ham{
 			const char *what() const noexcept override{ return m_msg.c_str(); }
 
 		private:
-			str_buffer_utf8 m_msg;
+			str_buffer8 m_msg;
 	};
 
 	class basic_buffer_copy_error: public basic_buffer_exception{

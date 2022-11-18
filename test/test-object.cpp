@@ -100,7 +100,7 @@ bool ham_test_object(){
 	for(ham_usize i = 0; i < std::size(objs); i++){
 		const auto test_obj = (ham_object_test*)objs[i];
 		const auto test_vt  = (ham_object_test_vtable*)objs[i]->vptr;
-		if(test_vt->foo(test_obj) != i + 3){
+		if(test_vt->foo(test_obj) != (int)(i + 3)){
 			std::cerr << "Function call bad result from object " << i << " `foo(obj)`\n"
 						 "    Given:    " << test_obj->test_val << "\n"
 						 "    Expected: " << i + 3 << '\n';
@@ -109,7 +109,7 @@ bool ham_test_object(){
 		}
 
 		const auto bar_res = test_vt->bar(test_obj);
-		if(bar_res != (i + 3) * 4){
+		if(bar_res != (int)((i + 3) * 4)){
 			std::cerr << "Function call bad result from object " << i << " `bar(obj)`\n"
 						 "    Given:    " << bar_res << "\n"
 						 "    Expected: " << (i + 3) * 4 << '\n';

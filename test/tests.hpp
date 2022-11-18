@@ -46,6 +46,7 @@ ham_declare_test(mat)
 ham_declare_test(quat)
 ham_declare_test(transform)
 ham_declare_test(camera)
+ham_declare_test(typesys)
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_LEFT_HANDED
@@ -127,7 +128,7 @@ namespace ham{
 	class basic_test<Result(Args...)>{
 		public:
 			basic_test(
-				str_buffer_utf8 name_,
+				str_buffer8 name_,
 				indirect_function<Result(Args...)> fn_,
 				indirect_function<bool(Result)> check_fn_
 			)
@@ -163,7 +164,7 @@ namespace ham{
 			}
 
 		private:
-			str_buffer_utf8 m_name;
+			str_buffer8 m_name;
 			indirect_function<Result(Args...)> m_fn;
 			indirect_function<bool(Result)> m_check_fn;
 	};

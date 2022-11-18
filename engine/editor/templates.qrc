@@ -3,7 +3,9 @@
         <file>templates/ham-engine-config.json</file>
         <file>templates/scratch/.ham/engine-template.json</file>
         <file>templates/scratch/ham-engine-project.json.in</file>
-        <file>templates/scratch/CMakeLists.txt.in</file>
-        <file>templates/scratch/src/CMakeLists.txt.in</file>
+        <file>templates/scratch/source/CMakeLists.txt.in</file>
+        <file>templates/scratch/source/include/{{ham_project_name}}_app.h.in</file>
+        <file>templates/scratch/source/app/{{ham_project_name}}_app.cpp.in</file>
+        <file>templates/scratch/source/app/CMakeLists.txt.in</file>
     </qresource>
 </RCC>

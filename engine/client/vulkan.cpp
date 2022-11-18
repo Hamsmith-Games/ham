@@ -74,7 +74,7 @@ VkInstance ham_engine_client_init_vk_inst(SDL_Window *window, const ham_engine_a
 		false;
 	#endif
 
-	const ham::str_buffer_utf8 name_buf = app->name;
+	const ham::str_buffer8 name_buf = app->name;
 
 	VkApplicationInfo app_info{
 		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,

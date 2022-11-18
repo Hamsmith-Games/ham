@@ -142,7 +142,7 @@ namespace ham{
 			}
 
 			ptr->exprs = std_vector<expr_base_ctype_t<Char>*>(ctx_allocator);
-			ptr->error_messages = std_vector<str_buffer_utf8>(ctx_allocator);
+			ptr->error_messages = std_vector<str_buffer8>(ctx_allocator);
 			ptr->root_scope.ctx = ptr;
 
 			return ptr;
@@ -274,7 +274,7 @@ namespace ham{
 
 			if(req_len <= 0) return nullptr;
 
-			ham::str_buffer_utf8 msg_buf(ctx.handle()->exprs.get_allocator());
+			ham::str_buffer8 msg_buf(ctx.handle()->exprs.get_allocator());
 			msg_buf.resize(req_len);
 
 			vsnprintf(msg_buf.ptr(), req_len+1, fmt_str, va);
@@ -722,7 +722,7 @@ namespace ham::detail{
 	struct parse_context_data_utf{
 		ham::std_vector<expr_base_ctype_t<Char>*> exprs; // use allocator from here
 		ham::std_vector<const expr_base_ctype_t<Char>*> root_exprs; // use allocator from here
-		ham::std_vector<ham::str_buffer_utf8> error_messages; // parsing errors are always utf-8
+		ham::std_vector<ham::str_buffer8> error_messages; // parsing errors are always utf-8
 		parse_scope_ctype_t<Char> root_scope;
 	};
 }
