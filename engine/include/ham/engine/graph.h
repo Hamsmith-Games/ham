@@ -25,7 +25,6 @@
  */
 
 #include "ham/engine/config.h"
-#include "ham/typedefs.h"
 #include "ham/typesys.h"
 
 HAM_C_API_BEGIN
@@ -41,10 +40,11 @@ typedef struct ham_graph_node_connection{
 ham_nonnull_args(1)
 ham_engine_api const ham_type *ham_graph_exec_type(ham_typeset *ts);
 
-ham_engine_api ham_graph *ham_graph_create(ham_str8 name);
-ham_engine_api void ham_graph_destroy(ham_graph *graph);
+ham_engine_api ham_graph *ham_graph_create(ham_str8 name, const ham_typeset *ts);
+ham_engine_api ham_nothrow void ham_graph_destroy(ham_graph *graph);
 
-ham_engine_api ham_str8 ham_graph_name(const ham_graph *graph);
+ham_engine_api ham_nothrow ham_str8 ham_graph_name(const ham_graph *graph);
+ham_engine_api ham_nothrow const ham_typeset *ham_graph_ts(const ham_graph *graph);
 
 ham_engine_api bool ham_graph_set_name(ham_graph *graph, ham_str8 new_name);
 
@@ -52,6 +52,28 @@ ham_engine_api ham_usize ham_graph_num_nodes(const ham_graph *graph);
 
 ham_engine_api ham_graph_node *const *ham_graph_nodes(ham_graph *graph);
 ham_engine_api const ham_graph_node *const *ham_graph_const_nodes(const ham_graph *graph);
+
+typedef enum {
+	HAM_SERIALIZE_BINARY,
+	HAM_SERIALIZE_JSON,
+
+	HAM_SERIALIZE_KIND_COUNT,
+
+	// aliases
+
+	HAM_DESERIALIZE_BINARY = HAM_SERIALIZE_BINARY,
+	HAM_DESERIALIZE_JSON = HAM_SERIALIZE_JSON,
+
+	HAM_DESERIALIZE_KIND_COUNT = HAM_SERIALIZE_KIND_COUNT
+} ham_serialize_kind;
+
+typedef ham_serialize_kind ham_deserialize_kind;
+
+typedef ham_usize(*ham_write_fn)(ham_usize len, const void *bytes, void *user);
+
+ham_engine_api ham_usize ham_graph_serialize(ham_serialize_kind kind, const ham_graph *graph, ham_write_fn write_fn, void *user);
+
+ham_engine_api ham_graph *ham_graph_deserialize(ham_deserialize_kind kind, const ham_typeset *ts, ham_usize len, const void *data);
 
 /**
  * @defgroup HAM_ENGINE_GRAPH_NODE Nodes
@@ -383,8 +405,8 @@ namespace ham::engine{
 
 	class graph{
 		public:
-			explicit graph(str8 name)
-				: m_handle(ham_graph_create(name))
+			graph(str8 name, const ham_typeset *ts)
+				: m_handle(ham_graph_create(name, ts))
 			{}
 
 			operator graph_view() noexcept{ return m_handle.get(); }

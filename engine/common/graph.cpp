@@ -20,6 +20,10 @@
 
 #include "ham/check.h"
 #include "ham/buffer.h"
+#include "ham/json.h"
+#include "ham/functional.h"
+
+#include <cinttypes>
 
 using namespace ham::typedefs;
 
@@ -27,6 +31,7 @@ HAM_C_API_BEGIN
 
 struct ham_graph{
 	const ham_allocator *allocator;
+	const ham_typeset *ts;
 	ham_name_buffer_utf8 name;
 	ham::basic_buffer<ham_graph_node*> nodes;
 };
@@ -71,31 +76,46 @@ const ham_type *ham_graph_exec_type(ham_typeset *ts){
 // Graph
 //
 
-ham_graph *ham_graph_create(ham_str8 name){
-	if(!ham_check(name.len && name.ptr) || !ham_check(name.len < (HAM_NAME_BUFFER_SIZE - 1))) return nullptr;
+ham_graph *ham_graph_create(ham_str8 name, const ham_typeset *ts){
+	if(
+		!ham_check((name.len && name.ptr) || (!name.len && !name.ptr)) ||
+		!ham_check(name.len < (HAM_NAME_BUFFER_SIZE - 1)) ||
+		!ham_check(ts != NULL)
+	){
+		return nullptr;
+	}
 
 	const auto allocator = ham_current_allocator();
 
 	const auto graph = ham_allocator_new(allocator, ham_graph);
 
 	graph->allocator = allocator;
+	graph->ts = ts;
 
-	memcpy(graph->name, name.ptr, name.len);
+	if(name.len){
+		memcpy(graph->name, name.ptr, name.len);
+	}
+
 	graph->name[name.len] = '\0';
 
 	return graph;
 }
 
-void ham_graph_destroy(ham_graph *graph){
+ham_nothrow void ham_graph_destroy(ham_graph *graph){
 	if(ham_unlikely(!graph)) return;
 
 	const auto allocator = graph->allocator;
 	ham_allocator_delete(allocator, graph);
 }
 
-ham_str8 ham_graph_name(const ham_graph *graph){
+ham_nothrow ham_str8 ham_graph_name(const ham_graph *graph){
 	if(!ham_check(graph != NULL)) return HAM_EMPTY_STR8;
 	return ham::str8((const char*)graph->name);
+}
+
+ham_nothrow const ham_typeset *ham_graph_ts(const ham_graph *graph){
+	if(!ham_check(graph != NULL)) return nullptr;
+	return graph->ts;
 }
 
 bool ham_graph_set_name(ham_graph *graph, ham_str8 new_name){
@@ -126,6 +146,207 @@ ham_graph_node *const *ham_graph_nodes(ham_graph *graph){
 const ham_graph_node *const *ham_graph_const_nodes(const ham_graph *graph){
 	if(!ham_check(graph != NULL)) return nullptr;
 	return graph->nodes.data();
+}
+
+ham_usize ham_graph_serialize(ham_serialize_kind kind, const ham_graph *graph, ham_write_fn write_fn, void *user){
+	if(!ham_check(kind < HAM_SERIALIZE_KIND_COUNT) || !ham_check(graph != NULL) || !ham_check(write_fn != NULL)){
+		return (usize)-1;
+	}
+
+	if(kind != HAM_SERIALIZE_JSON){
+		ham_logapierrorf("Only JSON serialization currently implemented");
+		return (usize)-1;
+	}
+
+	ham::str_buffer8 buf;
+
+	buf.append("{\"ham_graph\":{");
+
+	const auto num_nodes = ham_graph_num_nodes(graph);
+	const auto nodes = ham_graph_const_nodes(graph);
+
+	buf.append("\"name\":\"");
+	buf.append(ham_graph_name(graph));
+	buf.append("\",\"nodes\":[");
+
+	for(usize i = 0; i < num_nodes; i++){
+		const auto node = nodes[i];
+
+		const ham::str8 node_name = ham_graph_node_name(node);
+
+		buf.append("{\"name\":\"");
+		buf.append(node_name);
+		buf.append("\",\"pins\":[");
+
+		const auto num_pins = ham_graph_node_num_pins(node);
+		const auto pins = ham_graph_node_const_pins(node);
+
+		for(usize j = 0; j < num_pins; j++){
+			const auto pin = pins[j];
+
+			const auto pin_name = ham_graph_node_pin_name(pin);
+			const auto pin_type = ham_graph_node_pin_type(pin);
+			const auto pin_type_str = ham_type_str(pin_type);
+			const auto pin_dir = ham_graph_node_pin_get_direction(pin);
+
+			buf.append("{\"name\":\"");
+			buf.append(pin_name);
+			buf.append("\",\"type\":\"");
+			buf.append(pin_type_str);
+			buf.append("\",\"dir\":");
+			buf.append(pin_dir == HAM_GRAPH_NODE_PIN_IN ? "0}" : "1}");
+
+			if(j < (num_pins - 1)){
+				buf.append(",");
+			}
+		}
+
+		buf.append("]}");
+
+		if(i < (num_nodes - 1)){
+			buf.append(",");
+		}
+	}
+
+	buf.append("]}}");
+
+	return write_fn(buf.len(), buf.c_str(), user);
+}
+
+ham_graph *ham_graph_deserialize(ham_deserialize_kind kind, const ham_typeset *ts, ham_usize len, const void *data){
+	if(!ham_check(kind < HAM_DESERIALIZE_KIND_COUNT) || !ham_check((len && data) || (!len && !data))){
+		return nullptr;
+	}
+
+	const auto graph = ham_graph_create(HAM_EMPTY_STR8, ts);
+	if(!graph){
+		ham_logapierrorf("Failed to create graph");
+		return nullptr;
+	}
+
+	if(!len){
+		return graph;
+	}
+
+	ham::scope_exit graph_destroyer([graph]{ ham_graph_destroy(graph); });
+
+	switch(kind){
+		case HAM_DESERIALIZE_JSON:{
+			const auto json_doc = ham_json_document_create({ (const ham_char8*)data, len });
+			if(!json_doc){
+				ham_logapierrorf("Failed to load graph json");
+				return nullptr;
+			}
+
+			const ham::scope_exit doc_destroyer([json_doc]{ ham_json_document_destroy(json_doc); });
+
+			static const auto apiname = ham_funcname;
+
+		#define json_errorf(fmt_str, ...) ham::logerror(apiname, "Invalid graph json: " fmt_str __VA_OPT__(,) __VA_ARGS__);
+
+			const ham::json_value_view root = ham_json_document_root(json_doc);
+
+			if(!root.is_object()){
+				json_errorf("expected root object");
+				return nullptr;
+			}
+
+			const auto graph_root = root["ham_graph"];
+			if(!graph_root){
+				json_errorf("no 'ham_graph' object key found");
+				return nullptr;
+			}
+
+			if(!graph_root.object_validate({ {"name", ham::json_type::string}, {"nodes", ham::json_type::array} })){
+				json_errorf("Invalid 'ham_graph' object");
+			}
+
+			const auto graph_name = graph_root["name"].get_str();
+
+			ham_graph_set_name(graph, graph_name);
+
+			const auto nodes = graph_root["nodes"];
+
+			const usize good_nodes = nodes.array_iterate(
+				[&](usize idx, ham::json_value_view<> node){
+					if(
+						!node.object_validate({
+							{"name", ham::json_type::string},
+							{"pins", ham::json_type::array}
+						}))
+					{
+						json_errorf("invalid node at element {} of 'nodes'", idx);
+						return false;
+					}
+
+					const auto name = node["name"].get_str();
+
+					const auto node_ptr = ham_graph_node_create(graph, name);
+					if(!node_ptr){
+						json_errorf("failed to create graph node '{}'", name);
+						return false;
+					}
+
+					const auto pins = node["pins"];
+
+					const usize good_pins = node.array_iterate([&](usize pin_idx, ham::json_value_view<> pin){
+						if(!pin.object_validate({ {"name", ham::json_type::string}, {"type", ham::json_type::string}, {"dir", ham::json_type::nat} })){
+							json_errorf("invalid pin at element {} of node {}", pin_idx, idx);
+							return false;
+						}
+
+						const auto pin_type_str = pin["type"].get_str();
+
+						const auto pin_type = ham_typeset_get(ts, pin_type_str);
+						if(!pin_type){
+							json_errorf("invalid pin type '{}'", pin_type_str);
+							return false;
+						}
+
+						const auto pin_dir = pin["dir"].get_nat();
+						const auto pin_name = pin["name"].get_str();
+
+						const auto pin_ptr = ham_graph_node_pin_create(
+							node_ptr,
+							pin_dir ? HAM_GRAPH_NODE_PIN_OUT : HAM_GRAPH_NODE_PIN_IN,
+							pin_name,
+							pin_type
+						);
+
+						if(!pin_ptr){
+							ham::logerror(apiname, "Could not create graph node pin '{}' for node '{}'", pin_name, name);
+							return false;
+						}
+
+						return true;
+					});
+
+					if(good_pins != pins.array_len()){
+						return false;
+					}
+
+					return true;
+				}
+			);
+
+			if(good_nodes != nodes.array_len()){
+				return nullptr;
+			}
+
+			graph_destroyer.release();
+			return graph;
+		}
+
+		case HAM_DESERIALIZE_BINARY:{
+			ham_logapierrorf("Binary graph serialization currently unimplemented");
+			return nullptr;
+		}
+
+		default:{
+			ham_logapierrorf("Unrecognized ham_deserialize_kind value for 'kind': 0x%x", kind);
+			return nullptr;
+		}
+	}
 }
 
 //

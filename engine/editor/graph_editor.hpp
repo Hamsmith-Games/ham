@@ -24,14 +24,17 @@
 #include "ham/engine/graph.h"
 
 #include <QVector2D>
+
 #include <QWidget>
-#include <QGraphicsView>
-#include <QGraphicsWidget>
+#include <QMenu>
 #include <QLabel>
 
-Q_DECLARE_METATYPE(ham::type)
+#include <QGraphicsView>
+#include <QGraphicsWidget>
 
-class QLabel;
+Q_DECLARE_METATYPE(ham::type)
+Q_DECLARE_METATYPE(ham::typeset_view)
+Q_DECLARE_METATYPE(ham::const_typeset_view)
 
 class QGraphicsScene;
 class QGraphicsView;
@@ -142,6 +145,7 @@ namespace ham::engine::editor{
 						const QPointF max_xy = {qMax(loc_beg.y(), loc_end.y()), qMax(loc_beg.y(), loc_end.y())};
 
 						const QPointF d_xy = max_xy - min_xy;
+						(void)d_xy;
 
 						if(loc_beg.x() < loc_end.x()){
 							// start on left
@@ -298,10 +302,12 @@ namespace ham::engine::editor{
 
 		Q_SIGNALS:
 			void name_changed(const QString&);
-			void pos_changed(QPointF);
 
 			void pin_added(ham::engine::editor::graph_node_pin*);
 			void pin_removed(ham::engine::editor::graph_node_pin*);
+
+		protected:
+			QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
 
 		private:
 			QLabel *m_name_lbl;
@@ -309,6 +315,34 @@ namespace ham::engine::editor{
 			QList<graph_node_pin*> m_inputs, m_outputs;
 			QGraphicsLinearLayout *m_in_lay, *m_out_lay;
 	};
+
+	class graph_node_menu: public QMenu{
+		public:
+			explicit graph_node_menu(QWidget *parent = nullptr)
+				: QMenu(parent){}
+
+		private:
+	};
+
+	namespace detail{
+		class graph_scene: public QGraphicsScene{
+			Q_OBJECT
+
+			public:
+				explicit graph_scene(QString name_, QObject *parent = nullptr);
+
+				void set_name(QAnyStringView new_name);
+
+				qreal grid_size() const noexcept{ return m_grid_size; }
+
+			protected:
+				void drawBackground(QPainter *painter, const QRectF &rect);
+
+			private:
+				QString m_name;
+				qreal m_grid_size;
+		};
+	}
 
 	class graph: public QObject{
 		Q_OBJECT
@@ -319,7 +353,7 @@ namespace ham::engine::editor{
 		Q_PROPERTY(QList<ham::engine::editor::graph_node*> nodes READ nodes CONSTANT)
 
 		public:
-			explicit graph(QString name, QObject *parent = nullptr);
+			graph(QString name, ham::const_typeset_view ts, QObject *parent = nullptr);
 			~graph();
 
 			QGraphicsScene *scene() const noexcept{ return m_scene; }
@@ -352,30 +386,58 @@ namespace ham::engine::editor{
 			QList<graph_node*> m_nodes;
 	};
 
-	class graph_editor: public QWidget{
+	class graph_menu: public QMenu{
+		Q_OBJECT
+
+		public:
+			explicit graph_menu(QWidget *parent = nullptr);
+
+			explicit graph_menu(editor::graph *graph, QWidget *parent = nullptr)
+				: graph_menu(parent)
+			{
+				set_graph(graph);
+			}
+
+			editor::graph *graph() const noexcept{ return m_graph; }
+
+			void set_graph(editor::graph *new_graph);
+
+		Q_SIGNALS:
+			void graph_changed(editor::graph*);
+
+		private:
+			editor::graph *m_graph;
+	};
+
+	class graph_editor: public QGraphicsView{
 		Q_OBJECT
 
 		Q_PROPERTY(ham::engine::editor::graph* graph READ graph CONSTANT)
-		Q_PROPERTY(QGraphicsView* graphics_view READ graphics_view CONSTANT)
 
 		public:
 			explicit graph_editor(editor::graph *graph = nullptr, QWidget *parent = nullptr);
 
-			explicit graph_editor(const QString &name, QWidget *parent = nullptr)
-				: graph_editor(new editor::graph(name), parent){}
+			graph_editor(const QString &name, ham::const_typeset_view ts, QWidget *parent = nullptr)
+				: graph_editor(new editor::graph(name, ts), parent){}
 
 			~graph_editor();
 
 			editor::graph *graph() const noexcept{ return m_graph; }
-			QGraphicsView *graphics_view() const noexcept{ return m_view; }
 
 			graph_node *new_node(QPointF pos, const QString &name){
 				return m_graph->new_node(pos, name);
 			}
 
+		protected:
+			void mousePressEvent(QMouseEvent *event) override;
+			void mouseReleaseEvent(QMouseEvent *event) override;
+			void wheelEvent(QWheelEvent *event) override;
+
+			void show_graph_menu(const QPoint &p);
+
 		private:
 			editor::graph *m_graph;
-			QGraphicsView *m_view;
+			qreal m_zoom_factor = 1.0;
 	};
 }
 

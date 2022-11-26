@@ -88,6 +88,15 @@ namespace ham::engine::editor{
 				return QString::fromUtf8(app->name.ptr, app->name.len);
 			}
 
+			void show_overlay(bool do_show = true){
+				if(do_show){
+					m_overlay_widget->show();
+				}
+				else{
+					m_overlay_widget->hide();
+				}
+			}
+
 		protected:
 			void mouseMoveEvent(QMouseEvent *ev) override;
 			void mousePressEvent(QMouseEvent *ev) override;
@@ -104,6 +113,7 @@ namespace ham::engine::editor{
 			ham_engine *m_engine;
 			ham_world *m_world;
 			renderer_widget *m_r_widget;
+			QWidget *m_overlay_widget;
 			draw_group m_gizmo_group, m_test_group;
 
 			ham_light *m_cam_light;

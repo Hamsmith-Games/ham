@@ -62,8 +62,8 @@ namespace ham::engine::editor{
 
 			~window_header();
 
-			void setGapWidget(enum gap gap, QWidget *w);
-			void setGapLayout(enum gap gap, QLayout *l);
+			void set_gap_widget(enum gap gap, QWidget *w);
+			void set_gap_layout(enum gap gap, QLayout *l);
 
 		protected:
 			void mousePressEvent(QMouseEvent *event) override;

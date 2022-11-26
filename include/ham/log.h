@@ -126,7 +126,7 @@ static inline void ham_logf(ham_log_level level, const char *api, const char *fm
 #endif
 }
 
-#define ham_logapif(level, fmt_str, ...) (ham_logf(level, __FUNCTION__, fmt_str __VA_OPT__(,) __VA_ARGS__))
+#define ham_logapif(level, fmt_str, ...) (ham_logf(level, ham_funcname, fmt_str __VA_OPT__(,) __VA_ARGS__))
 
 #define ham_loginfof(api, fmt_str, ...)    (ham_logf(HAM_LOG_INFO,    api, fmt_str __VA_OPT__(,) __VA_ARGS__))
 #define ham_logverbosef(api, fmt_str, ...) (ham_logf(HAM_LOG_VERBOSE, api, fmt_str __VA_OPT__(,) __VA_ARGS__))

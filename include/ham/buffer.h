@@ -39,6 +39,8 @@ struct ham_buffer{
 	ham_usize alignment, allocated, capacity;
 };
 
+#define HAM_EMPTY_BUFFER ((ham_buffer){ ham_null, ham_null, 0, 0, 0 })
+
 ham_used ham_constexpr static inline ham_u32 ham_bit_ceil32(ham_u32 x){ return x == 1 ? 1 : 1 << (32UL - ham_lzcnt32(x - 1UL)); }
 ham_used ham_constexpr static inline ham_u64 ham_bit_ceil64(ham_u64 x){ return x == 1 ? 1 : 1 << (64UL - ham_lzcnt64(x - 1UL)); }
 //! @endcond

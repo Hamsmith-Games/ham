@@ -82,11 +82,13 @@ editor::world_view::world_view(ham_engine *engine, ham_world *world, QWidget *pa
 	m_r_widget = new editor::renderer_widget_gl(this);
 	m_r_widget->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
 
+	m_overlay_widget = createOverlay();
+
 	const auto view_stack = new QStackedLayout(this);
 
 	view_stack->setContentsMargins(0, 0, 0, 0);
 	view_stack->setStackingMode(QStackedLayout::StackAll);
-	view_stack->addWidget(createOverlay());
+	view_stack->addWidget(m_overlay_widget);
 	view_stack->addWidget(m_r_widget);
 
 	const auto lay = new QHBoxLayout(this);

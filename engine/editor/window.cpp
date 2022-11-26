@@ -207,7 +207,7 @@ editor::window_header::window_header(editor::window *parent)
 
 editor::window_header::~window_header(){}
 
-void editor::window_header::setGapWidget(enum gap gap, QWidget *w){
+void editor::window_header::set_gap_widget(enum gap gap, QWidget *w){
 	const auto vlay = qobject_cast<QVBoxLayout*>(layout());
 	const auto grid = qobject_cast<QGridLayout*>(vlay->itemAt(0)->layout());
 
@@ -244,7 +244,7 @@ void editor::window_header::setGapWidget(enum gap gap, QWidget *w){
 	grid->addWidget(w, 0, col, Qt::AlignJustify);
 }
 
-void editor::window_header::setGapLayout(enum gap gap, QLayout *l){
+void editor::window_header::set_gap_layout(enum gap gap, QLayout *l){
 	const auto vlay = qobject_cast<QVBoxLayout*>(layout());
 	const auto grid = qobject_cast<QGridLayout*>(vlay->itemAt(0)->layout());
 

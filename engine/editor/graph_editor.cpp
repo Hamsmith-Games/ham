@@ -40,8 +40,9 @@ using namespace ham::typedefs;
 
 namespace editor = ham::engine::editor;
 
-constexpr static qreal node_title_size = 14.f;
+constexpr static qreal node_title_size = 12.f;
 constexpr static qreal node_title_margin = 10.f;
+constexpr static qreal node_corner_radius = 10.f;
 constexpr static qreal pin_radius = 7.5f;
 constexpr static qreal pin_spacing = 10.f;
 
@@ -212,9 +213,17 @@ editor::graph_node::graph_node(engine::graph *graph, const QString &name, QGraph
 
 	top_lay->addItem(inner_lay);
 
-	setCacheMode(QGraphicsItem::DeviceCoordinateCache);
-	setContentsMargins(0.f, 0.f, 0.f, 0.f);
 	setLayout(top_lay);
+
+	setContentsMargins(0.f, 0.f, 0.f, 0.f);
+
+	setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+
+	setFlag(QGraphicsItem::ItemIsSelectable);
+	setFlag(QGraphicsItem::ItemIsMovable);
+	setFlag(QGraphicsItem::ItemSendsGeometryChanges);
+	setFlag(QGraphicsItem::ItemSendsScenePositionChanges);
+	//setFlags(QGraphicsItem::ItemIsSelectable | QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemSendsScenePositionChanges);
 }
 
 editor::graph_node_pin *editor::graph_node::new_pin(ham_graph_node_pin_direction direction, const QString &name_, ham::type type){
@@ -258,20 +267,141 @@ void editor::graph_node::paint(QPainter *painter, const QStyleOptionGraphicsItem
 	rect.setLeft(pin_radius);
 
 	painter->setBrush(QColor(105, 105, 105));
-	painter->drawRoundedRect(rect, 10.f, 10.f);
+	painter->drawRoundedRect(rect, node_corner_radius, node_corner_radius);
 
 	QGraphicsWidget::paint(painter, option, widget);
+}
+
+QVariant editor::graph_node::itemChange(GraphicsItemChange change, const QVariant &value){
+	if(change == ItemPositionChange && scene()){
+		QPointF new_pos = value.toPointF();
+
+		const auto graph_scene = qobject_cast<editor::detail::graph_scene*>(scene());
+		if(graph_scene){
+			new_pos.setX(qRound(new_pos.x()/graph_scene->grid_size()) * graph_scene->grid_size());
+			new_pos.setY(qRound(new_pos.y()/graph_scene->grid_size()) * graph_scene->grid_size());
+
+			new_pos.setX(new_pos.x() - pin_radius);
+		}
+
+		return new_pos;
+	}
+
+	return QGraphicsWidget::itemChange(change, value);
+}
+
+//
+// Graph menu
+//
+
+editor::graph_menu::graph_menu(QWidget *parent)
+	: QMenu(parent)
+{
+	const auto selected_lbl = new QLabel(this);
+
+	const auto lay = new QVBoxLayout(this);
+
+	lay->addWidget(selected_lbl);
+
+	setLayout(lay);
+}
+
+void editor::graph_menu::set_graph(editor::graph *new_graph){
+	if(m_graph == new_graph) return;
+
+	m_graph = new_graph;
+	Q_EMIT graph_changed(new_graph);
+}
+
+//
+// Graph scene
+//
+
+editor::detail::graph_scene::graph_scene(QString name_, QObject *parent)
+	: QGraphicsScene(parent)
+	, m_name(std::move(name_))
+	, m_grid_size(50.0)
+{
+
+}
+
+void editor::detail::graph_scene::set_name(QAnyStringView new_name){
+	if(m_name != new_name){
+		m_name = new_name.toString();
+		update();
+	}
+}
+
+void editor::detail::graph_scene::drawBackground(QPainter *painter, const QRectF &rect){
+	QGraphicsScene::drawBackground(painter, rect);
+
+	const qreal point_radius = 6.0;
+
+	const qreal x_pos_mod = fmod(rect.x(), m_grid_size);
+	const qreal y_pos_mod = fmod(rect.y(), m_grid_size);
+
+	qreal y_pos = rect.y() - y_pos_mod;
+	while(y_pos < rect.height()){
+		const auto y0 = y_pos - point_radius;
+		const auto y1 = y_pos + point_radius;
+
+		qreal x_pos = rect.x() - x_pos_mod;
+		while(x_pos < rect.width()){
+			const auto c0 = QPointF(x_pos, y_pos);
+
+			const auto x0 = x_pos - point_radius;
+			const auto x1 = x_pos + point_radius;
+
+			QPainterPath point_path(QPointF{x_pos, y1});
+
+			const QPointF points[] = {
+				{x1, y_pos},
+				{x_pos, y0},
+				{x0, y_pos},
+				{x_pos, y1},
+			};
+
+			for(int i = 0; i < 4; i++){
+				const auto mid = (points[i] + point_path.currentPosition()) * 0.5f;
+
+				const auto c1 = (c0 + mid) * 0.5f;
+
+				point_path.cubicTo(c1, c1, points[i]);
+			}
+
+			//point_path.setFillRule(Qt::FillRule::OddEvenFill);
+
+			painter->fillPath(point_path, QColor(255, 255, 255, 64));
+
+			x_pos += m_grid_size;
+		}
+
+		y_pos += m_grid_size;
+	}
+
+	QFont name_fnt = QGuiApplication::font();
+	name_fnt.setPointSizeF(20.0);
+
+	const auto name_metrics = QFontMetricsF(name_fnt).boundingRect(m_name);
+
+	painter->setPen(QColor(255, 255, 255, 255));
+	painter->setBrush(QColor(255, 255, 255, 255));
+	painter->setFont(name_fnt);
+
+	const qreal name_margin = 20.0;
+
+	painter->drawText(QPointF(rect.x() + name_margin, rect.y() + name_metrics.height() + name_margin), m_name);
 }
 
 //
 // Graphs
 //
 
-editor::graph::graph(QString name, QObject *parent)
+editor::graph::graph(QString name, ham::const_typeset_view ts, QObject *parent)
 	: QObject(parent)
-	, m_scene(new QGraphicsScene(this))
+	, m_scene(new editor::detail::graph_scene(name, this))
 	, m_name(std::move(name))
-	, m_graph("NULL")
+	, m_graph("NULL", ts)
 {
 	const auto name_utf8 = m_name.toUtf8();
 	m_graph.set_name(name_utf8.data());
@@ -296,7 +426,7 @@ editor::graph_node *editor::graph::new_node(QPointF pos, const QString &name){
 
 	m_nodes.append(node);
 
-	node->setFlags(QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable);
+	//node->setFlags(QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable);
 
 	m_scene->addItem(node);
 
@@ -310,37 +440,90 @@ editor::graph_node *editor::graph::new_node(QPointF pos, const QString &name){
 //
 
 editor::graph_editor::graph_editor(editor::graph *graph, QWidget *parent)
-	: QWidget(parent)
+	: QGraphicsView(graph->scene(), parent)
 	, m_graph(graph)
-	, m_view(new QGraphicsView(graph->scene(), this))
 {
 	Q_ASSERT(graph != nullptr);
 
-	m_graph->setParent(this);
+	if(!graph->parent()){
+		graph->setParent(this);
+	}
 
 	QPalette pal = palette();
-	pal.setColor(QPalette::All, QPalette::Base, QColor(0, 0, 0, 0));
+	pal.setColor(QPalette::All, QPalette::Base, QColor(105, 105, 105, 64));
+	//pal.setColor(QPalette::All, QPalette::Base, QColor(0, 0, 0, 0));
 
 	setPalette(pal);
 	setContentsMargins(0, 0, 0, 0);
 	setAttribute(Qt::WA_TranslucentBackground);
 
-	pal.setColor(QPalette::All, QPalette::Base, QColor(105, 105, 105, 64));
+	setContextMenuPolicy(Qt::CustomContextMenu);
 
-	m_view->setPalette(pal);
-	//m_view->setBackgroundBrush(QColor(105, 105, 105, 64));
-	//m_view->setViewport(new QOpenGLWidget);
-	//m_view->setAttribute(Qt::WA_AlwaysStackOnTop);
-	m_view->setAttribute(Qt::WA_TranslucentBackground);
+	connect(
+		this, &QWidget::customContextMenuRequested,
+		this, &editor::graph_editor::show_graph_menu
+	);
 
-	const auto lay = new QHBoxLayout(this);
+	//setCacheMode(QGraphicsView::CacheBackground);
+	//setRenderHint(QPainter::Antialiasing);
+	setRenderHint(QPainter::TextAntialiasing);
+	setRenderHint(QPainter::SmoothPixmapTransform);
 
-	lay->setContentsMargins(0, 0, 0, 0);
-	lay->addWidget(m_view);
-
-	setLayout(lay);
-
-	m_view->show();
+	//setBackgroundBrush(QColor(105, 105, 105, 64));
+	//setAttribute(Qt::WA_AlwaysStackOnTop);
+	//setViewport(new QOpenGLWidget);
 }
 
 editor::graph_editor::~graph_editor(){}
+
+void editor::graph_editor::mousePressEvent(QMouseEvent *event){
+	if(event->button() == Qt::MiddleButton){
+		setDragMode(QGraphicsView::ScrollHandDrag);
+
+		const auto left_ev = new QMouseEvent(
+			QEvent::GraphicsSceneMousePress, event->pos(), event->pos(), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier
+		);
+
+		mousePressEvent(left_ev);
+	}
+	else{
+		QGraphicsView::mousePressEvent(event);
+	}
+}
+
+void editor::graph_editor::mouseReleaseEvent(QMouseEvent *event){
+	if(event->button() == Qt::MiddleButton){
+		const auto left_ev = new QMouseEvent(
+			QEvent::GraphicsSceneMousePress, event->pos(), event->pos(), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier
+		);
+
+		mouseReleaseEvent(left_ev);
+
+		setDragMode(QGraphicsView::NoDrag);
+	}
+	else{
+		QGraphicsView::mouseReleaseEvent(event);
+	}
+}
+
+void editor::graph_editor::wheelEvent(QWheelEvent *event){
+	const auto num_degs = event->angleDelta() / 8;
+	//const auto num_steps = num_degs / 15;
+
+	const auto old_scale_trans = QTransform::fromScale(m_zoom_factor, m_zoom_factor).inverted();
+
+	m_zoom_factor += num_degs.y() / 600.0;
+
+	auto new_trans = (old_scale_trans * transform());
+	new_trans.scale(m_zoom_factor, m_zoom_factor);
+
+	setTransform(new_trans);
+
+	//scale(m_zoom_factor, m_zoom_factor);
+	//QGraphicsView::wheelEvent(event);
+}
+
+void editor::graph_editor::show_graph_menu(const QPoint &p){
+	editor::graph_menu menu(m_graph, this);
+	menu.exec(mapToGlobal(p));
+}

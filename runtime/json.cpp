@@ -24,6 +24,8 @@
 
 #include "yyjson.h"
 
+using namespace ham::typedefs;
+
 HAM_C_API_BEGIN
 
 struct ham_json_document{
@@ -203,6 +205,61 @@ ham_usize ham_json_object_iterate(const ham_json_value *json, ham_json_object_it
 	else{
 		return unsafe_yyjson_get_len(yyval);
 	}
+}
+
+ham_nothrow bool ham_json_object_validate(const ham_json_value *obj, ham_usize num_members, const ham_json_member_desc *members){
+	if(
+		!ham_check(obj != NULL) ||
+		!ham_check(ham_json_is_object(obj)) ||
+		!ham_check(num_members <= 64)
+	){
+		return false;
+	}
+
+	struct {
+		usize num_members;
+		const ham_json_member_desc *members;
+		usize valid_members = 0;
+		u64 member_bits = 0;
+	} validate_data{ num_members, members };
+
+	return ham_json_object_iterate(
+		obj,
+		[](ham_str8 key, const ham_json_value *value, void *user){
+			const auto data = reinterpret_cast<decltype(validate_data)*>(user);
+
+			const auto key_hash = ham::hash(key);
+
+			for(usize i = 0 ; i < data->num_members; i++){
+				if((data->member_bits >> i) & 0x1){
+					continue;
+				}
+
+				const auto desc = &data->members[i];
+
+				if(ham::hash(desc->name) != key_hash || ham::str8(desc->name) != key){
+					continue;
+				}
+
+				const auto type = ham_json_get_type(value);
+
+				if(type != desc->type){
+					ham::logwarn(
+						ham_funcname,
+						"Invalid member {}: expected type {}, got {}",
+						key, desc->type, type
+					);
+
+					return false;
+				}
+
+				data->member_bits |= (1 << i);
+			}
+
+			return true;
+		},
+		&validate_data
+	) == num_members;
 }
 
 //

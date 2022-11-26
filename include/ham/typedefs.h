@@ -675,6 +675,8 @@ typedef HAM_CHAR_UTF(HAM_UTF) ham_uchar;
  * @{
  */
 
+#define ham_funcname __FUNCTION__
+
 typedef enum ham_str_encoding{
 	HAM_STR_UTF8,
 	HAM_STR_UTF16,

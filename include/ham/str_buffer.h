@@ -354,7 +354,7 @@ namespace ham{
 	}
 
 	template<typename ... Args>
-	str_buffer8 format(const fmt::format_string<Args...> &fmt_str, Args &&... args){
+	str_buffer8 format(fmt::format_string<Args...> fmt_str, Args &&... args){
 		str_buffer8 ret;
 		fmt::format_to(
 			std::back_inserter(ret),

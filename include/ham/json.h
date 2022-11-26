@@ -55,6 +55,25 @@ typedef enum ham_json_type{
 	HAM_JSON_TYPE_COUNT
 } ham_json_type;
 
+static inline ham_constexpr ham_nothrow const char *ham_json_type_str(ham_json_type type){
+	switch(type){
+	#define HAM_CASE(val) case (val): return #val;
+
+		HAM_CASE(HAM_JSON_NULL)
+		HAM_CASE(HAM_JSON_OBJECT)
+		HAM_CASE(HAM_JSON_ARRAY)
+		HAM_CASE(HAM_JSON_BOOL)
+		HAM_CASE(HAM_JSON_NAT)
+		HAM_CASE(HAM_JSON_INT)
+		HAM_CASE(HAM_JSON_REAL)
+		HAM_CASE(HAM_JSON_STRING)
+		HAM_CASE(HAM_JSON_RAW)
+
+	#undef HAM_CASE
+		default: return nullptr;
+	}
+}
+
 ham_api ham_json_type ham_json_get_type(const ham_json_value *json);
 
 ham_api bool ham_json_is_null(const ham_json_value *json);
@@ -74,6 +93,13 @@ ham_api const ham_json_value *ham_json_object_get(const ham_json_value *json, co
 typedef bool(*ham_json_object_iterate_fn)(ham_str8 key, const ham_json_value *value, void *user);
 
 ham_api ham_usize ham_json_object_iterate(const ham_json_value *json, ham_json_object_iterate_fn fn, void *user);
+
+typedef struct {
+	ham_str8 name;
+	ham_json_type type;
+} ham_json_member_desc;
+
+ham_api ham_nothrow bool ham_json_object_validate(const ham_json_value *obj, ham_usize num_members, const ham_json_member_desc *members);
 
 // Arrays
 
@@ -114,6 +140,22 @@ namespace ham{
 		raw = HAM_JSON_RAW,
 	};
 
+	constexpr str8 json_type_str(json_type type) noexcept{
+		return ham_json_type_str(static_cast<ham_json_type>(type));
+	}
+
+	struct json_member_desc{
+		str8 name;
+		json_type type;
+
+		constexpr operator ham_json_member_desc() const noexcept{
+			return { name, static_cast<ham_json_type>(type) };
+		}
+	};
+
+	static_assert(sizeof(json_member_desc) == sizeof(ham_json_member_desc));
+	static_assert(alignof(json_member_desc) == alignof(ham_json_member_desc));
+
 	template<bool Mutable = false>
 	class json_value_view{
 		public:
@@ -142,6 +184,11 @@ namespace ham{
 				};
 
 				return ham_json_object_iterate(m_val, wrapper, &f);
+			}
+
+			bool object_validate(const std::initializer_list<json_member_desc> &members) const noexcept{
+				// really bad stuff incoming
+				return ham_json_object_validate(m_val, members.size(), (const ham_json_member_desc*)std::data(members));
 			}
 
 			usize array_len() const noexcept{ return ham_json_array_iterate(m_val, nullptr, nullptr); }
@@ -226,6 +273,40 @@ namespace ham{
 				: m_handle(ham_json_document_open(path)){}
 
 			unique_handle<ham_json_document*, ham_json_document_destroy> m_handle;
+	};
+}
+
+namespace fmt{
+	template<>
+	struct formatter<ham_json_type>{
+		public:
+			constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()){
+				return str_formatter.parse(ctx);
+			}
+
+			template<typename FormatContext>
+			auto format(ham_json_type type, FormatContext &ctx) const -> decltype(ctx.out()){
+				return str_formatter.format(ham_json_type_str(type), ctx);
+			}
+
+		private:
+			formatter<ham::str8> str_formatter;
+	};
+
+	template<>
+	struct formatter<ham::json_type>{
+		public:
+			constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()){
+				return str_formatter.parse(ctx);
+			}
+
+			template<typename FormatContext>
+			auto format(ham::json_type type, FormatContext &ctx) const -> decltype(ctx.out()){
+				return str_formatter.format(ham::json_type_str(type), ctx);
+			}
+
+		private:
+			formatter<ham::str8> str_formatter;
 	};
 }
 

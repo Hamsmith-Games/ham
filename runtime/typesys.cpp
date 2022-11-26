@@ -104,6 +104,11 @@ ham_nothrow ham_u32 ham_type_get_flags(const ham_type *type){
 	return type->flags;
 }
 
+ham_nothrow const char *ham_type_str(const ham_type *type){
+	if(!ham_check(type != NULL)) return nullptr;
+	return type->name;
+}
+
 ham_nothrow const char *ham_type_name(const ham_type *type){
 	if(!ham_check(type != NULL)) return nullptr;
 	return type->name;

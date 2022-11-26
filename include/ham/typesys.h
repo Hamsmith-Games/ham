@@ -76,6 +76,8 @@ typedef enum ham_type_info_flag{
 
 typedef struct ham_type ham_type;
 
+ham_api ham_nothrow const char *ham_type_str(const ham_type *type);
+
 ham_api ham_nothrow ham_u32 ham_type_get_flags(const ham_type *type);
 
 ham_used

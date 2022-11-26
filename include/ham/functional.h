@@ -439,6 +439,40 @@ namespace ham{
 			const char *what() const noexcept override{ return "error in ham_workgroup_init"; }
 	};
 
+	template<typename F>
+	class scope_exit{
+		public:
+			template<typename UF>
+			explicit scope_exit(UF &&f) noexcept(std::is_nothrow_constructible_v<F, UF> || std::is_nothrow_constructible_v<F, UF&>)
+				: m_f(std::forward<UF>(f)), m_do(true){}
+
+			scope_exit(scope_exit &&other) noexcept(std::is_nothrow_move_constructible_v<F> || std::is_nothrow_copy_constructible_v<F>)
+				: m_f(std::move(other)), m_do(other.m_do)
+			{
+				other.m_do = false;
+			}
+
+			scope_exit(const scope_exit&) = delete;
+
+			~scope_exit(){
+				if(m_do) m_f();
+			}
+
+			template<typename UF>
+			scope_exit &operator=(UF &&f) = delete;
+
+			void release() noexcept{
+				m_do = false;
+			}
+
+		private:
+			F m_f;
+			bool m_do;
+	};
+
+	template<typename F>
+	scope_exit(F&&) -> scope_exit<std::remove_cvref_t<F>>;
+
 	class workgroup{
 		public:
 			workgroup(){

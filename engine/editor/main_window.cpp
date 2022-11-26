@@ -17,6 +17,9 @@
  */
 
 #include "main_window.hpp"
+#include "project.hpp"
+#include "world_view.hpp"
+#include "graph_editor.hpp"
 
 #include <QSettings>
 #include <QResizeEvent>
@@ -119,9 +122,11 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 	inner_lay->setContentsMargins(0, 0, 0, 0);
 	inner_lay->setStackingMode(QStackedLayout::StackAll);
 
-//	const auto graph_editor = new editor::graph_editor("Test graph", inner_widget);
+	ham::typeset_view ts = ham_engine_ts(m_engine);
 
-//	inner_lay->addWidget(graph_editor);
+	m_graph_editor = new editor::graph_editor(project_->name(), ts.ptr(), inner_widget);
+
+	inner_lay->addWidget(m_graph_editor);
 	inner_lay->addWidget(m_world_view);
 
 	inner_widget->setLayout(inner_lay);
@@ -130,33 +135,40 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 
 	set_central_widget(inner_widget);
 
-//	const auto test_node = graph_editor->new_node(QPointF{0.f, 0.f}, "Hello, Graph!");
+	const auto test_node = m_graph_editor->new_node(QPointF{0.f, 0.f}, "Hello, Graph!");
 
-//	ham::typeset_view ts = ham_engine_ts(m_engine);
+	const auto test_in_exec_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_IN, "Test exec", ham::engine::graph_exec_type(ts));
+	(void)test_in_exec_pin;
 
-//	const auto test_in_exec_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_IN, "Test exec", ham::engine::graph_exec_type(ts));
-//	(void)test_in_exec_pin;
+	const auto test_in_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_IN, "Test input", ts.get("i32"));
+	(void)test_in_pin;
 
-//	const auto test_in_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_IN, "Test input", ts.get("i32"));
-//	(void)test_in_pin;
+	const auto test_out_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_OUT, "Test output", ham::engine::graph_exec_type(ts));
+	(void)test_out_pin;
 
-//	const auto test_out_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_OUT, "Test output", ham::engine::graph_exec_type(ts));
-//	(void)test_out_pin;
+//	const auto settings_img = QImage("://images/cog.png").scaledToWidth(32, Qt::SmoothTransformation);
+//	const auto settings_pix = QPixmap::fromImage(settings_img);
 
-	const auto settings_img = QImage("://images/cog.png").scaledToWidth(32, Qt::SmoothTransformation);
-	const auto settings_pix = QPixmap::fromImage(settings_img);
+//	const auto settings_btn = new QPushButton(this);
+//	settings_btn->setFixedSize(32, 32);
+//	settings_btn->setContentsMargins(0, 0, 0, 0);
+//	settings_btn->setIcon(QIcon(settings_pix));
+//	settings_btn->setIconSize(QSize(32, 32));
 
-	const auto settings_btn = new QPushButton(this);
-	settings_btn->setFixedSize(32, 32);
-	settings_btn->setContentsMargins(0, 0, 0, 0);
-	settings_btn->setIcon(QIcon(settings_pix));
-	settings_btn->setIconSize(QSize(32, 32));
+//	const auto header_btn_lay = new QHBoxLayout;
+//	header_btn_lay->setContentsMargins(0, 0, 0, 0);
+//	header_btn_lay->addWidget(settings_btn, 1, Qt::AlignLeft | Qt::AlignVCenter);
 
-	const auto header_btn_lay = new QHBoxLayout;
-	header_btn_lay->setContentsMargins(0, 0, 0, 0);
-	header_btn_lay->addWidget(settings_btn, 1, Qt::AlignLeft | Qt::AlignVCenter);
+//	header()->set_gap_layout(window_header::gap::left, header_btn_lay);
 
-	header()->setGapLayout(window_header::gap::left, header_btn_lay);
+	const auto graph_shown = settings.value(QString("%1/editor/show_graph").arg(m_proj->name()), false).toBool();
+
+	if(graph_shown){
+		show_graph_editor();
+	}
+	else{
+		hide_graph_editor();
+	}
 
 	settings.beginGroup("editor");
 	const auto sizeVar = settings.value("size");
@@ -175,6 +187,20 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 editor::main_window::~main_window(){
 	ham_world_destroy(m_world);
 	ham_engine_destroy(m_engine);
+}
+
+void editor::main_window::show_graph_editor(bool do_show){
+	QSettings settings;
+	settings.setValue(QString("%1/editor/show_graph").arg(m_proj->name()), do_show);
+
+	if(do_show){
+		m_graph_editor->show();
+		m_world_view->show_overlay(false);
+	}
+	else{
+		m_graph_editor->hide();
+		m_world_view->show_overlay();
+	}
 }
 
 void editor::main_window::changeEvent(QEvent *event){
@@ -206,4 +232,19 @@ void editor::main_window::resizeEvent(QResizeEvent *ev){
 
 	QSettings settings;
 	settings.setValue("editor/size", ev->size());
+}
+
+void editor::main_window::keyReleaseEvent(QKeyEvent *event){
+	switch(event->key()){
+		case Qt::Key_G:{
+			show_graph_editor(m_graph_editor->isHidden());
+			event->accept();
+			break;
+		}
+
+		default:{
+			window::keyReleaseEvent(event);
+			break;
+		}
+	}
 }

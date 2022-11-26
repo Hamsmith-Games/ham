@@ -22,8 +22,12 @@
 #include "ham/engine.h"
 
 #include "window.hpp"
-#include "project.hpp"
-#include "world_view.hpp"
+
+namespace ham::engine::editor{
+	class project;
+	class world_view;
+	class graph_editor;
+}
 
 namespace ham::engine::editor{
 	class main_window: public window{
@@ -37,15 +41,23 @@ namespace ham::engine::editor{
 			class project *project() const noexcept{ return m_proj; }
 			class world_view *world_view() noexcept{ return m_world_view; }
 
+			void show_graph_editor(bool do_show = true);
+			void hide_graph_editor(){ show_graph_editor(false); }
+
 		protected:
 			void changeEvent(QEvent *event) override;
 			void resizeEvent(QResizeEvent *ev) override;
 
+			void keyReleaseEvent(QKeyEvent *event) override;
+
 		private:
 			ham_engine *m_engine;
 			ham_world *m_world;
+
 			class project *m_proj;
 			class world_view *m_world_view;
+			class graph_editor *m_graph_editor;
+			QWidget *m_view_overlay;
 	};
 }
 
