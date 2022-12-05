@@ -27,6 +27,7 @@ namespace ham::engine::editor{
 	class project;
 	class world_view;
 	class graph_editor;
+	class source_editor;
 }
 
 namespace ham::engine::editor{
@@ -57,6 +58,7 @@ namespace ham::engine::editor{
 			class project *m_proj;
 			class world_view *m_world_view;
 			class graph_editor *m_graph_editor;
+			class source_editor *m_source_editor;
 			QWidget *m_view_overlay;
 	};
 }

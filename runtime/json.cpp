@@ -259,7 +259,7 @@ ham_nothrow bool ham_json_object_validate(const ham_json_value *obj, ham_usize n
 			return true;
 		},
 		&validate_data
-	) == num_members;
+	) >= num_members;
 }
 
 //

@@ -17,7 +17,7 @@
  */
 
 #include "ham/json.h"
-#include "ham/engine/config.h"
+#include "ham/engine/types.h"
 
 extern "C" {
 #define template template_ // eww
@@ -31,7 +31,9 @@ extern "C" {
 #include <QDebug>
 #include <QHash>
 #include <QStandardPaths>
+#include <QDirIterator>
 #include <QSettings>
+#include <QJsonDocument>
 
 namespace editor = ham::engine::editor;
 
@@ -86,9 +88,14 @@ editor::project::project(const QDir &dir, QObject *parent)
 		throw project_dir_error{};
 	}
 
+	if(!ham::engine::ensure_types(m_ts.handle())){
+		qWarning() << "Failed to ensure engine types for project";
+		throw project_dir_error{};
+	}
+
 	QFile json_file(json_path);
 	if(!json_file.open(QFile::ReadOnly)){
-		qWarning() << "Failed to open template JSON" << json_path;
+		qWarning() << "Failed to open project JSON" << json_path;
 		throw project_dir_error{};
 	}
 
@@ -96,7 +103,7 @@ editor::project::project(const QDir &dir, QObject *parent)
 
 	const auto json_doc = ham::json_document(ham::str8(file_bytes.data(), file_bytes.size()-1));
 	if(!json_doc){
-		qWarning() << "Failed to open template JSON" << json_path;
+		qWarning() << "Failed to parse project JSON" << json_path;
 		throw project_json_error{};
 	}
 
@@ -108,47 +115,26 @@ editor::project::project(const QDir &dir, QObject *parent)
 		throw project_json_error{};
 	}
 
-	const auto proj_id_json = proj_root["id"];
-	if(!proj_id_json){
-		qWarning() << "Invalid project JSON file" << json_path << "no \"project.id\" key";
-		throw project_json_error();
-	}
-
-	const auto proj_name_json = proj_root["name"];
-	if(!proj_name_json){
-		qWarning() << "Invalid project JSON file" << json_path << "no \"project.name\" key";
+	if(!proj_root.object_validate({
+		{"id", ham::json_type::nat},
+		{"name", ham::json_type::string},
+		{"display-name", ham::json_type::string},
+		{"author", ham::json_type::string},
+		{"version", ham::json_type::array},
+		{"license", ham::json_type::string},
+		{"desc", ham::json_type::string},
+	})){
+		qWarning() << "Invalid project JSON file" << json_path << "invalid \"project\" object";
 		throw project_json_error{};
 	}
 
+	const auto proj_id_json      = proj_root["id"];
+	const auto proj_name_json    = proj_root["name"];
 	const auto proj_display_json = proj_root["display-name"];
-	if(!proj_display_json){
-		qWarning() << "Invalid project JSON file" << json_path << "no \"project.display-name\" key";
-		throw project_json_error{};
-	}
-
-	const auto proj_author_json = proj_root["author"];
-	if(!proj_author_json){
-		qWarning() << "Invalid project JSON file" << json_path << "no \"project.author\" key";
-		throw project_json_error{};
-	}
-
+	const auto proj_author_json  = proj_root["author"];
 	const auto proj_version_json = proj_root["version"];
-	if(!proj_version_json){
-		qWarning() << "Invalid template JSON file" << json_path << "no \"project.version\" key";
-		throw project_json_error{};
-	}
-
 	const auto proj_license_json = proj_root["license"];
-	if(!proj_license_json){
-		qWarning() << "Invalid template JSON file" << json_path << "no \"project.license\" key";
-		throw project_json_error{};
-	}
-
-	const auto proj_desc_json = proj_root["desc"];
-	if(!proj_desc_json){
-		qWarning() << "Invalid template JSON file" << json_path << "no \"project.desc\" key";
-		throw project_json_error{};
-	}
+	const auto proj_desc_json    = proj_root["desc"];
 
 	const auto proj_ver_maj = proj_version_json[0].get_nat();
 	const auto proj_ver_min = proj_version_json[1].get_nat();
@@ -161,12 +147,57 @@ editor::project::project(const QDir &dir, QObject *parent)
 	const auto proj_desc    = proj_desc_json.get_str();
 
 	m_id = proj_id_json.get_nat();
-	m_ver = QVersionNumber(proj_ver_maj, proj_ver_min, proj_ver_rev);
 	m_name = QString::fromUtf8(proj_name.ptr());
 	m_display_name = QString::fromUtf8(proj_display.ptr());
 	m_author = QString::fromUtf8(proj_author.ptr());
+	m_ver = QVersionNumber(proj_ver_maj, proj_ver_min, proj_ver_rev);
 	m_license = QString::fromUtf8(proj_license.ptr());
 	m_desc = QString::fromUtf8(proj_desc.ptr());
+
+	const auto graph_dir_info = QFileInfo(dir, "graphs");
+	if(graph_dir_info.exists()){
+		if(!graph_dir_info.isDir()){
+			qWarning() << "expected directory at path" << graph_dir_info.absoluteFilePath();
+		}
+		else{
+			// TODO: load graphs
+
+			qDebug() << "Looking for graphs in" << graph_dir_info.absoluteFilePath();
+
+			QDirIterator graph_iter(graph_dir_info.absoluteFilePath(), {"*.json"}, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+			while(graph_iter.hasNext()){
+				QString graph_path = graph_iter.next();
+
+				qDebug() << "Loading graph" << graph_path;
+
+				QFile json_file(graph_path);
+				if(!json_file.open(QIODevice::ReadOnly)){
+					qWarning() << "Failed to open graph json" << graph_path;
+					continue;
+				}
+
+				const auto json_doc = QJsonDocument::fromJson(json_file.readAll());
+
+				if(!json_doc.isObject()){
+					qWarning() << "Invalid graph json" << graph_path << ": expected root object with 'ham_graph' key";
+					continue;
+				}
+
+				const auto graph_root = json_doc.object();
+
+				const auto graph = editor::graph::from_json(ts(), graph_root);
+				graph->setParent(this);
+
+				if(m_graphs.contains(graph->name())){
+					qWarning() << "Project already contains graph by name" << graph->name();
+					delete graph;
+					continue;
+				}
+
+				m_graphs[graph->name()] = graph;
+			}
+		}
+	}
 }
 
 editor::project::~project(){}

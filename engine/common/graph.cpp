@@ -213,8 +213,8 @@ ham_usize ham_graph_serialize(ham_serialize_kind kind, const ham_graph *graph, h
 	return write_fn(buf.len(), buf.c_str(), user);
 }
 
-ham_graph *ham_graph_deserialize(ham_deserialize_kind kind, const ham_typeset *ts, ham_usize len, const void *data){
-	if(!ham_check(kind < HAM_DESERIALIZE_KIND_COUNT) || !ham_check((len && data) || (!len && !data))){
+ham_graph *ham_graph_deserialize_json(const ham_typeset *ts, const ham_json_value *json){
+	if(!ham_check(ts != NULL)){
 		return nullptr;
 	}
 
@@ -224,11 +224,124 @@ ham_graph *ham_graph_deserialize(ham_deserialize_kind kind, const ham_typeset *t
 		return nullptr;
 	}
 
-	if(!len){
+	if(!json){
 		return graph;
 	}
 
 	ham::scope_exit graph_destroyer([graph]{ ham_graph_destroy(graph); });
+
+	static const auto apiname = ham_funcname;
+
+#define json_errorf(fmt_str, ...) ham::logerror(apiname, "Invalid graph json: " fmt_str __VA_OPT__(,) __VA_ARGS__);
+
+	const ham::json_value_view root = json;
+
+	if(!root.is_object()){
+		json_errorf("expected root object");
+		return nullptr;
+	}
+
+	const auto graph_root = root["ham_graph"];
+	if(!graph_root){
+		json_errorf("no 'ham_graph' object key found");
+		return nullptr;
+	}
+
+	if(!graph_root.object_validate({ {"name", ham::json_type::string}, {"nodes", ham::json_type::array} })){
+		json_errorf("invalid 'ham_graph' object");
+		return nullptr;
+	}
+
+	const auto graph_name = graph_root["name"].get_str();
+
+	ham_graph_set_name(graph, graph_name);
+
+	const auto nodes = graph_root["nodes"];
+	if(!nodes.is_array()){
+		json_errorf("invalid 'ham_graph.nodes' value, expected array type");
+		return nullptr;
+	}
+
+	const usize good_nodes = nodes.array_iterate(
+		[&](usize idx, ham::json_value_view<> node){
+			if(
+				!node.object_validate({
+					{"name", ham::json_type::string},
+					{"pins", ham::json_type::array}
+				}))
+			{
+				json_errorf("invalid node at element {} of 'nodes'", idx);
+				return false;
+			}
+
+			const auto name = node["name"].get_str();
+
+			const auto node_ptr = ham_graph_node_create(graph, name);
+			if(!node_ptr){
+				json_errorf("failed to create graph node '{}'", name);
+				return false;
+			}
+
+			const auto pins = node["pins"];
+
+			const usize good_pins = pins.array_iterate(
+				[&](usize pin_idx, ham::json_value_view<> pin){
+					if(!pin.object_validate({ {"name", ham::json_type::string}, {"type", ham::json_type::string}, {"dir", ham::json_type::nat} })){
+						json_errorf("invalid pin at element {} of node {}", pin_idx, idx);
+						return false;
+					}
+
+					const auto pin_type_str = pin["type"].get_str();
+
+					const auto pin_type = ham_typeset_get(ts, pin_type_str);
+					if(!pin_type){
+						json_errorf("invalid pin type '{}'", pin_type_str);
+						return false;
+					}
+
+					const auto pin_dir = pin["dir"].get_nat();
+					const auto pin_name = pin["name"].get_str();
+
+					const auto pin_ptr = ham_graph_node_pin_create(
+						node_ptr,
+						pin_dir ? HAM_GRAPH_NODE_PIN_OUT : HAM_GRAPH_NODE_PIN_IN,
+						pin_name,
+						pin_type
+					);
+
+					if(!pin_ptr){
+						ham::logerror(apiname, "Could not create graph node pin '{}' for node '{}'", pin_name, name);
+						return false;
+					}
+
+					return true;
+				}
+			);
+
+			if(good_pins != pins.array_len()){
+				return false;
+			}
+
+			return true;
+		}
+	);
+
+	if(good_nodes != nodes.array_len()){
+		return nullptr;
+	}
+
+	graph_destroyer.release();
+	return graph;
+}
+
+ham_graph *ham_graph_deserialize(ham_deserialize_kind kind, const ham_typeset *ts, ham_usize len, const void *data){
+	if(!ham_check(kind < HAM_DESERIALIZE_KIND_COUNT) || !ham_check((len && data) || (!len && !data))){
+		return nullptr;
+	}
+
+	if(!len){
+		return ham_graph_create(HAM_EMPTY_STR8, ts);
+	}
 
 	switch(kind){
 		case HAM_DESERIALIZE_JSON:{
@@ -238,103 +351,13 @@ ham_graph *ham_graph_deserialize(ham_deserialize_kind kind, const ham_typeset *t
 				return nullptr;
 			}
 
-			const ham::scope_exit doc_destroyer([json_doc]{ ham_json_document_destroy(json_doc); });
-
-			static const auto apiname = ham_funcname;
-
-		#define json_errorf(fmt_str, ...) ham::logerror(apiname, "Invalid graph json: " fmt_str __VA_OPT__(,) __VA_ARGS__);
-
-			const ham::json_value_view root = ham_json_document_root(json_doc);
-
-			if(!root.is_object()){
-				json_errorf("expected root object");
-				return nullptr;
+			const auto ret = ham_graph_deserialize_json(ts, ham_json_document_root(json_doc));
+			if(!ret){
+				ham_logapierrorf("Failed to parse graph json");
 			}
 
-			const auto graph_root = root["ham_graph"];
-			if(!graph_root){
-				json_errorf("no 'ham_graph' object key found");
-				return nullptr;
-			}
-
-			if(!graph_root.object_validate({ {"name", ham::json_type::string}, {"nodes", ham::json_type::array} })){
-				json_errorf("Invalid 'ham_graph' object");
-			}
-
-			const auto graph_name = graph_root["name"].get_str();
-
-			ham_graph_set_name(graph, graph_name);
-
-			const auto nodes = graph_root["nodes"];
-
-			const usize good_nodes = nodes.array_iterate(
-				[&](usize idx, ham::json_value_view<> node){
-					if(
-						!node.object_validate({
-							{"name", ham::json_type::string},
-							{"pins", ham::json_type::array}
-						}))
-					{
-						json_errorf("invalid node at element {} of 'nodes'", idx);
-						return false;
-					}
-
-					const auto name = node["name"].get_str();
-
-					const auto node_ptr = ham_graph_node_create(graph, name);
-					if(!node_ptr){
-						json_errorf("failed to create graph node '{}'", name);
-						return false;
-					}
-
-					const auto pins = node["pins"];
-
-					const usize good_pins = node.array_iterate([&](usize pin_idx, ham::json_value_view<> pin){
-						if(!pin.object_validate({ {"name", ham::json_type::string}, {"type", ham::json_type::string}, {"dir", ham::json_type::nat} })){
-							json_errorf("invalid pin at element {} of node {}", pin_idx, idx);
-							return false;
-						}
-
-						const auto pin_type_str = pin["type"].get_str();
-
-						const auto pin_type = ham_typeset_get(ts, pin_type_str);
-						if(!pin_type){
-							json_errorf("invalid pin type '{}'", pin_type_str);
-							return false;
-						}
-
-						const auto pin_dir = pin["dir"].get_nat();
-						const auto pin_name = pin["name"].get_str();
-
-						const auto pin_ptr = ham_graph_node_pin_create(
-							node_ptr,
-							pin_dir ? HAM_GRAPH_NODE_PIN_OUT : HAM_GRAPH_NODE_PIN_IN,
-							pin_name,
-							pin_type
-						);
-
-						if(!pin_ptr){
-							ham::logerror(apiname, "Could not create graph node pin '{}' for node '{}'", pin_name, name);
-							return false;
-						}
-
-						return true;
-					});
-
-					if(good_pins != pins.array_len()){
-						return false;
-					}
-
-					return true;
-				}
-			);
-
-			if(good_nodes != nodes.array_len()){
-				return nullptr;
-			}
-
-			graph_destroyer.release();
-			return graph;
+			ham_json_document_destroy(json_doc);
+			return ret;
 		}
 
 		case HAM_DESERIALIZE_BINARY:{

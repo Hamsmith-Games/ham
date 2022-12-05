@@ -20,6 +20,7 @@
 #include "project.hpp"
 #include "world_view.hpp"
 #include "graph_editor.hpp"
+#include "source_editor.hpp"
 
 #include <QSettings>
 #include <QResizeEvent>
@@ -99,7 +100,7 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 		engine_app.description = ham::str8(desc_u8.data());
 		engine_app.version = { (u16)version.majorVersion(), (u16)version.minorVersion(), (u16)version.microVersion() };
 
-		m_engine = ham_engine_create(&engine_app);
+		m_engine = ham_engine_create(&engine_app, project_->ts());
 		if(!m_engine){
 			ham::logapierror("Error in ham_engine_create");
 			throw std::runtime_error("Could not create main window engine instance");
@@ -122,29 +123,41 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 	inner_lay->setContentsMargins(0, 0, 0, 0);
 	inner_lay->setStackingMode(QStackedLayout::StackAll);
 
-	ham::typeset_view ts = ham_engine_ts(m_engine);
+	ham::typeset_view ts = project_->ts();
 
-	m_graph_editor = new editor::graph_editor(project_->name(), ts.ptr(), inner_widget);
+	const auto app_graph = project_->get_graph(project_->name());
+	if(app_graph){
+		m_graph_editor = new editor::graph_editor(app_graph, inner_widget);
+	}
+	else{
+		m_graph_editor = new editor::graph_editor(project_->name(), ts, inner_widget);
+
+		const auto test_node = m_graph_editor->new_node(QPointF{0.f, 0.f}, "Hello, Graph!");
+
+		const auto test_in_exec_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_IN, "Test exec", ham::engine::graph_exec_type(ts));
+		(void)test_in_exec_pin;
+
+		const auto test_in_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_IN, "Test input", ts.get("i32"));
+		(void)test_in_pin;
+
+		const auto test_out_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_OUT, "Test output", ham::engine::graph_exec_type(ts));
+		(void)test_out_pin;
+	}
+
+//	m_source_editor = new editor::source_editor(inner_widget);
+//	m_source_editor->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+//	inner_lay->addWidget(m_source_editor);
 
 	inner_lay->addWidget(m_graph_editor);
 	inner_lay->addWidget(m_world_view);
 
 	inner_widget->setLayout(inner_lay);
 
-	project_->setParent(this);
+	if(!project_->parent()){
+		project_->setParent(this);
+	}
 
 	set_central_widget(inner_widget);
-
-	const auto test_node = m_graph_editor->new_node(QPointF{0.f, 0.f}, "Hello, Graph!");
-
-	const auto test_in_exec_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_IN, "Test exec", ham::engine::graph_exec_type(ts));
-	(void)test_in_exec_pin;
-
-	const auto test_in_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_IN, "Test input", ts.get("i32"));
-	(void)test_in_pin;
-
-	const auto test_out_pin = test_node->new_pin(HAM_GRAPH_NODE_PIN_OUT, "Test output", ham::engine::graph_exec_type(ts));
-	(void)test_out_pin;
 
 //	const auto settings_img = QImage("://images/cog.png").scaledToWidth(32, Qt::SmoothTransformation);
 //	const auto settings_pix = QPixmap::fromImage(settings_img);

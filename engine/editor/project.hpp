@@ -28,6 +28,8 @@
 #include <QVersionNumber>
 #include <QAbstractListModel>
 
+#include "graph_editor.hpp"
+
 #define HAM_ENGINE_EDITOR_TEMPLATE_JSON_PATH ".ham/engine-template.json"
 
 namespace ham::engine::editor{
@@ -102,6 +104,9 @@ namespace ham::engine::editor{
 			explicit project(const QDir &dir, QObject *parent = nullptr);
 			~project();
 
+			ham::typeset_view ts() noexcept{ return m_ts; }
+			ham::const_typeset_view ts() const noexcept{ return m_ts; }
+
 			const QDir    &dir() const noexcept{ return m_dir; }
 			const quint32 &id() const noexcept{ return m_id; }
 			const QString &name() const noexcept{ return m_name; }
@@ -111,6 +116,31 @@ namespace ham::engine::editor{
 			const QString &description() const noexcept{ return m_desc; }
 
 			const QVersionNumber &version() const noexcept{ return m_ver; }
+
+			QList<QString> graph_names() const noexcept{ return m_graphs.keys(); }
+
+			QList<const editor::graph*> const_graphs() const noexcept{
+				QList<const editor::graph*> ret;
+
+				const auto mut = m_graphs.values();
+				ret.reserve(mut.size());
+
+				for(auto graph : mut){
+					ret.append(graph);
+				}
+
+				return ret;
+			}
+
+			QList<editor::graph*> graphs() noexcept{ return m_graphs.values(); }
+
+			editor::graph *get_graph(const QString &name) noexcept{
+				return m_graphs.value(name, nullptr);
+			}
+
+			const editor::graph *get_graph(const QString &name) const noexcept{
+				return m_graphs.value(name, nullptr);
+			}
 
 			void set_id(quint32 new_id) noexcept{
 				if(new_id != m_id){
@@ -176,7 +206,8 @@ namespace ham::engine::editor{
 			quint32 m_id;
 			QVersionNumber m_ver;
 			QString m_name, m_display_name, m_author, m_license, m_desc;
-
+			QHash<QString, editor::graph*> m_graphs;
+			ham::typeset m_ts;
 	};
 
 	class project_template: public QObject{

@@ -237,6 +237,12 @@ namespace ham{
 
 			constexpr basic_typeset_view(pointer ptr = nullptr) noexcept: m_ptr(ptr){}
 
+			constexpr operator basic_typeset_view<>() const noexcept
+				requires is_mutable
+			{
+				return {m_ptr};
+			}
+
 			constexpr operator bool() const noexcept{ return !!m_ptr; }
 			constexpr operator pointer() const noexcept{ return m_ptr; }
 
@@ -260,6 +266,9 @@ namespace ham{
 			operator const_typeset_view() const noexcept{ return m_handle.get(); }
 
 			type get(str8 name) const noexcept{ return ham_typeset_get(m_handle.get(), name); }
+
+			ham_typeset *handle() noexcept{ return m_handle.get(); }
+			const ham_typeset *handle() const noexcept{ return m_handle.get(); }
 
 		private:
 			unique_handle<ham_typeset*, ham_typeset_destroy> m_handle;

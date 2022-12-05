@@ -25,6 +25,7 @@
  */
 
 #include "ham/engine/config.h"
+#include "ham/json.h"
 #include "ham/typesys.h"
 
 HAM_C_API_BEGIN
@@ -71,8 +72,15 @@ typedef ham_serialize_kind ham_deserialize_kind;
 
 typedef ham_usize(*ham_write_fn)(ham_usize len, const void *bytes, void *user);
 
+
 ham_engine_api ham_usize ham_graph_serialize(ham_serialize_kind kind, const ham_graph *graph, ham_write_fn write_fn, void *user);
 
+ham_used
+static inline ham_usize ham_graph_serialize_json(const ham_graph *graph, ham_write_fn write_fn, void *user){
+	return ham_graph_serialize(HAM_SERIALIZE_JSON, graph, write_fn, user);
+}
+
+ham_engine_api ham_graph *ham_graph_deserialize_json(const ham_typeset *ts, const ham_json_value *json);
 ham_engine_api ham_graph *ham_graph_deserialize(ham_deserialize_kind kind, const ham_typeset *ts, ham_usize len, const void *data);
 
 /**
@@ -374,6 +382,8 @@ namespace ham::engine{
 
 			pointer ptr() const noexcept{ return m_ptr; }
 
+			const_typeset_view ts() const noexcept{ return ham_graph_ts(m_ptr); }
+
 			str8 name() const noexcept{ return ham_graph_name(m_ptr); }
 
 			bool set_name(str8 new_name) noexcept
@@ -409,8 +419,14 @@ namespace ham::engine{
 				: m_handle(ham_graph_create(name, ts))
 			{}
 
+			static graph from_handle(ham_graph *handle) noexcept{
+				return graph(handle);
+			}
+
 			operator graph_view() noexcept{ return m_handle.get(); }
 			operator const_graph_view() const noexcept{ return m_handle.get(); }
+
+			const_typeset_view ts() const noexcept{ return ham_graph_ts(m_handle.get()); }
 
 			str8 name() const noexcept{ return ham_graph_name(m_handle.get()); }
 
@@ -432,6 +448,9 @@ namespace ham::engine{
 			const_graph_node_array_view nodes() const noexcept{ return const_graph_node_array_view(num_nodes(), ham_graph_const_nodes(m_handle.get())); }
 
 		private:
+			explicit graph(ham_graph *graph) noexcept
+				: m_handle(graph){}
+
 			unique_handle<ham_graph*, ham_graph_destroy> m_handle;
 	};
 }

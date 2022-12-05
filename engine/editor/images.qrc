@@ -11,5 +11,6 @@
         <file>images/default-tex.png</file>
         <file>images/camera.png</file>
         <file>images/settings.png</file>
+        <file>images/new-file.png</file>
     </qresource>
 </RCC>

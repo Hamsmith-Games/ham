@@ -19,8 +19,12 @@
 #include "ham/log.h"
 
 #include "graph_editor.hpp"
+#include "util.hpp"
 
 #include <QApplication>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 
 #include <QHBoxLayout>
 
@@ -35,16 +39,104 @@
 #include <QGraphicsView>
 #include <QGraphicsLinearLayout>
 #include <QGraphicsProxyWidget>
+#include <QGraphicsDropShadowEffect>
 
 using namespace ham::typedefs;
 
 namespace editor = ham::engine::editor;
 
-constexpr static qreal node_title_size = 12.f;
-constexpr static qreal node_title_margin = 10.f;
-constexpr static qreal node_corner_radius = 10.f;
-constexpr static qreal pin_radius = 7.5f;
-constexpr static qreal pin_spacing = 10.f;
+constexpr static qreal grid_size_default = 50.0;
+constexpr static qreal node_title_size = 12.0;
+constexpr static qreal node_title_margin = 10.0;
+constexpr static qreal node_corner_radius = 12.0;
+constexpr static qreal pin_radius = 7.5;
+constexpr static qreal pin_spacing = 10.0;
+
+//
+// Graph node pin connections
+//
+
+QRectF editor::graph_node_pin::connection_curve::boundingRect() const{
+	const QPointF min_xy = {qMin(m_beg.x(), m_end.x()), qMin(m_beg.y(), m_end.y())};
+	const QPointF max_xy = {qMax(m_beg.y(), m_end.y()), qMax(m_beg.y(), m_end.y())};
+
+	const QPointF d_xy = max_xy - min_xy;
+
+	return QRectF({0.f, 0.f}, d_xy);
+
+//						if(m_beg.x() < m_end.x()){
+//							// begin is on left
+//							if(m_beg.y() < m_end.y()){
+//								// begin is top left
+//								return QRectF(m_beg, m_end);
+//							}
+//							else{
+//								// bottom left
+//								const QPointF top_left = {m_beg.x(), m_end.y()};
+//								return QRectF(top_left, m_beg);
+//							}
+//						}
+//						else{
+//							// begin is on right
+//							if(m_beg.y() < m_end.y()){
+//								// begin is top right
+//								const QPointF top_left = {m_end.x(), m_beg.y()};
+//								const QPointF bot_right = {m_beg.x(), m_end.y()};
+//								return QRectF(top_left, bot_right);
+//							}
+//							else{
+//								// bottom right
+//								return QRectF(m_end, m_beg);
+//							}
+//						}
+}
+
+void editor::graph_node_pin::connection_curve::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget){
+	const auto loc_beg = mapFromScene(m_beg);
+	const auto loc_end = mapFromScene(m_end);
+
+	QPainterPath path(loc_beg);
+
+	const QPointF min_xy = {qMin(loc_beg.x(), loc_end.x()), qMin(loc_beg.y(), loc_end.y())};
+	const QPointF max_xy = {qMax(loc_beg.y(), loc_end.y()), qMax(loc_beg.y(), loc_end.y())};
+
+	const QPointF d_xy = max_xy - min_xy;
+	(void)d_xy;
+
+	if(loc_beg.x() < loc_end.x()){
+		// start on left
+		if(loc_beg.y() < loc_end.y()){
+			// start top left
+		}
+		else{
+			// bottom left
+		}
+
+		path.cubicTo(min_xy, max_xy, loc_end);
+	}
+	else{
+		// start on right
+		if(loc_beg.y() < loc_end.y()){
+			// start top right
+			path.cubicTo(min_xy, max_xy, loc_end);
+		}
+		else{
+			// bottom right
+			path.cubicTo(max_xy, min_xy, loc_end);
+		}
+	}
+
+	auto new_pen = painter->pen();
+
+	QColor color = m_color;
+	color.setAlpha(128);
+
+	new_pen.setColor(color);
+	new_pen.setWidthF(5.f);
+
+	painter->setPen(new_pen);
+	painter->drawPath(path);
+}
 
 //
 // Graph node pins
@@ -194,8 +286,14 @@ editor::graph_node::graph_node(engine::graph *graph, const QString &name, QGraph
 	m_name_lbl->setFont(name_fnt);
 	m_name_lbl->setContentsMargins(node_title_margin + (pin_radius * 2.f), node_title_margin + pin_radius, node_title_margin, node_title_margin);
 
+	const auto name_shadow_fx = new QGraphicsDropShadowEffect;
+	name_shadow_fx->setBlurRadius(5.0);
+	name_shadow_fx->setOffset(1.0);
+	name_shadow_fx->setColor(Qt::black);
+
 	const auto name_proxy = new QGraphicsProxyWidget(this);
 	name_proxy->setWidget(m_name_lbl);
+	name_proxy->setGraphicsEffect(name_shadow_fx);
 
 	// top-level layout incl name
 	const auto top_lay = new QGraphicsLinearLayout(Qt::Vertical, this);
@@ -217,7 +315,7 @@ editor::graph_node::graph_node(engine::graph *graph, const QString &name, QGraph
 
 	setContentsMargins(0.f, 0.f, 0.f, 0.f);
 
-	setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+	//setCacheMode(QGraphicsItem::DeviceCoordinateCache);
 
 	setFlag(QGraphicsItem::ItemIsSelectable);
 	setFlag(QGraphicsItem::ItemIsMovable);
@@ -266,10 +364,188 @@ void editor::graph_node::paint(QPainter *painter, const QStyleOptionGraphicsItem
 	rect.setWidth(rect.width() - pin_radius);
 	rect.setLeft(pin_radius);
 
+	const auto name_lbl_rect = m_name_lbl->rect();
+
+	const auto name_path_height = name_lbl_rect.height();
+	const auto name_path_start = rect.topLeft() + QPointF(0.0, name_path_height);
+
+	QPainterPath name_path(name_path_start);
+
+	{
+		const auto arc_center = rect.topRight() - QPointF(node_corner_radius, -node_corner_radius);
+		const auto arc_rect = QRectF(arc_center - QPointF(node_corner_radius, node_corner_radius), QSizeF(2.0 * node_corner_radius, 2.0 * node_corner_radius));
+
+		name_path.moveTo(arc_center);
+		name_path.arcTo(
+			arc_rect,
+			0.0, 90.0
+		);
+		name_path.closeSubpath();
+	}
+
+	{
+		const auto arc_center = rect.topLeft() + QPointF(node_corner_radius, node_corner_radius);
+		const auto arc_rect = QRectF(arc_center - QPointF(node_corner_radius, node_corner_radius), QSizeF(2.0 * node_corner_radius, 2.0 * node_corner_radius));
+
+		name_path.moveTo(arc_center);
+		name_path.arcTo(
+			arc_rect,
+			90.0, 90.0
+		);
+		name_path.closeSubpath();
+	}
+
+	painter->save();
+
+	painter->setPen(QColor(105, 105, 105));
 	painter->setBrush(QColor(105, 105, 105));
 	painter->drawRoundedRect(rect, node_corner_radius, node_corner_radius);
 
+	const auto name_color = string_color(m_name_lbl->text()).darker(150);
+
+	const auto name_square_rect = QRectF(rect.topLeft() + QPointF(0.0, node_corner_radius), QSizeF(rect.width(), name_path_height - node_corner_radius));
+
+	painter->setPen(name_color);
+	painter->setBrush(name_color);
+
+	painter->drawRect(name_square_rect);
+
+	painter->drawRect(
+		{
+			QPointF(rect.topLeft() + QPointF(node_corner_radius, 0.0)),
+			QSizeF(rect.width() - 2.0 * node_corner_radius, node_corner_radius)
+		}
+	);
+
+	{
+		const auto arc_center = rect.topRight() - QPointF(node_corner_radius, -node_corner_radius);
+		const auto arc_rect = QRectF(arc_center - QPointF(node_corner_radius, node_corner_radius), QSizeF(2.0 * node_corner_radius, 2.0 * node_corner_radius));
+
+		painter->drawPie(arc_rect, 0, 90 * 16);
+	}
+
+	{
+		const auto arc_rect = QRectF(rect.topLeft(), QSizeF(2.0 * node_corner_radius, 2.0 * node_corner_radius));
+
+		painter->drawPie(arc_rect, 90 * 16, 90 * 16);
+	}
+
+
+
+	//painter->fillPath(name_path, string_color(m_name_lbl->text()).darker(100));
+
+	painter->restore();
+
 	QGraphicsWidget::paint(painter, option, widget);
+}
+
+QJsonObject editor::graph_node::to_json() const{
+	QJsonArray pin_arr;
+
+	for(auto pin : m_inputs){
+		QJsonObject pin_obj{
+			{"name", pin->name()},
+			{"dir", 0},
+			{"type", to_QString(pin->pin_type().name())}
+		};
+
+		pin_arr.append(pin_obj);
+	}
+
+	for(auto pin : m_outputs){
+		QJsonObject pin_obj{
+			{"name", pin->name()},
+			{"dir", 1},
+			{"type", to_QString(pin->pin_type().name())}
+		};
+
+		pin_arr.append(pin_obj);
+	}
+
+	const auto cur_pos = pos();
+
+	QJsonArray pos_arr{cur_pos.x(), cur_pos.y()};
+
+	return {
+		{"name", m_name_lbl->text()},
+		{"pins", pin_arr},
+		{"pos", pos_arr}
+	};
+}
+
+editor::graph_node *editor::graph_node::from_json(editor::graph *graph, const QJsonObject &obj){
+	const auto name = obj["name"];
+	if(!name.isString()){
+		qWarning() << "Invalid graph node json: expected 'name' key with string value";
+		return nullptr;
+	}
+
+	const auto pins = obj["pins"];
+	if(!pins.isArray()){
+		qWarning() << "Invalid graph node json: expected 'pins' key with array value";
+		return nullptr;
+	}
+
+	QPointF new_pos;
+
+	const auto pos_arr = obj["pos"].toArray({});
+
+	new_pos.setX(pos_arr.at(0).toDouble(grid_size_default * 5));
+	new_pos.setX(pos_arr.at(1).toDouble(grid_size_default * 5));
+
+	const auto node = graph->new_node(new_pos, name.toString());
+
+	const auto pins_arr = pins.toArray();
+
+	for(auto pin : pins_arr){
+		if(!pin.isObject()){
+			qWarning() << "Invalid pin json in graph node" << node->name();
+			continue;
+		}
+
+		const auto pin_obj = pin.toObject();
+
+		const auto pin_name = pin_obj["name"];
+		if(!pin_name.isString()){
+			qWarning() << "Invalid pin json in graph node" << node->name() << ": expected 'name' key with string value";
+			continue;
+		}
+
+		const auto pin_dir = pin_obj["dir"];
+		if(!pin_dir.isDouble()){
+			qWarning() << "Invalid pin json in graph node" << node->name() << ": expected 'dir' key with unsigned integer value";
+			continue;
+		}
+
+		const auto pin_dir_val = pin_obj["dir"].toDouble();
+		if(qRound(pin_dir_val) != pin_dir_val){
+			qWarning() << "Invalid pin json in graph node" << node->name() << ": expected 'dir' key with unsigned integer value";
+			continue;
+		}
+
+		const auto pin_type = pin_obj["type"];
+		if(!pin_type.isString()){
+			qWarning() << "Invalid pin json in graph node" << node->name() << ": expected 'type' key with string value";
+			continue;
+		}
+
+		const auto pin_type_str = pin_type.toString();
+		const auto pin_type_u8  = pin_type_str.toUtf8();
+
+		const auto pin_type_val = graph->ts().get({pin_type_u8.constData(), (usize)pin_type_u8.size()});
+		if(!pin_type_val){
+			qWarning() << "Invalid pin json in graph node" << node->name() << ": unrecognized type" << pin_type_str;
+			continue;
+		}
+
+		node->new_pin(
+			(pin_dir_val != 0.0) ? HAM_GRAPH_NODE_PIN_OUT : HAM_GRAPH_NODE_PIN_IN,
+			pin_name.toString(),
+			pin_type_val
+		);
+	}
+
+	return node;
 }
 
 QVariant editor::graph_node::itemChange(GraphicsItemChange change, const QVariant &value){
@@ -320,9 +596,8 @@ void editor::graph_menu::set_graph(editor::graph *new_graph){
 editor::detail::graph_scene::graph_scene(QString name_, QObject *parent)
 	: QGraphicsScene(parent)
 	, m_name(std::move(name_))
-	, m_grid_size(50.0)
+	, m_grid_size(grid_size_default)
 {
-
 }
 
 void editor::detail::graph_scene::set_name(QAnyStringView new_name){
@@ -397,6 +672,13 @@ void editor::detail::graph_scene::drawBackground(QPainter *painter, const QRectF
 // Graphs
 //
 
+editor::graph::graph(ham::engine::graph engine_graph, QObject *parent)
+	: QObject(parent)
+	, m_scene(new editor::detail::graph_scene(to_QString(engine_graph.name()), this))
+	, m_name(to_QString(engine_graph.name()))
+	, m_graph(std::move(engine_graph))
+{}
+
 editor::graph::graph(QString name, ham::const_typeset_view ts, QObject *parent)
 	: QObject(parent)
 	, m_scene(new editor::detail::graph_scene(name, this))
@@ -430,9 +712,65 @@ editor::graph_node *editor::graph::new_node(QPointF pos, const QString &name){
 
 	m_scene->addItem(node);
 
+	node->setPos(pos);
+
 	Q_EMIT node_added(node);
 
 	return node;
+}
+
+QJsonObject editor::graph::to_json() const{
+	QJsonArray nodes_arr;
+
+	for(auto node : m_nodes){
+		nodes_arr.append(node->to_json());
+	}
+
+	return {
+		{"ham_graph",
+			QJsonObject{
+				{"name", m_name},
+				{"nodes", nodes_arr}
+			}
+		}
+	};
+}
+
+editor::graph *editor::graph::from_json(ham::const_typeset_view ts, const QJsonObject &obj){
+	const auto graph_val = obj["ham_graph"];
+	if(!graph_val.isObject()){
+		qWarning() << "Invalid graph json: expected 'ham_graph' key with object value";
+		return nullptr;
+	}
+
+	const auto graph_obj = graph_val.toObject();
+
+	const auto name = graph_obj["name"];
+	if(!name.isString()){
+		qWarning() << "Invalid graph json: expected 'name' key with string value";
+		return nullptr;
+	}
+
+	const auto nodes = graph_obj["nodes"];
+	if(!nodes.isArray()){
+		qWarning() << "Invalid graph json: expected 'nodes' key with array value";
+		return nullptr;
+	}
+
+	const auto graph = new editor::graph(name.toString(), ts);
+
+	const auto nodes_arr = nodes.toArray();
+
+	for(auto node : nodes_arr){
+		if(!node.isObject()){
+			qWarning() << "Invalid graph node json: expected object type";
+			continue;
+		}
+
+		editor::graph_node::from_json(graph, node.toObject());
+	}
+
+	return graph;
 }
 
 //

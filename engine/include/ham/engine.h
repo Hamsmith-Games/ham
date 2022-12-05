@@ -89,7 +89,7 @@ ham_engine_api ham_nothrow bool ham_engine_app_load_json(ham_engine_app *ret, co
  * @returns newly created engine or ``NULL`` on error
  */
 ham_nonnull_args(1)
-ham_engine_api ham_engine *ham_engine_create_alloc(const ham_allocator *allocator, const ham_engine_app *app);
+ham_engine_api ham_engine *ham_engine_create_alloc(const ham_allocator *allocator, const ham_engine_app *app, ham_typeset *ts);
 
 /**
  * @brief Create a new engine instance.
@@ -98,8 +98,8 @@ ham_engine_api ham_engine *ham_engine_create_alloc(const ham_allocator *allocato
  * @returns newly created engine or ``NULL`` on error
  */
 ham_used
-static inline ham_engine *ham_engine_create(const ham_engine_app *app){
-	return ham_engine_create_alloc(ham_current_allocator(), app);
+static inline ham_engine *ham_engine_create(const ham_engine_app *app, ham_typeset *ts){
+	return ham_engine_create_alloc(ham_current_allocator(), app, ts);
 }
 
 /**

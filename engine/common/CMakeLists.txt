@@ -66,6 +66,7 @@ ham_add_library(
 	${HAM_ENGINE_HEADERS}
 	${HAM_ENGINE_SHADERS}
 	engine.cpp
+	types.cpp
 	argparse.cpp
 	sys.cpp
 	model.cpp

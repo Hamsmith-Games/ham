@@ -37,6 +37,49 @@
 # Dependencies
 ##
 
+include(ExternalProject)
+include(ProcessorCount)
+
+ProcessorCount(NPROC)
+
+set(QSCINTILLA_VERSION 2.13.3)
+
+set(QSCINTILLA_ARCHIVE_NAME "QScintilla_src-${QSCINTILLA_VERSION}.tar.gz")
+set(QSCINTILLA_ARCHIVE_URL "https://www.riverbankcomputing.com/static/Downloads/QScintilla/${QSCINTILLA_VERSION}/${QSCINTILLA_ARCHIVE_NAME}")
+set(QSCINTILLA_ARCHIVE_SHA256 "711d28e37c8fccaa8229e8e39a5b3b2d97f3fffc63da10b71c71b84fa3649398")
+
+FetchContent_Declare(
+	qscintilla_content
+	URL "${QSCINTILLA_ARCHIVE_URL}"
+	URL_HASH "SHA256=${QSCINTILLA_ARCHIVE_SHA256}"
+	DOWNLOAD_EXTRACT_TIMESTAMP ON
+)
+
+#FetchContent_MakeAvailable(qscintilla_content)
+FetchContent_GetProperties(qscintilla_content)
+if(NOT qscintilla_content_POPULATED)
+	FetchContent_Populate(qscintilla_content)
+endif()
+
+set(QSCINTILLA_LIBRARY "${qscintilla_content_BINARY_DIR}/libqscintilla2_qt6${CMAKE_SHARED_LIBRARY_SUFFIX}")
+
+message(STATUS "QScintilla library path: ${QSCINTILLA_LIBRARY}")
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets OpenGLWidgets)
+
+add_custom_command(
+	OUTPUT ${QSCINTILLA_LIBRARY}
+	COMMAND Qt6::qmake $<$<CONFIG:Debug>:-d> ${qscintilla_content_SOURCE_DIR}/src/qscintilla.pro
+	COMMAND make -j${NPROC}
+
+	WORKING_DIRECTORY ${qscintilla_content_BINARY_DIR}
+)
+
+add_library(QScintilla SHARED IMPORTED)
+set_target_properties(QScintilla PROPERTIES IMPORTED_LOCATION "${QSCINTILLA_LIBRARY}")
+target_include_directories(QScintilla INTERFACE "${qscintilla_content_SOURCE_DIR}/src")
+add_dependencies(QScintilla qscintilla_content)
+
 FetchContent_Declare(
 	mustach_content
 	GIT_REPOSITORY https://gitlab.com/jobol/mustach.git
@@ -54,10 +97,8 @@ if(NOT mustach_content_POPULATED)
 endif()
 
 ##
-# Dependencies
+# Editor targets
 ##
-
-find_package(Qt6 REQUIRED COMPONENTS Widgets OpenGLWidgets)
 
 qt_standard_project_setup()
 
@@ -69,6 +110,8 @@ ham_add_executable(
 	models.qrc
 
 	main.cpp
+
+	util.hpp
 
 	window.hpp
 	window.cpp
@@ -89,6 +132,9 @@ ham_add_executable(
 
 	world_view.hpp
 	world_view.cpp
+
+	source_editor.hpp
+	source_editor.cpp
 
 	graph_editor.hpp
 	graph_editor.cpp
@@ -114,4 +160,5 @@ target_link_libraries(
 	    ham::engine
 		Qt6::Widgets Qt6::OpenGLWidgets
 		mustach::mustach
+		QScintilla
 )

@@ -32,6 +32,7 @@ struct ham_engine{
 	const ham_allocator *allocator;
 	ham_engine_app app;
 
+	bool owns_ts;
 	ham_typeset *ts;
 
 	ham_image *default_tex;
@@ -220,7 +221,7 @@ static inline void ham_image_buf_fill_rgba8(
 	}
 }
 
-ham_engine *ham_engine_create_alloc(const ham_allocator *allocator, const ham_engine_app *app){
+ham_engine *ham_engine_create_alloc(const ham_allocator *allocator, const ham_engine_app *app, ham_typeset *ts){
 	ham::scoped_lock lock(ham_impl_gengine_mut);
 
 	if(
@@ -240,10 +241,13 @@ ham_engine *ham_engine_create_alloc(const ham_allocator *allocator, const ham_en
 		return nullptr;
 	}
 
-	const auto ts = ham_typeset_create_alloc(allocator);
-	if(!ts){
-		ham::logapierror("Could not create typeset");
-		return nullptr;
+	const bool owns_ts = !ts;
+	if(owns_ts){
+		ts = ham_typeset_create_alloc(allocator);
+		if(!ts){
+			ham::logapierror("Could not create typeset");
+			return nullptr;
+		}
 	}
 
 	ham_u8 default_tex_pixels[512*512*4];
@@ -291,6 +295,7 @@ ham_engine *ham_engine_create_alloc(const ham_allocator *allocator, const ham_en
 	engine->app.user = app->user;
 
 	engine->allocator = allocator;
+	engine->owns_ts = owns_ts;
 	engine->ts = ts;
 	engine->default_tex = default_tex;
 
@@ -345,7 +350,9 @@ ham_nothrow void ham_engine_destroy(ham_engine *engine){
 
 	ham_image_destroy(engine->default_tex);
 
-	ham_typeset_destroy(engine->ts);
+	if(engine->owns_ts){
+		ham_typeset_destroy(engine->ts);
+	}
 
 	ham_allocator_delete(allocator, engine);
 

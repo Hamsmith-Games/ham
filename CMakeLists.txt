@@ -457,6 +457,7 @@ if(HAM_BUILD_ENGINE)
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine-object.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/argparse.h
+		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/types.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/input.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/model.h
 		${HAM_ENGINE_SOURCE_INCLUDE_DIR}/ham/engine/entity.h

@@ -20,6 +20,7 @@
 
 #include "welcome_wizard.hpp"
 #include "main_window.hpp"
+#include "source_editor.hpp"
 
 #include <QApplication>
 #include <QCommandLineParser>

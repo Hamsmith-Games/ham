@@ -25,6 +25,8 @@
 
 #include <QVector2D>
 
+#include <QJsonObject>
+
 #include <QWidget>
 #include <QMenu>
 #include <QLabel>
@@ -39,6 +41,13 @@ Q_DECLARE_METATYPE(ham::const_typeset_view)
 class QGraphicsScene;
 class QGraphicsView;
 class QGraphicsLinearLayout;
+
+// predefs
+namespace ham::engine::editor{
+	class graph;
+	class graph_node;
+	class graph_node_pin;
+}
 
 namespace ham::engine::editor{
 	static inline QColor string_color(ham::str8 str){
@@ -57,8 +66,6 @@ namespace ham::engine::editor{
 		const auto utf8_str = str.toUtf8();
 		return string_color(str8(utf8_str.data(), utf8_str.size()-1));
 	}
-
-	class graph_node;
 
 	class graph_node_pin: public QGraphicsWidget{
 		Q_OBJECT
@@ -100,87 +107,9 @@ namespace ham::engine::editor{
 						update();
 					}
 
-					QRectF boundingRect() const override{
-						const QPointF min_xy = {qMin(m_beg.x(), m_end.x()), qMin(m_beg.y(), m_end.y())};
-						const QPointF max_xy = {qMax(m_beg.y(), m_end.y()), qMax(m_beg.y(), m_end.y())};
+					QRectF boundingRect() const override;
 
-						const QPointF d_xy = max_xy - min_xy;
-
-						return QRectF({0.f, 0.f}, d_xy);
-
-//						if(m_beg.x() < m_end.x()){
-//							// begin is on left
-//							if(m_beg.y() < m_end.y()){
-//								// begin is top left
-//								return QRectF(m_beg, m_end);
-//							}
-//							else{
-//								// bottom left
-//								const QPointF top_left = {m_beg.x(), m_end.y()};
-//								return QRectF(top_left, m_beg);
-//							}
-//						}
-//						else{
-//							// begin is on right
-//							if(m_beg.y() < m_end.y()){
-//								// begin is top right
-//								const QPointF top_left = {m_end.x(), m_beg.y()};
-//								const QPointF bot_right = {m_beg.x(), m_end.y()};
-//								return QRectF(top_left, bot_right);
-//							}
-//							else{
-//								// bottom right
-//								return QRectF(m_end, m_beg);
-//							}
-//						}
-					}
-
-					void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override{
-						const auto loc_beg = mapFromScene(m_beg);
-						const auto loc_end = mapFromScene(m_end);
-
-						QPainterPath path(loc_beg);
-
-						const QPointF min_xy = {qMin(loc_beg.x(), loc_end.x()), qMin(loc_beg.y(), loc_end.y())};
-						const QPointF max_xy = {qMax(loc_beg.y(), loc_end.y()), qMax(loc_beg.y(), loc_end.y())};
-
-						const QPointF d_xy = max_xy - min_xy;
-						(void)d_xy;
-
-						if(loc_beg.x() < loc_end.x()){
-							// start on left
-							if(loc_beg.y() < loc_end.y()){
-								// start top left
-							}
-							else{
-								// bottom left
-							}
-
-							path.cubicTo(min_xy, max_xy, loc_end);
-						}
-						else{
-							// start on right
-							if(loc_beg.y() < loc_end.y()){
-								// start top right
-								path.cubicTo(min_xy, max_xy, loc_end);
-							}
-							else{
-								// bottom right
-								path.cubicTo(max_xy, min_xy, loc_end);
-							}
-						}
-
-						auto new_pen = painter->pen();
-
-						QColor color = m_color;
-						color.setAlpha(128);
-
-						new_pen.setColor(color);
-						new_pen.setWidthF(5.f);
-
-						painter->setPen(new_pen);
-						painter->drawPath(path);
-					}
+					void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
 				private:
 					QPointF m_beg, m_end;
@@ -300,6 +229,11 @@ namespace ham::engine::editor{
 
 			void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
+			QJsonObject to_json() const;
+
+			[[maybe_unused]]
+			static graph_node *from_json(editor::graph *graph, const QJsonObject &obj);
+
 		Q_SIGNALS:
 			void name_changed(const QString&);
 
@@ -353,10 +287,15 @@ namespace ham::engine::editor{
 		Q_PROPERTY(QList<ham::engine::editor::graph_node*> nodes READ nodes CONSTANT)
 
 		public:
+			explicit graph(ham::engine::graph engine_graph, QObject *parent = nullptr);
+
 			graph(QString name, ham::const_typeset_view ts, QObject *parent = nullptr);
+
 			~graph();
 
 			QGraphicsScene *scene() const noexcept{ return m_scene; }
+
+			ham::const_typeset_view ts() const noexcept{ return m_graph.ts(); }
 
 			const QString &name() const noexcept{ return m_name; }
 
@@ -372,6 +311,10 @@ namespace ham::engine::editor{
 					Q_EMIT name_changed(new_name);
 				}
 			}
+
+			QJsonObject to_json() const;
+
+			static graph *from_json(ham::const_typeset_view ts, const QJsonObject &obj);
 
 		Q_SIGNALS:
 			void name_changed(const QString&);
