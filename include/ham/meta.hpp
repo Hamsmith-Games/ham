@@ -51,6 +51,16 @@ namespace ham::meta{
 			constexpr operator str8() const noexcept{ return basic_str(m_chars, N); }
 			constexpr operator const char*() const noexcept{ return m_chars; }
 
+			template<std::size_t M>
+			constexpr bool operator==(const char(&lit)[M]) const noexcept{
+				if constexpr(M != (N+1)){
+					return false;
+				}
+				else{
+					return (str8)*this == lit;
+				}
+			}
+
 			constexpr bool operator==(const str8 &other) const noexcept{
 				if(other.size() != N) return false;
 

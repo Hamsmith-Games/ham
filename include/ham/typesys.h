@@ -265,24 +265,55 @@ namespace ham{
 	using object_type = basic_type<ham_object>;
 
 	namespace detail{
-		template<usize N> struct sized_int_helper;
 		template<usize N> struct sized_nat_helper;
-
-		template<> struct sized_int_helper<8>:  id<i8>{};
-		template<> struct sized_int_helper<16>: id<i16>{};
-		template<> struct sized_int_helper<32>: id<i32>{};
-		template<> struct sized_int_helper<64>: id<i64>{};
+		template<usize N> struct sized_int_helper;
+		template<usize N> struct sized_rat_helper;
+		template<usize N> struct sized_float_helper;
 
 		template<> struct sized_nat_helper<8>:  id<u8>{};
 		template<> struct sized_nat_helper<16>: id<u16>{};
 		template<> struct sized_nat_helper<32>: id<u32>{};
 		template<> struct sized_nat_helper<64>: id<u64>{};
 
+		template<> struct sized_int_helper<8>:  id<i8>{};
+		template<> struct sized_int_helper<16>: id<i16>{};
+		template<> struct sized_int_helper<32>: id<i32>{};
+		template<> struct sized_int_helper<64>: id<i64>{};
+
+		#ifdef HAM_INT128
+		template<> struct sized_nat_helper<128>: id<u128>{};
+		template<> struct sized_int_helper<128>: id<i128>{};
+		#endif
+
+		template<> struct sized_rat_helper<8>:  id<ham_rat8>{};
+		template<> struct sized_rat_helper<16>: id<ham_rat16>{};
+		template<> struct sized_rat_helper<32>: id<ham_rat32>{};
+		template<> struct sized_rat_helper<64>: id<ham_rat64>{};
+		template<> struct sized_rat_helper<128>: id<ham_rat128>{};
+		template<> struct sized_rat_helper<256>: id<ham_rat256>{};
+
+		#ifdef HAM_FLOAT16
+		template<> struct sized_float_helper<16>: id<f16>{};
+		#endif
+
+		template<> struct sized_float_helper<32>: id<f32>{};
+		template<> struct sized_float_helper<64>: id<f64>{};
+
+		#ifdef HAM_FLOAT128
+		template<> struct sized_float_helper<128>: id<f128>{};
+		#endif
+
 		template<usize N>
 		using sized_int = typename sized_int_helper<N>::type;
 
 		template<usize N>
 		using sized_nat = typename sized_nat_helper<N>::type;
+
+		template<usize N>
+		using sized_rat = typename sized_rat_helper<N>::type;
+
+		template<usize N>
+		using sized_float = typename sized_float_helper<N>::type;
 	}
 
 	template<usize N>
@@ -290,6 +321,12 @@ namespace ham{
 
 	template<usize N>
 	using int_type = basic_type<detail::sized_int<N>>;
+
+	template<usize N>
+	using rat_type = basic_type<detail::sized_rat<N>>;
+
+	template<usize N>
+	using float_type = basic_type<detail::sized_float<N>>;
 
 	template<typename ... Tags>
 	class basic_typeset_view{
@@ -314,12 +351,26 @@ namespace ham{
 			type get(str8 name) const noexcept{ return ham_typeset_get(m_ptr, name); }
 
 			type get_void() const noexcept{ return ham_typeset_void(m_ptr); }
-			type get_unit() const noexcept{ return ham_typeset_unit(m_ptr); }
-			type get_bool() const noexcept{ return ham_typeset_bool(m_ptr); }
+
+			basic_type<ham_unit> get_unit() const noexcept{ return ham_typeset_unit(m_ptr); }
+			basic_type<bool> get_bool() const noexcept{ return ham_typeset_bool(m_ptr); }
+
 			type get_nat(usize num_bits) const noexcept{ return ham_typeset_nat(m_ptr, num_bits); }
 			type get_int(usize num_bits) const noexcept{ return ham_typeset_int(m_ptr, num_bits); }
 			type get_rat(usize num_bits) const noexcept{ return ham_typeset_rat(m_ptr, num_bits); }
 			type get_float(usize num_bits) const noexcept{ return ham_typeset_float(m_ptr, num_bits); }
+
+			template<std::size_t N>
+			nat_type<N> get_nat() const noexcept{ return ham_typeset_nat(m_ptr, N); }
+
+			template<std::size_t N>
+			int_type<N> get_int() const noexcept{ return ham_typeset_int(m_ptr, N); }
+
+			template<std::size_t N>
+			rat_type<N> get_rat() const noexcept{ return ham_typeset_rat(m_ptr, N); }
+
+			template<std::size_t N>
+			float_type<N> get_float() const noexcept{ return ham_typeset_float(m_ptr, N); }
 
 			object_type get_object(str8 name) const noexcept{ return ham_typeset_object(m_ptr, name); }
 
@@ -367,6 +418,16 @@ namespace ham{
 			unique_handle<ham_type_builder*, ham_type_builder_destroy> m_handle;
 	};
 
+	template<typename T>
+	concept Rational =
+		std::is_same_v<T, ham_rat8> ||
+		std::is_same_v<T, ham_rat16> ||
+		std::is_same_v<T, ham_rat32> ||
+		std::is_same_v<T, ham_rat64> ||
+		std::is_same_v<T, ham_rat128> ||
+		std::is_same_v<T, ham_rat256>
+	;
+
 	namespace detail{
 		template<typename T>
 		struct rtti_helper{
@@ -387,17 +448,22 @@ namespace ham{
 		struct rtti_helper<Int>{
 			static auto get(const_typeset_view ts){
 				if constexpr(std::is_signed_v<Int>){
-					return ts.get_int(sizeof(Int) * CHAR_BIT);
+					return ts.get_int<sizeof(Int) * CHAR_BIT>();
 				}
 				else{
-					return ts.get_nat(sizeof(Int) * CHAR_BIT);
+					return ts.get_nat<sizeof(Int) * CHAR_BIT>();
 				}
 			}
 		};
 
+		template<Rational Rat>
+		struct rtti_helper<Rat>{
+			static auto get(const_typeset_view ts){ return ts.get_rat<sizeof(Rat) * CHAR_BIT>(); }
+		};
+
 		template<std::floating_point Float>
 		struct rtti_helper<Float>{
-			static auto get(const_typeset_view ts){ return ts.get_float(sizeof(Float) * CHAR_BIT); }
+			static auto get(const_typeset_view ts){ return ts.get_float<sizeof(Float) * CHAR_BIT>(); }
 		};
 	}
 

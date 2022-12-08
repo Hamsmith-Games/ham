@@ -36,9 +36,9 @@ bool ham_test_typesys(){
 		ham_test_assert(builder.set_kind(HAM_TYPE_OBJECT));
 		ham_test_assert(builder.set_name(ham::meta::type_name_v<ham_typesys_test_type>));
 
-		const auto bool_ty = ts.get("bool");
-		const auto f32_ty  = ts.get("f32");
-		const auto v3_ty   = ts.get("ham_vec3");
+		const auto bool_ty = ham::get_type<bool>(ts);
+		const auto f32_ty  = ham::get_type<f32>(ts);
+		const auto v3_ty   = ham::get_type<ham_vec3>(ts);
 
 		ham_test_assert(builder.add_member("b",  bool_ty));
 		ham_test_assert(builder.add_member("f",  f32_ty));
