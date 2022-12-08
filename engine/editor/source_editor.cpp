@@ -18,16 +18,34 @@
 
 #include "source_editor.hpp"
 
-#include "ham/typedefs.h"
+#include <QFontDatabase>
 
 namespace editor = ham::engine::editor;
-
-using namespace ham::typedefs;
 
 editor::source_editor::source_editor(QWidget *parent)
 	: QsciScintilla(parent)
 {
+	setCaretForegroundColor(QColor(255, 255, 255));
+	setCaretLineBackgroundColor(QColor(66, 66, 66));
+	setCaretLineVisible(true);
+
+	setMarginType(0, QsciScintilla::NumberMargin);
+	setMarginWidth(0, "0000");
+
+	setMarginType(1, QsciScintilla::SymbolMargin);
+
+	setMarginsForegroundColor(QColor(255, 255, 255));
+	setMarginsBackgroundColor(QColor(105, 105, 105));
+
+	setIndentationsUseTabs(true);
+	setTabWidth(4);
+	setTabIndents(true);
+	setAutoIndent(true);
+
 	setText("Hello, World!");
+	setUtf8(true);
+
+	setFont(QFontDatabase::font("JetBrains Mono", "Regular", 12));
 }
 
 editor::source_editor::~source_editor(){}

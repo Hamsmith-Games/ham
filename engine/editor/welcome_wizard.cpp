@@ -343,8 +343,13 @@ editor::project_wizard::project_wizard(QWidget *parent)
 			setField("subdir", false);
 		}
 
+		const auto name_u8    = proj_name.toUtf8();
+		const auto display_u8 = proj_display.toUtf8();
+		const auto author_u8  = proj_author.toUtf8();
+		const auto desc_u8    = proj_desc.toUtf8();
+
 		const auto proj_tmpl = tmpl_page->current_template();
-		if(!proj_tmpl->createInDir(QDir(proj_dir), proj_name, proj_display, proj_author, proj_desc)){
+		if(!proj_tmpl->createInDir(QDir(proj_dir), name_u8, display_u8, author_u8, desc_u8)){
 			QMessageBox::warning(this, "Error", QString("Failed to create project \"%2\" in \"%1\"").arg(proj_dir, proj_name));
 			QWizard::done(-1);
 			return;

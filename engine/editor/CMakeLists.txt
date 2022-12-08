@@ -109,6 +109,7 @@ ham_add_executable(
 	templates.qrc
 	models.qrc
 
+	engine_instance.hpp
 	main.cpp
 
 	util.hpp

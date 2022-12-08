@@ -97,7 +97,7 @@ struct ham_entity{
 struct ham_entity_vtable{
 	ham_derive(ham_object_vtable)
 
-	void(*loop)(ham_entity *self, ham_f64 dt);
+	void(*tick)(ham_entity *self, ham_f64 dt);
 };
 
 HAM_C_API_END

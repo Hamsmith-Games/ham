@@ -18,6 +18,7 @@
 
 #include "main_window.hpp"
 #include "project.hpp"
+#include "engine_instance.hpp"
 #include "world_view.hpp"
 #include "graph_editor.hpp"
 #include "source_editor.hpp"
@@ -39,18 +40,18 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 	Q_ASSERT(project_);
 
 	setMinimumSize(854, 480);
-	setWindowTitle(QString("%1 - %2").arg(tr("Ham"), project_->name()));
+	setWindowTitle(QString("%1 - %2").arg(tr("Ham"), project_->name().toString()));
 
 	QSettings settings;
 
 	settings.beginGroup("editor");
 
-	QList<QPair<QString, QString>> recent_projs{ { project_->name(), project_->dir().absolutePath() } };
+	QList<QPair<QUtf8StringView, QString>> recent_projs{ { project_->name(), project_->dir().absolutePath() } };
 	const int cur_num_recents = settings.beginReadArray("recent-projs");
 	for(int i = 0; i < cur_num_recents; i++){
 		settings.setArrayIndex(i);
 
-		auto name = settings.value("name").toString();
+		auto name = settings.value("name").toString().toUtf8();
 		auto dir  = settings.value("dir").toString();
 
 		if(name == project_->name() && dir == project_->dir().absolutePath()){
@@ -68,7 +69,7 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 		const auto &recent_info = recent_projs[i];
 
 		settings.setArrayIndex(i);
-		settings.setValue("name", recent_info.first);
+		settings.setValue("name", recent_info.first.toString());
 		settings.setValue("dir",  recent_info.second);
 	}
 
@@ -77,32 +78,23 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 	settings.endGroup(); // editor
 
 	{
-		const auto dir_u8 = project_->dir().path().toUtf8();
-		const auto author_u8 = project_->author().toUtf8();
-		const auto desc_u8 = project_->description().toUtf8();
-		const auto name_u8 = project_->name().toUtf8();
-		const auto display_u8 = project_->display_name().toUtf8();
-		const auto license_u8 = project_->license().toUtf8();
-		const auto version = project_->version();
+		const auto app = new editor::engine_app(
+			project_->id(),
+			project_->dir(),
+			project_->name(),
+			project_->display_name(),
+			project_->author(),
+			project_->license(),
+			project_->description(),
+			project_->version(),
+			[](auto...){ return true; },
+			[](auto...){},
+			[](auto...){},
+			nullptr
+		);
 
-		ham_engine_app engine_app{};
-
-		engine_app.init = [](auto...){ return true; };
-		engine_app.fini = [](auto...){};
-		engine_app.loop = [](auto...){};
-
-		engine_app.id = project_->id();
-		engine_app.dir = ham::str8(dir_u8.data());
-		engine_app.name = ham::str8(name_u8.data());
-		engine_app.display_name = ham::str8(display_u8.data());
-		engine_app.author = ham::str8(author_u8.data());
-		engine_app.license = ham::str8(license_u8.data());
-		engine_app.description = ham::str8(desc_u8.data());
-		engine_app.version = { (u16)version.majorVersion(), (u16)version.minorVersion(), (u16)version.microVersion() };
-
-		m_engine = ham_engine_create(&engine_app, project_->ts());
+		m_engine = new editor::engine_instance(app, project_->ts(), this);
 		if(!m_engine){
-			ham::logapierror("Error in ham_engine_create");
 			throw std::runtime_error("Could not create main window engine instance");
 		}
 	}
@@ -110,11 +102,11 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 	m_world = ham_world_create(HAM_LIT("ham-editor"));
 	if(!m_world){
 		ham::logapierror("Error in ham_world_create");
-		ham_engine_destroy(m_engine);
+		delete m_engine;
 		throw std::runtime_error("Could not create main window world instance");
 	}
 
-	m_world_view = new editor::world_view(m_engine, m_world, this);
+	m_world_view = new editor::world_view(m_engine->handle(), m_world, this);
 
 	const auto inner_widget = new QWidget(this);
 	inner_widget->setContentsMargins(0, 0, 0, 0);
@@ -125,12 +117,14 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 
 	ham::typeset_view ts = project_->ts();
 
-	const auto app_graph = project_->get_graph(project_->name());
+	const auto proj_name_str = project_->name().toString();
+
+	const auto app_graph = project_->get_graph(proj_name_str);
 	if(app_graph){
 		m_graph_editor = new editor::graph_editor(app_graph, inner_widget);
 	}
 	else{
-		m_graph_editor = new editor::graph_editor(project_->name(), ts, inner_widget);
+		m_graph_editor = new editor::graph_editor(proj_name_str, ts, inner_widget);
 
 		const auto test_node = m_graph_editor->new_node(QPointF{0.f, 0.f}, "Hello, Graph!");
 
@@ -174,7 +168,7 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 
 //	header()->set_gap_layout(window_header::gap::left, header_btn_lay);
 
-	const auto graph_shown = settings.value(QString("%1/editor/show_graph").arg(m_proj->name()), false).toBool();
+	const auto graph_shown = settings.value(QString("%1/editor/show_graph").arg(proj_name_str), false).toBool();
 
 	if(graph_shown){
 		show_graph_editor();
@@ -199,12 +193,12 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 
 editor::main_window::~main_window(){
 	ham_world_destroy(m_world);
-	ham_engine_destroy(m_engine);
+	delete m_engine;
 }
 
 void editor::main_window::show_graph_editor(bool do_show){
 	QSettings settings;
-	settings.setValue(QString("%1/editor/show_graph").arg(m_proj->name()), do_show);
+	settings.setValue(QString("%1/editor/show_graph").arg(m_proj->name().toString()), do_show);
 
 	if(do_show){
 		m_graph_editor->show();

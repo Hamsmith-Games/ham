@@ -19,7 +19,7 @@
 #ifndef HAM_ENGINE_EDITOR_MAIN_WINDOW_HPP
 #define HAM_ENGINE_EDITOR_MAIN_WINDOW_HPP 1
 
-#include "ham/engine.h"
+#include "ham/engine/world.h"
 
 #include "window.hpp"
 
@@ -28,6 +28,7 @@ namespace ham::engine::editor{
 	class world_view;
 	class graph_editor;
 	class source_editor;
+	class engine_instance;
 }
 
 namespace ham::engine::editor{
@@ -38,7 +39,7 @@ namespace ham::engine::editor{
 			explicit main_window(class project *project_, QWidget *parent = nullptr);
 			~main_window();
 
-			ham_engine *engine() const noexcept{ return m_engine; }
+			engine_instance *engine() const noexcept{ return m_engine; }
 			class project *project() const noexcept{ return m_proj; }
 			class world_view *world_view() noexcept{ return m_world_view; }
 
@@ -52,7 +53,7 @@ namespace ham::engine::editor{
 			void keyReleaseEvent(QKeyEvent *event) override;
 
 		private:
-			ham_engine *m_engine;
+			engine_instance *m_engine;
 			ham_world *m_world;
 
 			class project *m_proj;

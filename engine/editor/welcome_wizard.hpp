@@ -96,12 +96,12 @@ namespace ham::engine::editor{
 						switch(role){
 							case Qt::DisplayRole:
 							case NameRole:
-								return QVariant(m_data[index.row()]->name());
+								return QVariant(m_data[index.row()]->name().toString());
 
 							case DirRole: return QVariant(m_data[index.row()]->dir().path());
 
-							case AuthorRole: return QVariant(m_data[index.row()]->author());
-							case DescriptionRole: return QVariant(m_data[index.row()]->description());
+							case AuthorRole: return QVariant(m_data[index.row()]->author().toString());
+							case DescriptionRole: return QVariant(m_data[index.row()]->description().toString());
 
 							default: return QVariant();
 						}

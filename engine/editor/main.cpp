@@ -82,6 +82,83 @@ int main(int argc, char *argv[]){
 		return 1;
 	}
 
+	const QString code_font_paths[] = {
+		// Fira code
+		":/fonts/FiraCode/ttf/FiraCode-Bold.ttf",
+		":/fonts/FiraCode/ttf/FiraCode-Medium.ttf",
+		":/fonts/FiraCode/ttf/FiraCode-Light.ttf",
+		":/fonts/FiraCode/ttf/FiraCode-Retina.ttf",
+		":/fonts/FiraCode/ttf/FiraCode-SemiBold.ttf",
+
+		// Hack
+		":/fonts/Hack/Hack-Bold.ttf",
+		":/fonts/Hack/Hack-BoldItalic.ttf",
+		":/fonts/Hack/Hack-Italic.ttf",
+		":/fonts/Hack/Hack-Regular.ttf",
+
+		// Inconsolata
+		":/fonts/Inconsolata/Inconsolata.otf",
+
+		// JetBrains Mono
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Bold.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-BoldItalic.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-ExtraBold.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-ExtraBoldItalic.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-ExtraLight.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-ExtraLightItalic.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Italic.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Light.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-LightItalic.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Medium.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-MediumItalic.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Regular.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-SemiBold.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-SemiBoldItalic.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-Thin.ttf",
+		":/fonts/JetBrainsMono/fonts/ttf/JetBrainsMono-ThinItalic.ttf",
+
+		// Monoid
+		":/fonts/Monoid/Monoid-Bold.ttf",
+		":/fonts/Monoid/Monoid-Italic.ttf",
+		":/fonts/Monoid/Monoid-Regular.ttf",
+		":/fonts/Monoid/Monoid-Retina.ttf",
+
+		// NotoSans Mono
+		":/fonts/NotoSansMono/static/NotoSansMono/NotoSansMono-Black.ttf",
+		":/fonts/NotoSansMono/static/NotoSansMono/NotoSansMono-Bold.ttf",
+		":/fonts/NotoSansMono/static/NotoSansMono/NotoSansMono-ExtraBold.ttf",
+		":/fonts/NotoSansMono/static/NotoSansMono/NotoSansMono-ExtraLight.ttf",
+		":/fonts/NotoSansMono/static/NotoSansMono/NotoSansMono-Light.ttf",
+		":/fonts/NotoSansMono/static/NotoSansMono/NotoSansMono-Medium.ttf",
+		":/fonts/NotoSansMono/static/NotoSansMono/NotoSansMono-Regular.ttf",
+		":/fonts/NotoSansMono/static/NotoSansMono/NotoSansMono-SemiBold.ttf",
+		":/fonts/NotoSansMono/static/NotoSansMono/NotoSansMono-Thin.ttf",
+
+		// SourceCodePro
+		":/fonts/SourceCodePro/SourceCodePro-Black.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-BlackIt.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-Bold.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-BoldIt.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-ExtraLight.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-ExtraLightIt.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-It.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-Light.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-LightIt.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-Medium.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-MediumIt.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-Regular.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-Semibold.ttf",
+		":/fonts/SourceCodePro/SourceCodePro-SemiboldIt.ttf",
+	};
+
+	for(auto &&font_path : code_font_paths){
+		const int res = QFontDatabase::addApplicationFont(font_path);
+		if(res == -1){
+			qWarning() << "Could not load font" << font_path;
+		}
+	}
+
+	// default font
 	int font_id = QFontDatabase::addApplicationFont(":/fonts/PressStart2P-Regular.ttf");
 	const auto font_fam = QFontDatabase::applicationFontFamilies(font_id).at(0);
 

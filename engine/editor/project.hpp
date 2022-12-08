@@ -91,14 +91,17 @@ namespace ham::engine::editor{
 	class project: public QObject{
 		Q_OBJECT
 
-		Q_PROPERTY(QDir dir READ dir NOTIFY dir_changed)
 		Q_PROPERTY(quint32 id READ id WRITE set_id NOTIFY id_changed)
-		Q_PROPERTY(QString name READ name WRITE set_name NOTIFY name_changed)
-		Q_PROPERTY(QString display_name READ name WRITE set_display_name NOTIFY display_name_changed)
-		Q_PROPERTY(QString author READ author WRITE set_author NOTIFY author_changed)
+
+		Q_PROPERTY(QDir dir READ dir NOTIFY dir_changed)
+
+		Q_PROPERTY(QUtf8StringView name READ name WRITE set_name NOTIFY name_changed)
+		Q_PROPERTY(QUtf8StringView display_name READ name WRITE set_display_name NOTIFY display_name_changed)
+		Q_PROPERTY(QUtf8StringView author READ author WRITE set_author NOTIFY author_changed)
+		Q_PROPERTY(QUtf8StringView license READ license WRITE set_license NOTIFY license_changed)
+		Q_PROPERTY(QUtf8StringView description READ description WRITE set_description NOTIFY description_changed)
+
 		Q_PROPERTY(QVersionNumber version READ version WRITE set_version NOTIFY version_changed)
-		Q_PROPERTY(QString license READ license WRITE set_license NOTIFY license_changed)
-		Q_PROPERTY(QString description READ description WRITE set_description NOTIFY description_changed)
 
 		public:
 			explicit project(const QDir &dir, QObject *parent = nullptr);
@@ -107,15 +110,17 @@ namespace ham::engine::editor{
 			ham::typeset_view ts() noexcept{ return m_ts; }
 			ham::const_typeset_view ts() const noexcept{ return m_ts; }
 
-			const QDir    &dir() const noexcept{ return m_dir; }
-			const quint32 &id() const noexcept{ return m_id; }
-			const QString &name() const noexcept{ return m_name; }
-			const QString &display_name() const noexcept{ return m_display_name; }
-			const QString &author() const noexcept{ return m_author; }
-			const QString &license() const noexcept{ return m_license; }
-			const QString &description() const noexcept{ return m_desc; }
+			quint32 id() const noexcept{ return m_id; }
 
-			const QVersionNumber &version() const noexcept{ return m_ver; }
+			const QDir &dir() const noexcept{ return m_dir; }
+
+			QUtf8StringView name() const noexcept{ return m_name; }
+			QUtf8StringView display_name() const noexcept{ return m_display_name; }
+			QUtf8StringView author() const noexcept{ return m_author; }
+			QUtf8StringView license() const noexcept{ return m_license; }
+			QUtf8StringView description() const noexcept{ return m_desc; }
+
+			QVersionNumber version() const noexcept{ return m_ver; }
 
 			QList<QString> graph_names() const noexcept{ return m_graphs.keys(); }
 
@@ -149,63 +154,66 @@ namespace ham::engine::editor{
 				}
 			}
 
-			void set_name(QString new_name) noexcept{
+			void set_name(QUtf8StringView new_name) noexcept{
 				if(new_name != m_name){
-					m_name = std::move(new_name);
+					m_name = QByteArray(new_name.data(), new_name.size());
 					Q_EMIT name_changed(m_name);
 				}
 			}
 
-			void set_display_name(QString new_display_name) noexcept{
-				if(new_display_name != m_display_name){
-					m_display_name = std::move(new_display_name);
+			void set_display_name(QUtf8StringView new_display) noexcept{
+				if(new_display != m_display_name){
+					m_display_name = QByteArray(new_display.data(), new_display.size());
 					Q_EMIT display_name_changed(m_display_name);
 				}
 			}
 
-			void set_author(QString new_author) noexcept{
+			void set_author(QUtf8StringView new_author) noexcept{
 				if(new_author != m_author){
-					m_author = std::move(new_author);
+					m_author = QByteArray(new_author.data(), new_author.size());
 					Q_EMIT author_changed(m_author);
 				}
 			}
 
-			void set_version(const QVersionNumber &new_ver) noexcept{
+			void set_license(QUtf8StringView new_license) noexcept{
+				if(new_license != m_license){
+					m_license = QByteArray(new_license.data(), new_license.size());
+					Q_EMIT license_changed(m_license);
+				}
+			}
+
+			void set_description(QUtf8StringView new_desc) noexcept{
+				if(new_desc != m_desc){
+					m_desc = QByteArray(new_desc.data(), new_desc.size());
+					Q_EMIT description_changed(m_desc);
+				}
+			}
+
+			void set_version(QVersionNumber new_ver) noexcept{
 				if(m_ver != new_ver){
 					m_ver = new_ver;
 					Q_EMIT version_changed(m_ver);
 				}
 			}
 
-			void set_license(QString new_license) noexcept{
-				if(new_license != m_license){
-					m_license = std::move(new_license);
-					Q_EMIT license_changed(m_license);
-				}
-			}
-
-			void set_description(QString new_desc) noexcept{
-				if(new_desc != m_desc){
-					m_desc = std::move(new_desc);
-					Q_EMIT description_changed(m_desc);
-				}
-			}
-
 		Q_SIGNALS:
-			void dir_changed(const QDir&);
 			void id_changed(quint32);
-			void name_changed(const QString&);
-			void display_name_changed(const QString&);
-			void author_changed(const QString&);
+
+			void dir_changed(const QDir&);
+
+			void name_changed(QUtf8StringView);
+			void display_name_changed(QUtf8StringView);
+			void author_changed(QUtf8StringView);
+			void license_changed(QUtf8StringView);
+			void description_changed(QUtf8StringView);
+
 			void version_changed(const QVersionNumber&);
-			void license_changed(const QString&);
-			void description_changed(const QString&);
 
 		private:
-			QDir m_dir;
 			quint32 m_id;
+			QDir m_dir;
+			QByteArray m_name, m_display_name, m_author, m_license, m_desc;
 			QVersionNumber m_ver;
-			QString m_name, m_display_name, m_author, m_license, m_desc;
 			QHash<QString, editor::graph*> m_graphs;
 			ham::typeset m_ts;
 	};
@@ -214,30 +222,32 @@ namespace ham::engine::editor{
 		Q_OBJECT
 
 		Q_PROPERTY(QDir dir READ dir CONSTANT)
-		Q_PROPERTY(QString name READ name CONSTANT)
-		Q_PROPERTY(QString author READ author CONSTANT)
-		Q_PROPERTY(QString description READ description CONSTANT)
+
+		Q_PROPERTY(QUtf8StringView name READ name CONSTANT)
+		Q_PROPERTY(QUtf8StringView author READ author CONSTANT)
+		Q_PROPERTY(QUtf8StringView description READ description CONSTANT)
 
 		public:
 			explicit project_template(const QDir &dir, QObject *parent = nullptr);
 			~project_template();
 
-			const QDir    &dir() const noexcept{ return m_dir; }
-			const QString &name() const noexcept{ return m_name; }
-			const QString &author() const noexcept{ return m_author; }
-			const QString &description() const noexcept{ return m_desc; }
+			const QDir &dir() const noexcept{ return m_dir; }
+
+			QUtf8StringView name() const noexcept{ return m_name; }
+			QUtf8StringView author() const noexcept{ return m_author; }
+			QUtf8StringView description() const noexcept{ return m_desc; }
 
 			bool createInDir(
 				const QDir &proj_dir,
-				const QString &proj_name,
-				const QString &proj_display_name,
-				const QString &proj_author,
-				const QString &proj_description
+				QUtf8StringView proj_name,
+				QUtf8StringView proj_display_name,
+				QUtf8StringView proj_author,
+				QUtf8StringView proj_description
 			) const;
 
 		private:
 			QDir m_dir;
-			QString m_name, m_author, m_desc;
+			QByteArray m_name, m_author, m_desc;
 	};
 }
 

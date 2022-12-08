@@ -27,6 +27,7 @@ extern "C" {
 
 #define QT_NO_KEYWORDS 1
 #include "project.hpp"
+#include "util.hpp"
 
 #include <QDebug>
 #include <QHash>
@@ -59,14 +60,46 @@ void editor::recent_projects_model::update_list(){
 
 	const int num_projs = settings.beginReadArray("recent-projs");
 
+	bool list_changed = false;
+
+	QSet<QString> existing;
+
 	for(int i = 0; i < num_projs; i++){
 		settings.setArrayIndex(i);
 
-		auto name = settings.value("name").toString();
 		auto dir  = settings.value("dir").toString();
 
+		if(!QDir(dir).exists() || existing.contains(dir)){
+			list_changed = true;
+			continue;
+		}
+
+		auto name = settings.value("name").toString();
+
 		m_projs.emplaceBack(std::move(name), std::move(dir));
+		existing.insert(dir);
 	}
+
+	settings.endArray();
+
+	if(!list_changed){
+		return;
+	}
+
+	settings.remove("recent-projs");
+
+	settings.beginWriteArray("recent-projs");
+
+	for(int i = 0; i < m_projs.size(); i++){
+		settings.setArrayIndex(i);
+
+		const auto proj = m_projs[i];
+
+		settings.setValue("name", proj.first);
+		settings.setValue("dir", proj.second);
+	}
+
+	settings.endArray();
 }
 
 //
@@ -147,12 +180,14 @@ editor::project::project(const QDir &dir, QObject *parent)
 	const auto proj_desc    = proj_desc_json.get_str();
 
 	m_id = proj_id_json.get_nat();
-	m_name = QString::fromUtf8(proj_name.ptr());
-	m_display_name = QString::fromUtf8(proj_display.ptr());
-	m_author = QString::fromUtf8(proj_author.ptr());
+
+	m_name         = from_str8<QByteArray>(proj_name);
+	m_display_name = from_str8<QByteArray>(proj_display);
+	m_author       = from_str8<QByteArray>(proj_author);
+	m_license      = from_str8<QByteArray>(proj_license);
+	m_desc         = from_str8<QByteArray>(proj_desc);
+
 	m_ver = QVersionNumber(proj_ver_maj, proj_ver_min, proj_ver_rev);
-	m_license = QString::fromUtf8(proj_license.ptr());
-	m_desc = QString::fromUtf8(proj_desc.ptr());
 
 	const auto graph_dir_info = QFileInfo(dir, "graphs");
 	if(graph_dir_info.exists()){
@@ -259,9 +294,9 @@ editor::project_template::project_template(const QDir &dir, QObject *parent)
 	const auto tmpl_author = tmpl_author_json.get_str();
 	const auto tmpl_desc   = tmpl_desc_json.get_str();
 
-	m_name = QString::fromUtf8(tmpl_name.ptr());
-	m_author = QString::fromUtf8(tmpl_author.ptr());
-	m_desc = QString::fromUtf8(tmpl_desc.ptr());
+	m_name   = from_str8<QByteArray>(tmpl_name);
+	m_author = from_str8<QByteArray>(tmpl_author);
+	m_desc   = from_str8<QByteArray>(tmpl_desc);
 }
 
 editor::project_template::~project_template(){}
@@ -409,10 +444,10 @@ static bool ham_impl_write_project_template_path(const QDir &tmpl_dir, const QDi
 
 bool editor::project_template::createInDir(
 	const QDir &proj_dir,
-	const QString &proj_name,
-	const QString &proj_display_name,
-	const QString &proj_author,
-	const QString &proj_desc
+	QUtf8StringView proj_name,
+	QUtf8StringView proj_display_name,
+	QUtf8StringView proj_author,
+	QUtf8StringView proj_desc
 ) const
 {
 	QHash<QString, QByteArray> vars;
@@ -421,13 +456,17 @@ bool editor::project_template::createInDir(
 	vars["ham_engine_version_major"] = QByteArrayLiteral(HAM_STRINGIFY(HAM_ENGINE_VERSION_MAJOR));
 	vars["ham_engine_version_minor"] = QByteArrayLiteral(HAM_STRINGIFY(HAM_ENGINE_VERSION_MINOR));
 	vars["ham_engine_version_patch"] = QByteArrayLiteral(HAM_STRINGIFY(HAM_ENGINE_VERSION_PATCH));
+
 	vars["ham_project_id"] = QByteArrayLiteral("480");
-	vars["ham_project_name"] = proj_name.toUtf8();
-	vars["ham_project_display_name"] = proj_display_name.toUtf8();
-	vars["ham_project_author"] = proj_author.toUtf8();
-	vars["ham_project_description"] = proj_desc.toUtf8();
-	vars["ham_project_license"] = "UNLICENSED";
+
+	vars["ham_project_name"]         = QByteArray(proj_name.data(), proj_name.size());
+	vars["ham_project_display_name"] = QByteArray(proj_display_name.data(), proj_display_name.size());
+	vars["ham_project_author"]       = QByteArray(proj_author.data(), proj_author.size());
+	vars["ham_project_description"]  = QByteArray(proj_desc.data(), proj_desc.size());
+
+	vars["ham_project_license"] = QByteArrayLiteral("UNLICENSED");
 	vars["ham_project_version"] = QByteArrayLiteral("0.0.1");
+
 	vars["ham_project_version_major"] = QByteArrayLiteral("0");
 	vars["ham_project_version_minor"] = QByteArrayLiteral("0");
 	vars["ham_project_version_patch"] = QByteArrayLiteral("1");
