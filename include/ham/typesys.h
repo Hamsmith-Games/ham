@@ -38,6 +38,8 @@ typedef enum ham_type_kind_flag{
 	HAM_TYPE_STRING,
 	HAM_TYPE_NUMERIC,
 
+	HAM_TYPE_RUNTIME, // special types from C or other runtimes
+
 	HAM_TYPE_KIND_FLAG_COUNT,
 
 	HAM_TYPE_KIND_MAX_VALUE = 0x7,
@@ -64,6 +66,8 @@ typedef enum ham_type_info_flag{
 	HAM_TYPE_INFO_NUMERIC_RATIONAL,
 	HAM_TYPE_INFO_NUMERIC_FLOATING_POINT,
 	HAM_TYPE_INFO_NUMERIC_VECTOR,
+
+	HAM_TYPE_INFO_RUNTIME_C = 0x0,
 
 	HAM_TYPE_INFO_MAX_VALUE = 0x3F
 } ham_type_info_flag;
@@ -102,6 +106,8 @@ ham_api ham_nothrow const char *ham_type_name(const ham_type *type);
 
 ham_api ham_nothrow ham_usize ham_type_alignment(const ham_type *type);
 ham_api ham_nothrow ham_usize ham_type_size(const ham_type *type);
+
+ham_api ham_nothrow const ham_type *ham_type_super(const ham_type *type);
 
 /**
  * @defgroup HAM_TYPESYS_OBJECT Object type introspection
@@ -148,10 +154,11 @@ ham_api void ham_typeset_destroy(ham_typeset *ts);
 
 ham_api ham_nothrow const ham_type *ham_typeset_get(const ham_typeset *ts, ham_str8 name);
 
-ham_api const ham_type *ham_typeset_void(const ham_typeset *ts);
-ham_api const ham_type *ham_typeset_unit(const ham_typeset *ts);
 ham_api const ham_type *ham_typeset_top(const ham_typeset *ts);
 ham_api const ham_type *ham_typeset_bottom(const ham_typeset *ts);
+
+ham_api const ham_type *ham_typeset_void(const ham_typeset *ts);
+ham_api const ham_type *ham_typeset_unit(const ham_typeset *ts);
 ham_api const ham_type *ham_typeset_ref(const ham_typeset *ts, const ham_type *refed);
 ham_api const ham_type *ham_typeset_object(const ham_typeset *ts, ham_str8 name);
 
@@ -204,29 +211,85 @@ HAM_C_API_END
 
 #ifdef __cplusplus
 
+#include "meta.hpp"
+
+#include <concepts>
+
 namespace ham{
-	class type{
+	template<typename Base = void>
+	class basic_type{
 		public:
 			using pointer = const ham_type*;
 
-			constexpr type(pointer ptr_ = nullptr) noexcept: m_ptr(ptr_){}
+			constexpr basic_type(pointer ptr_ = nullptr) noexcept: m_ptr(ptr_){}
 
 			constexpr operator bool() const noexcept{ return !!m_ptr; }
 			constexpr operator pointer() const noexcept{ return m_ptr; }
 
-			constexpr bool operator==(type other) const noexcept{ return m_ptr == other.m_ptr; }
-			constexpr bool operator!=(type other) const noexcept{ return m_ptr != other.m_ptr; }
+			constexpr bool operator==(basic_type other) const noexcept{ return m_ptr == other.m_ptr; }
+			constexpr bool operator!=(basic_type other) const noexcept{ return m_ptr != other.m_ptr; }
 
 			constexpr pointer ptr() const noexcept{ return m_ptr; }
 
-			usize alignment() const noexcept{ return ham_type_alignment(m_ptr); }
-			usize size() const noexcept{ return ham_type_size(m_ptr); }
+			constexpr operator basic_type<void>() const noexcept
+				requires (!std::is_same_v<Base, void>)
+			{
+				return m_ptr;
+			}
+
+			usize alignment() const noexcept{
+				if constexpr(std::is_integral_v<Base> || std::is_aggregate_v<Base>){
+					return alignof(Base);
+				}
+				else{
+					return ham_type_alignment(m_ptr);
+				}
+			}
+
+			usize size() const noexcept{
+				if constexpr(std::is_integral_v<Base> || std::is_aggregate_v<Base>){
+					return sizeof(Base);
+				}
+				else{
+					return ham_type_size(m_ptr);
+				}
+			}
 
 			str8 name() const noexcept{ return ham_type_name(m_ptr); }
 
 		private:
 			pointer m_ptr;
 	};
+
+	using type = basic_type<>;
+	using object_type = basic_type<ham_object>;
+
+	namespace detail{
+		template<usize N> struct sized_int_helper;
+		template<usize N> struct sized_nat_helper;
+
+		template<> struct sized_int_helper<8>:  id<i8>{};
+		template<> struct sized_int_helper<16>: id<i16>{};
+		template<> struct sized_int_helper<32>: id<i32>{};
+		template<> struct sized_int_helper<64>: id<i64>{};
+
+		template<> struct sized_nat_helper<8>:  id<u8>{};
+		template<> struct sized_nat_helper<16>: id<u16>{};
+		template<> struct sized_nat_helper<32>: id<u32>{};
+		template<> struct sized_nat_helper<64>: id<u64>{};
+
+		template<usize N>
+		using sized_int = typename sized_int_helper<N>::type;
+
+		template<usize N>
+		using sized_nat = typename sized_nat_helper<N>::type;
+	}
+
+	template<usize N>
+	using nat_type = basic_type<detail::sized_nat<N>>;
+
+	template<usize N>
+	using int_type = basic_type<detail::sized_int<N>>;
 
 	template<typename ... Tags>
 	class basic_typeset_view{
@@ -250,8 +313,21 @@ namespace ham{
 
 			type get(str8 name) const noexcept{ return ham_typeset_get(m_ptr, name); }
 
+			type get_void() const noexcept{ return ham_typeset_void(m_ptr); }
+			type get_unit() const noexcept{ return ham_typeset_unit(m_ptr); }
+			type get_bool() const noexcept{ return ham_typeset_bool(m_ptr); }
+			type get_nat(usize num_bits) const noexcept{ return ham_typeset_nat(m_ptr, num_bits); }
+			type get_int(usize num_bits) const noexcept{ return ham_typeset_int(m_ptr, num_bits); }
+			type get_rat(usize num_bits) const noexcept{ return ham_typeset_rat(m_ptr, num_bits); }
+			type get_float(usize num_bits) const noexcept{ return ham_typeset_float(m_ptr, num_bits); }
+
+			object_type get_object(str8 name) const noexcept{ return ham_typeset_object(m_ptr, name); }
+
 		private:
 			pointer m_ptr;
+
+			template<typename T>
+			friend inline basic_type<T> get_type(basic_typeset_view<> ts);
 	};
 
 	using typeset_view = basic_typeset_view<mutable_tag>;
@@ -285,11 +361,50 @@ namespace ham{
 			bool set_parent(type parent){ return ham_type_builder_set_parent(m_handle.get(), parent); }
 			bool set_vptr(const ham_object_vtable *vptr){ return ham_type_builder_set_vptr(m_handle.get(), vptr); }
 
-			bool add_member(str8 name, type type){ return ham_type_builder_add_member(m_handle.get(), name, type); }
+			bool add_member(str8 name, type t){ return ham_type_builder_add_member(m_handle.get(), name, t); }
 
 		private:
 			unique_handle<ham_type_builder*, ham_type_builder_destroy> m_handle;
 	};
+
+	namespace detail{
+		template<typename T>
+		struct rtti_helper{
+			static auto get(const_typeset_view ts){ return ts.get(meta::type_name_v<T>).ptr(); }
+		};
+
+		template<>
+		struct rtti_helper<void>{
+			static auto get(const_typeset_view ts){ return ts.get_void(); }
+		};
+
+		template<>
+		struct rtti_helper<bool>{
+			static auto get(const_typeset_view ts){ return ts.get_bool(); }
+		};
+
+		template<std::integral Int>
+		struct rtti_helper<Int>{
+			static auto get(const_typeset_view ts){
+				if constexpr(std::is_signed_v<Int>){
+					return ts.get_int(sizeof(Int) * CHAR_BIT);
+				}
+				else{
+					return ts.get_nat(sizeof(Int) * CHAR_BIT);
+				}
+			}
+		};
+
+		template<std::floating_point Float>
+		struct rtti_helper<Float>{
+			static auto get(const_typeset_view ts){ return ts.get_float(sizeof(Float) * CHAR_BIT); }
+		};
+	}
+
+	template<typename T>
+	inline basic_type<T> get_type(const_typeset_view ts){
+		return detail::rtti_helper<T>::get(ts);
+	}
 }
 
 #endif // __cplusplus

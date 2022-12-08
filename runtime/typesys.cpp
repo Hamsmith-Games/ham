@@ -21,6 +21,7 @@
 #include "ham/check.h"
 #include "ham/buffer.h"
 #include "ham/colony.h"
+#include "ham/transform.h"
 
 #include "ham/std_vector.hpp"
 
@@ -30,9 +31,15 @@ using namespace ham::typedefs;
 
 HAM_C_API_BEGIN
 
+#define HAM_METADATA_IMPL(key, value) \
+	";"##key##"="##value
+
+#define HAM_METADATA(key, value) \
+	HAM_METADATA_IMPL(#key, value)
+
 struct ham_type{
 	const ham_typeset *ts;
-	const char *name;
+	const char *name, *metadata;
 	u32 flags;
 	usize alignment, size;
 	const void *data;
@@ -52,6 +59,7 @@ struct ham_type_method{
 
 struct ham_type_object{
 	ham_derive(ham_type)
+	const ham_type *super;
 	ham::std_vector<ham_type_member> members;
 	ham::std_vector<ham_type_method> methods;
 };
@@ -70,6 +78,7 @@ struct ham_typeset{
 	const ham_type *top_type;
 	const ham_type *bottom_type;
 	const ham_type *bool_type;
+	const ham_type *object_type;
 
 	// u8, u16, u32, u64, u128
 	const ham_type *nat_types[5];
@@ -122,6 +131,11 @@ ham_nothrow ham_usize ham_type_alignment(const ham_type *type){
 ham_nothrow ham_usize ham_type_size(const ham_type *type){
 	if(!ham_check(type != NULL)) return (usize)-1;
 	return type->size;
+}
+
+ham_nothrow const ham_type *ham_type_super(const ham_type *type){
+	if(!ham_check(type != NULL)) return nullptr;
+	return ham_type_is_object(type) ? ((const ham_type_object*)type)->super : type->ts->top_type;
 }
 
 ham_nothrow const ham_object_vtable *ham_type_vptr(const ham_type *type){
@@ -193,10 +207,37 @@ ham_usize ham_type_methods_iterate(const ham_type *type, ham_type_methods_iterat
 // Typesets
 //
 
-ham_nonnull_args(1)
+ham_nonnull_args(1, 2, 3)
+static inline const ham_type *ham_impl_type_reset(
+	ham_type *type,
+	ham_typeset *ts,
+	const char *name,
+	const char *metadata,
+	ham_type_kind_flag kind,
+	ham_type_info_flag info,
+	usize alignment,
+	usize size,
+	const void *data = nullptr,
+	uptr n0 = (uptr)-1,
+	uptr n1 = (uptr)-1
+){
+	type->ts = ts;
+	type->name = name;
+	type->metadata = metadata;
+	type->flags = ham_make_type_flags(kind, info);
+	type->alignment = alignment;
+	type->size = size;
+	type->data = data;
+	type->n0 = n0;
+	type->n1 = n1;
+	return type;
+}
+
+ham_nonnull_args(1, 2)
 static inline const ham_type *ham_impl_typeset_new_type(
 	ham_typeset *ts,
 	const char *name,
+	const char *metadata,
 	ham_type_kind_flag kind,
 	ham_type_info_flag info,
 	usize alignment,
@@ -214,14 +255,7 @@ static inline const ham_type *ham_impl_typeset_new_type(
 	}
 
 	const auto new_type = ts->types.emplace();
-	new_type->ts = ts;
-	new_type->name = name;
-	new_type->flags = ham_make_type_flags(kind, info);
-	new_type->alignment = alignment;
-	new_type->size = size;
-	new_type->data = data;
-	new_type->n0 = n0;
-	new_type->n1 = n1;
+	ham_impl_type_reset(new_type, ts, name, metadata, kind, info, alignment, size, data, n0, n1);
 
 	if(!ts->type_map.try_emplace(name_str, new_type).second){
 		ham::logapiwarn("Type by name '{}' could not be emplaced in typeset map", name);
@@ -236,18 +270,18 @@ ham_typeset *ham_typeset_create_alloc(const ham_allocator *allocator){
 
 	ptr->allocator = allocator;
 
-	ptr->void_type   = ham_impl_typeset_new_type(ptr, "void",       HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_VOID,    0, 0);
-	ptr->unit_type   = ham_impl_typeset_new_type(ptr, "ham_unit",   HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_UNIT,    1, 1);
-	ptr->top_type    = ham_impl_typeset_new_type(ptr, "ham_top",    HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_TOP,     0, 0);
-	ptr->bottom_type = ham_impl_typeset_new_type(ptr, "ham_bottom", HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_BOTTOM,  0, 0);
-	ptr->bool_type   = ham_impl_typeset_new_type(ptr, "bool",       HAM_TYPE_NUMERIC,   HAM_TYPE_INFO_NUMERIC_BOOLEAN,   alignof(bool), sizeof(bool));
+	ptr->void_type   = ham_impl_typeset_new_type(ptr, "void", nullptr,       HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_VOID,    0, 0);
+	ptr->unit_type   = ham_impl_typeset_new_type(ptr, "ham_unit", nullptr,   HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_UNIT,    1, 1);
+	ptr->top_type    = ham_impl_typeset_new_type(ptr, "ham_top", nullptr,    HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_TOP,     0, 0);
+	ptr->bottom_type = ham_impl_typeset_new_type(ptr, "ham_bottom", nullptr, HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_BOTTOM,  0, 0);
+	ptr->bool_type   = ham_impl_typeset_new_type(ptr, "bool", nullptr,       HAM_TYPE_NUMERIC,   HAM_TYPE_INFO_NUMERIC_BOOLEAN,   alignof(bool), sizeof(bool));
 
 	constexpr const char *nat_names[] = { "u8", "u16", "u32", "u64", "u128" };
 
 	// nat types
 	for(usize i = 0; i < std::size(ptr->nat_types); i++){
 		const auto size = 1UL << i;
-		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, nat_names[i], HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_NATURAL, size, size);
+		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, nat_names[i], nullptr, HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_NATURAL, size, size);
 	}
 
 	constexpr const char *int_names[] = { "i8", "i16", "i32", "i64", "i128" };
@@ -255,7 +289,7 @@ ham_typeset *ham_typeset_create_alloc(const ham_allocator *allocator){
 	// int types
 	for(usize i = 0; i < std::size(ptr->int_types); i++){
 		const auto size = 1UL << i;
-		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, int_names[i], HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_INTEGER, size, size);
+		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, int_names[i], nullptr, HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_INTEGER, size, size);
 	}
 
 	constexpr const char *rat_names[] = { "ham_rat8", "ham_rat16", "ham_rat32", "ham_rat64", "ham_rat128", "ham_rat256" };
@@ -263,7 +297,7 @@ ham_typeset *ham_typeset_create_alloc(const ham_allocator *allocator){
 	// rat types
 	for(usize i = 0; i < std::size(ptr->rat_types); i++){
 		const auto size = 1UL << i;
-		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, rat_names[i], HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_RATIONAL, size, size);
+		ptr->nat_types[i] = ham_impl_typeset_new_type(ptr, rat_names[i], nullptr, HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_RATIONAL, size, size);
 	}
 
 	constexpr const char *float_names[] = { "f16", "f32", "f64", "f128" };
@@ -271,7 +305,7 @@ ham_typeset *ham_typeset_create_alloc(const ham_allocator *allocator){
 	// float types
 	for(usize i = 0; i < std::size(ptr->float_types); i++){
 		const auto size = 2UL << i;
-		ptr->float_types[i] = ham_impl_typeset_new_type(ptr, float_names[i], HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_FLOATING_POINT, size, size);
+		ptr->float_types[i] = ham_impl_typeset_new_type(ptr, float_names[i], nullptr, HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_FLOATING_POINT, size, size);
 	}
 
 	constexpr const char *str_names[] = {
@@ -282,7 +316,7 @@ ham_typeset *ham_typeset_create_alloc(const ham_allocator *allocator){
 	for(int i = 0; i < 3; i++){
 		constexpr auto size = sizeof(uptr) * 2;
 		constexpr auto alignment = alignof(uptr);
-		ptr->str_types[i] = ham_impl_typeset_new_type(ptr, str_names[i], HAM_TYPE_STRING, (ham_type_info_flag)(HAM_TYPE_INFO_STRING_UTF8 + i), alignment, size);
+		ptr->str_types[i] = ham_impl_typeset_new_type(ptr, str_names[i], nullptr, HAM_TYPE_STRING, (ham_type_info_flag)(HAM_TYPE_INFO_STRING_UTF8 + i), alignment, size);
 	}
 
 	constexpr usize vec_sizes[] = {
@@ -298,12 +332,197 @@ ham_typeset *ham_typeset_create_alloc(const ham_allocator *allocator){
 	};
 
 	constexpr const char *vec_names[] = {
-		"ham_vec2", "ham_vec3", "ham_vec4"
+		ham::meta::type_name_v<ham_vec2>,
+		ham::meta::type_name_v<ham_vec3>,
+		ham::meta::type_name_v<ham_vec4>
 	};
 
 	for(usize i = 0; i < std::size(vec_sizes); i++){
-		ptr->vec_types[i] = ham_impl_typeset_new_type(ptr, vec_names[i], HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_VECTOR, vec_aligns[i], vec_sizes[i]);
+		ptr->vec_types[i] = ham_impl_typeset_new_type(ptr, vec_names[i], nullptr, HAM_TYPE_NUMERIC, HAM_TYPE_INFO_NUMERIC_VECTOR, vec_aligns[i], vec_sizes[i]);
 	}
+
+	// Special C types
+
+	const auto va_list_ty  = ham_impl_typeset_new_type(ptr, ham::meta::type_name_v<va_list>, nullptr, HAM_TYPE_RUNTIME, HAM_TYPE_INFO_RUNTIME_C, alignof(va_list), sizeof(va_list));
+
+	const auto c_str_ty    = ham_impl_typeset_new_type(ptr, ham::meta::type_name_v<const char*>, "cref", HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_REF, alignof(void*), sizeof(void*));
+
+	const auto void_ptr_ty = ham_impl_typeset_new_type(ptr, ham::meta::type_name_v<void*>, nullptr, HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_REF, alignof(void*), sizeof(void*), ptr->void_type);
+
+	const auto usize_ty = [&]{
+		switch(sizeof(usize)){
+			case 1: return ptr->nat_types[0];
+			case 2: return ptr->nat_types[1];
+			case 4: return ptr->nat_types[2];
+			case 8: return ptr->nat_types[3];
+			default: return ptr->nat_types[3];
+		}
+	}();
+
+	(void)va_list_ty;
+
+	// Special ham types
+
+	const ham_type *allocator_ty = nullptr;
+
+	{
+		ham::type_builder allocator_build;
+
+		/*
+		typedef void*(*ham_alloc_fn)(ham_usize alignment, ham_usize size, void *user);
+		typedef void(*ham_free_fn)(void *mem, void *user);
+
+		ham_alloc_fn alloc;
+		ham_free_fn free;
+		void *user;
+		*/
+
+		allocator_build.set_name(ham::meta::type_name_v<ham_allocator>);
+		allocator_build.add_member("alloc", void_ptr_ty);
+		allocator_build.add_member("free", void_ptr_ty);
+		allocator_build.add_member("user", void_ptr_ty);
+
+		allocator_ty = allocator_build.instantiate(ptr);
+	}
+
+	const auto allocator_ptr_ty = ham_impl_typeset_new_type(ptr, ham::meta::type_name_v<const ham_allocator*>, "cref", HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_REF, alignof(void*), sizeof(void*), allocator_ty);
+
+	// Compound types
+
+	{
+		ham::type_builder buffer_build;
+
+		/*
+		const ham_allocator *allocator;
+		void *mem;
+		ham_usize alignment, allocated, capacity;
+		*/
+
+		buffer_build.set_name(ham::meta::type_name_v<ham_buffer>);
+		buffer_build.add_member("allocator", allocator_ptr_ty);
+		buffer_build.add_member("mem", void_ptr_ty);
+		buffer_build.add_member("alignment", usize_ty);
+		buffer_build.add_member("allocated", usize_ty);
+		buffer_build.add_member("capacity", usize_ty);
+
+		buffer_build.instantiate(ptr);
+	}
+
+	const ham_type *mat4_ty = nullptr;
+
+	{
+		ham::type_builder mat4_build;
+
+		/*
+		ham_vec4 cols[4];
+		*/
+
+		mat4_build.set_name(ham::meta::type_name_v<ham_mat4>);
+		mat4_build.add_member("cols", ptr->vec_types[2]);
+
+		mat4_ty = mat4_build.instantiate(ptr);
+	}
+
+	const ham_type *quat_ty = nullptr;
+
+	{
+		ham::type_builder quat_build;
+
+		/*
+		struct { ham_f32 x, y, z, w; };
+		*/
+
+		quat_build.set_name(ham::meta::type_name_v<ham_quat>);
+		quat_build.add_member("x", ptr->float_types[1]);
+		quat_build.add_member("y", ptr->float_types[1]);
+		quat_build.add_member("z", ptr->float_types[1]);
+		quat_build.add_member("w", ptr->float_types[1]);
+
+		quat_ty = quat_build.instantiate(ptr);
+	}
+
+	{
+		ham::type_builder trans_build;
+
+		/*
+		ham_vec3 pos, scale, pyr;
+
+		ham_mutable bool _impl_dirty;
+		ham_mutable ham_quat _impl_rot;
+		ham_mutable ham_mat4 _impl_trans;
+		*/
+
+		trans_build.set_name(ham::meta::type_name_v<ham_transform>);
+		trans_build.add_member("_impl_dirty", ptr->bool_type);
+		trans_build.add_member("_impl_rot", quat_ty);
+		trans_build.add_member("_impl_trans", mat4_ty);
+
+		trans_build.instantiate(ptr);
+	}
+
+	// Object types
+
+	const ham_type *obj_info_ty = nullptr;
+
+	{
+		ham::type_builder info_build;
+
+		/*
+		const char *type_id;
+		ham_usize alignment, size;
+		*/
+
+		info_build.set_name(ham::meta::type_name_v<ham_object_info>);
+		info_build.add_member("type_id", c_str_ty);
+		info_build.add_member("alignment", usize_ty);
+		info_build.add_member("size", usize_ty);
+
+		obj_info_ty = info_build.instantiate(ptr);
+	}
+
+	const auto obj_info_ptr_ty = ham_impl_typeset_new_type(ptr, ham::meta::type_name_v<const ham_object_info*>, "cref", HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_REF, alignof(void*), sizeof(void*), obj_info_ty);
+
+	const ham_type *vtable_ty = nullptr;
+
+	{
+		ham::type_builder vtable_build;
+
+		/*
+		const ham_object_info *info;
+
+		ham_object*(*ctor)(ham_object *ptr, ham_u32 nargs, va_list va);
+		void       (*dtor)(ham_object*);
+		*/
+		vtable_build.set_name(ham::meta::type_name_v<ham_object_vtable>);
+		vtable_build.add_member("info", obj_info_ptr_ty);
+
+		// TODO: fn pointer types
+		vtable_build.add_member("ctor", void_ptr_ty);
+		vtable_build.add_member("dtor", void_ptr_ty);
+
+		vtable_ty = vtable_build.instantiate(ptr);
+	}
+
+	const auto vtable_ptr_ty = ham_impl_typeset_new_type(ptr, ham::meta::type_name_v<const ham_object_vtable*>, "cref", HAM_TYPE_THEORETIC, HAM_TYPE_INFO_THEORETIC_REF, alignof(void*), sizeof(void*), vtable_ty);
+
+	const ham_type *obj_ty = nullptr;
+
+	{
+		ham::type_builder obj_build;
+
+		/*
+		const ham_object_vtable *vptr;
+		*/
+
+		obj_build.set_name(ham::meta::type_name_v<ham_object>);
+		obj_build.set_vptr(ham_object_null_vptr());
+
+		obj_build.add_member("vptr", vtable_ptr_ty);
+
+		obj_ty = obj_build.instantiate(ptr);
+	}
+
+	ptr->object_type = obj_ty;
 
 	return ptr;
 }
@@ -426,6 +645,10 @@ const ham_type *ham_typeset_vec(const ham_typeset *ts, const ham_type *elem, ham
 const ham_type *ham_typeset_object(const ham_typeset *ts, ham_str8 name){
 	if(!ham_check(ts != NULL)) return nullptr;
 
+	if(!name.ptr || !name.len || name == ham::meta::type_name_v<ham_object>){
+		return ts->object_type;
+	}
+
 	const auto res = ts->obj_types.find(name);
 	if(res != ts->obj_types.end()){
 		return ham_super(&res->second);
@@ -459,6 +682,8 @@ ham_type_builder *ham_type_builder_create_alloc(const ham_allocator *allocator){
 	ptr->kind = (ham_type_kind_flag)-1;
 	ptr->info = (ham_type_info_flag)-1;
 	ptr->instance = nullptr;
+	ptr->parent = nullptr;
+	ptr->vptr = nullptr;
 
 	return ptr;
 }
@@ -533,6 +758,7 @@ const ham_type *ham_type_builder_instantiate(ham_type_builder *builder, ham_type
 			type->n0        = builder->members.size();
 			type->n1        = builder->methods.size();
 
+			obj_type->super = builder->parent;
 			obj_type->members.reserve(type->n0);
 			obj_type->methods.reserve(type->n1);
 
@@ -675,8 +901,8 @@ bool ham_type_builder_add_member(ham_type_builder *builder, ham_str8 name, const
 		}
 	}
 	else{
-		builder->kind = HAM_TYPE_OBJECT;
-		builder->info = HAM_TYPE_INFO_OBJECT_POD;
+		builder->kind   = HAM_TYPE_OBJECT;
+		builder->info   = HAM_TYPE_INFO_OBJECT_POD;
 	}
 
 	auto &&member = builder->members.emplace_back();

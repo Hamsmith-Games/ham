@@ -71,6 +71,10 @@ static inline void ham_audio_oalsoft_dtor(ham_audio_oalsoft *ctx){
 	std::destroy_at(ctx);
 }
 
+static inline void ham_audio_oalsoft_update(ham_audio_oalsoft *ctx, ham_f64 dt){
+	(void)dt; (void)ctx;
+}
+
 static inline ham_vec3 ham_audio_oalsoft_position(const ham_audio_oalsoft *self){
 	ham_vec3 ret;
 	alGetListenerfv(AL_POSITION, ret.data);
@@ -98,7 +102,7 @@ static inline void ham_audio_oalsoft_set_position(ham_audio_oalsoft *self, ham_v
 	alListenerfv(AL_POSITION, pos.data);
 }
 
-static inline void ham_audio_oalsoft_set_rotation(ham_audio_oalsoft *self, ham_vec3 pyr){
+ham_audio_orientation_oalsoft ham_audio_orientation_from_pyr(ham_vec3 pyr){
 	constexpr ham::vec3 basis_z(0.f, 0.f, 1.f);
 	constexpr ham::vec3 basis_y(0.f, 1.f, 0.f);
 
@@ -111,12 +115,18 @@ static inline void ham_audio_oalsoft_set_rotation(ham_audio_oalsoft *self, ham_v
 	const ham::vec3 forward = q_pyr * basis_z;
 	const ham::vec3 up      = q_pyr * basis_y;
 
-	const ham::f32 orientation[] = {
-		forward.x(), forward.y(), forward.z(),
-		up.x(), up.y(), up.z()
+	return { forward, up };
+}
+
+static inline void ham_audio_oalsoft_set_rotation(ham_audio_oalsoft *self, ham_vec3 pyr){
+	const auto orientation = ham_audio_orientation_from_pyr(pyr);
+
+	const ham::f32 data[] = {
+		orientation.forward.x, orientation.forward.y, orientation.forward.z,
+		orientation.up.x, orientation.up.y, orientation.up.z
 	};
 
-	alListenerfv(AL_ORIENTATION, orientation);
+	alListenerfv(AL_ORIENTATION, data);
 }
 
 static inline void ham_audio_oalsoft_set_velocity(ham_audio_oalsoft *self, ham_vec3 vel){

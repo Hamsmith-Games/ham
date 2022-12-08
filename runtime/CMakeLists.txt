@@ -17,6 +17,7 @@
 #
 
 include(CMakePackageConfigHelpers)
+include(FetchContent)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
@@ -25,6 +26,19 @@ find_package(Magic REQUIRED)
 find_package(GMP REQUIRED)
 find_package(MPFR REQUIRED)
 find_package(FreeImage REQUIRED)
+
+FetchContent_Declare(
+	libsndfile_content
+	GIT_REPOSITORY https://github.com/libsndfile/libsndfile.git
+	GIT_TAG        ea3ac90e98c6a98cd52cae39010446fba368a2e3
+)
+
+FetchContent_GetProperties(libsndfile_content)
+if(NOT libsndfile_content_POPULATED)
+	FetchContent_Populate(libsndfile_content)
+	set(ENABLE_SSE2 ON CACHE BOOL "" FORCE)
+	add_subdirectory(${libsndfile_content_SOURCE_DIR} ${libsndfile_content_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
 set(
 	HAM_SOURCES
@@ -44,6 +58,7 @@ set(
 	shape.cpp
 	image.cpp
 	net.cpp
+	audio.cpp
 	renderer.cpp
 	ham.cpp
 )
@@ -123,6 +138,7 @@ target_link_libraries(
 		bfd
 		magic::magic
 		FreeImage::FreeImage
+		SndFile::sndfile
 		robin_hood::robin_hood
 		yyjson
 )

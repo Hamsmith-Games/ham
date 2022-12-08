@@ -145,6 +145,8 @@ ham_used static inline ham_object *ham_impl_object_new_init(
  */
 ham_api bool ham_object_delete(ham_object_manager *manager, ham_object *obj);
 
+ham_api ham_nothrow const ham_object_vtable *ham_object_null_vptr();
+
 ham_api const ham_object_vtable *ham_object_dso_vptr(ham_dso_handle dso, const char *obj_type_id);
 
 typedef bool(*ham_dso_iterate_object_vptrs_fn)(const ham_object_vtable *vptr, void *user);

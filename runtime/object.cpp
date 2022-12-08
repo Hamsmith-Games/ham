@@ -176,4 +176,20 @@ bool ham_object_delete(ham_object_manager *manager, ham_object *obj){
 	);
 }
 
+ham_nothrow const ham_object_vtable *ham_object_null_vptr(){
+	static const ham_object_info info = {
+		.type_id   = "ham_object",
+		.alignment = alignof(ham_object),
+		.size      = sizeof(ham_object),
+	};
+
+	static const ham_object_vtable ret = {
+		.info = &info,
+		.ctor = [](ham_object *ptr, ham_u32, va_list){ return ptr; },
+		.dtor = [](ham_object *ptr){ (void)ptr; },
+	};
+
+	return &ret;
+}
+
 HAM_C_API_END

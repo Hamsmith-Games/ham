@@ -34,6 +34,14 @@ namespace ham::meta{
 			consteval cexpr_str(const char (&lit)[N+1]) noexcept
 				: cexpr_str(lit, make_index_seq<N>()){}
 
+			template<std::size_t M, std::size_t From>
+			consteval cexpr_str(const char(&lit)[M], std::integral_constant<std::size_t, From>) noexcept
+				: cexpr_str(&lit[From], make_index_seq<N>())
+			{
+				static_assert(M - From >= N);
+			}
+
+
 			consteval cexpr_str(const cexpr_str &other) noexcept
 				: cexpr_str(other.m_chars, make_index_seq<N>()){}
 
@@ -41,6 +49,7 @@ namespace ham::meta{
 			constexpr const char *data() const noexcept{ return m_chars; }
 
 			constexpr operator str8() const noexcept{ return basic_str(m_chars, N); }
+			constexpr operator const char*() const noexcept{ return m_chars; }
 
 			constexpr bool operator==(const str8 &other) const noexcept{
 				if(other.size() != N) return false;
@@ -65,6 +74,10 @@ namespace ham::meta{
 			template<usize M>
 			constexpr auto operator+(const cexpr_str<M> &other) const noexcept{
 				return concat_impl(other, make_index_seq<N>(), make_index_seq<M>());
+			}
+
+			constexpr usize find(str8 str) const noexcept{
+				return ((str8)*this).find(str);
 			}
 
 			char m_chars[N+1];
@@ -92,6 +105,7 @@ namespace ham::meta{
 
 	template<cexpr_str Str>
 	struct constant_str{
+		constexpr static auto get() noexcept{ return Str; }
 		constexpr static auto value = Str;
 	};
 
@@ -107,10 +121,9 @@ namespace ham{
 }
 
 namespace ham::meta{
-	template<typename T>
-	struct type_name{
-		template<typename U = T>
-		static constexpr str8 get_name() noexcept{
+	namespace detail{
+		template<typename T>
+		constexpr static auto get_type_name(){
 		#ifdef __GNUC__
 
 			constexpr str8 full_fn_name = __PRETTY_FUNCTION__;
@@ -118,23 +131,16 @@ namespace ham::meta{
 		#	ifdef __clang__
 				constexpr str8 prefix_str = "[T = ";
 		#	else
-				constexpr str8 prefix_str = "[with U = ";
+				constexpr str8 prefix_str = "[with T = ";
 		#	endif
 
 			constexpr usize prefix_pos = full_fn_name.find(prefix_str);
 			static_assert(prefix_pos != str8::npos);
 
-		#	ifdef __clang__
-				constexpr usize sep_pos = full_fn_name.find(", U", prefix_pos + prefix_str.len());
-		#	else
-				constexpr usize sep_pos = full_fn_name.find(";", prefix_pos + prefix_str.len());
-		#	endif
-
-			static_assert(sep_pos != str8::npos);
-
 			constexpr usize start_pos = prefix_pos + prefix_str.len();
+			constexpr usize new_len = full_fn_name.size() - (start_pos + 1);
 
-			return full_fn_name.substr(start_pos, sep_pos - start_pos);
+			return cexpr_str<new_len>(__PRETTY_FUNCTION__, std::integral_constant<std::size_t, start_pos>());
 
 		#elif defined(_MSVC_VER)
 
@@ -146,12 +152,15 @@ namespace ham::meta{
 
 		#endif
 		}
+	}
 
-		constexpr static str8 value = get_name();
+	template<typename T>
+	struct type_name{
+		static constexpr auto get() noexcept{ return detail::get_type_name<T>(); }
 	};
 
 	template<typename T>
-	constexpr inline auto type_name_v = type_name<T>::value;
+	constexpr inline auto type_name_v = type_name<T>::get();
 
 	template<> struct type_name<ham_vec2>: constant_str<"vec2">{};
 	template<> struct type_name<ham_vec3>: constant_str<"vec3">{};
