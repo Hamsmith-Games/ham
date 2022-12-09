@@ -61,7 +61,7 @@ if(NOT qscintilla_content_POPULATED)
 	FetchContent_Populate(qscintilla_content)
 endif()
 
-set(QSCINTILLA_LIBRARY "${qscintilla_content_BINARY_DIR}/libqscintilla2_qt6${CMAKE_SHARED_LIBRARY_SUFFIX}")
+set(QSCINTILLA_LIBRARY "${qscintilla_content_BINARY_DIR}/libqscintilla2_qt6${CMAKE_SHARED_LIBRARY_SUFFIX}.15")
 
 message(STATUS "QScintilla library path: ${QSCINTILLA_LIBRARY}")
 

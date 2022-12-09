@@ -17,6 +17,7 @@
  */
 
 #include "ham/engine/config.h"
+#include "ham/log.h"
 
 #include "welcome_wizard.hpp"
 #include "main_window.hpp"

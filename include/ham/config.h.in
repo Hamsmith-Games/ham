@@ -336,14 +336,14 @@ static inline void ham_breakpoint(){
 		__builtin_debugtrap();
 #	elif __has_builtin(__debugbreak)
 		__debugbreak();
-//#	elif defined(__x86_64__) || defined(__i386__)
-//		__asm__ volatile("int3");
-//#	elif defined(__aarch64__)
-//		__asm__ volatile(".inst 0xd4200000");
-//#	elif defined(__powerpc__)
-//		__asm__ volatile(".4byte 0x7d821008");
-//#	elif defined(__riscv)
-//		__asm__ volatile(".4byte 0x00100073");
+#	elif defined(__x86_64__) || defined(__i386__)
+		__asm__ volatile("int3");
+#	elif defined(__aarch64__)
+		__asm__ volatile(".inst 0xd4200000");
+#	elif defined(__powerpc__)
+		__asm__ volatile(".4byte 0x7d821008");
+#	elif defined(__riscv)
+		__asm__ volatile(".4byte 0x00100073");
 #	else
 		raise(SIGTRAP);
 #	endif

@@ -355,13 +355,37 @@ FetchContent_Declare(
 	GIT_TAG        c3856514de0a67d7b66939bf3ed491a2d6e61277 # 0.5.1
 )
 
+FetchContent_Declare(
+	metacpp_content
+	GIT_REPOSITORY https://github.com/RamblingMadMan/metacpp.git
+	GIT_TAG        504fe18e64121885a7c9d6ac3ee63e2854e354df
+)
+
 FetchContent_MakeAvailable(yyjson_content fmtlib_content)
+
+FetchContent_GetProperties(yyjson_content)
+if(NOT yyjson_content_POPULATED)
+	FetchContent_Populate(yyjson_content_content)
+
+	set(OLD_BUILD_SHARED ${BUILD_SHARED})
+
+	set(BUILD_SHARED OFF)
+	add_subdirectory(${yyjson_content_SOURCE_DIR} ${yyjson_content_BINARY_DIR} EXCLUDE_FROM_ALL)
+	set(BUILD_SHARED ${OLD_BUILD_SHARED})
+endif()
 
 FetchContent_GetProperties(robin_hood_content)
 if(NOT robin_hood_content_POPULATED)
 	FetchContent_Populate(robin_hood_content)
 
 	add_subdirectory(${robin_hood_content_SOURCE_DIR} ${robin_hood_content_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
+FetchContent_GetProperties(metacpp_content)
+if(NOT metacpp_content_POPULATED)
+	FetchContent_Populate(metacpp_content)
+
+	add_subdirectory(${metacpp_content_SOURCE_DIR} ${metacpp_content_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
 ##
@@ -494,6 +518,11 @@ install(
 )
 
 install(
+	FILES ${HAM_BINARY_INCLUDE_DIR}/ham/config.h
+	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ham
+)
+
+install(
 	DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/include/ham
 	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 	FILES_MATCHING
@@ -530,3 +559,6 @@ if(HAM_INSTALL_TEST)
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	)
 endif()
+
+include(CPack)
+

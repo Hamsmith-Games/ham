@@ -20,14 +20,19 @@ find_package(Vulkan REQUIRED COMPONENTS glslc)
 
 set(VMA_STATIC_VULKAN_FUNCTIONS OFF CACHE BOOL "" FORCE)
 set(VMA_DYNAMIC_VULKAN_FUNCTIONS ON CACHE BOOL "" FORCE)
+set(BUILD_SHARED OFF)
 
 FetchContent_Declare(
-	VulkanMemoryAllocator_content
+	vma_content
 	GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
 	GIT_TAG        a6bfc237255a6bac1513f7c1ebde6d8aed6b5191
 )
 
-FetchContent_MakeAvailable(VulkanMemoryAllocator_content)
+FetchContent_GetProperties(vma_content)
+if(NOT vma_content_POPULATED)
+	FetchContent_Populate(vma_content)
+	add_subdirectory(${vma_content_SOURCE_DIR} ${vma_content_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	target_compile_options(VulkanMemoryAllocator PRIVATE "-fPIC")

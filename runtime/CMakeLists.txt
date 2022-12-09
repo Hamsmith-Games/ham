@@ -149,3 +149,5 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 elseif(MSVC)
 	target_compile_options(ham PRIVATE "/W4" "/nologo")
 endif()
+
+#target_reflect(ham)
