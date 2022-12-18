@@ -241,6 +241,12 @@ namespace ham{
 				return *this;
 			}
 
+			basic_str_buffer &operator=(const Char *str_){
+				set(str_);
+				// TODO: signal on error; exception?
+				return *this;
+			}
+
 			basic_str_buffer &operator=(const cstr_type &str_){
 				set(str_);
 				// TODO: signal on error; exception?

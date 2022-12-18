@@ -43,8 +43,8 @@ HAM_C_API_BEGIN
 	typedef ham_i64 ham_v4i64 __attribute__((vector_size(32)));
 	typedef ham_f64 ham_v4f64 __attribute__((vector_size(32)));
 
-#	define ham_simd_shuffle(vec0, vec2, ...) \
-		__builtin_shufflevector(vec0, vec2 __VA_OPT__(,) __VA_ARGS__)
+#	define ham_simd_shuffle(vec0, vec1, ...) \
+		__builtin_shufflevector(vec0, vec1 __VA_OPT__(,) __VA_ARGS__)
 
 #else
 #	warning "SIMD currently only supported with GNU C vector extensions"

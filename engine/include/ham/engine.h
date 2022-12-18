@@ -313,7 +313,7 @@ namespace ham::engine{
 		public:
 			using this_type = subsystem_base<Super>;
 
-			static_assert(std::is_base_of_v<Super, this_type>);
+			//static_assert(std::is_base_of_v<Super, this_type>);
 
 			str8 name() const noexcept{ return ham_engine_subsys_name(m_subsys); }
 

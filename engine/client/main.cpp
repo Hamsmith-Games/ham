@@ -170,7 +170,7 @@ int main(int argc, char *argv[]){
 		return -3;
 	}
 
-	const auto engine = ham_engine_create(&app_info);
+	const auto engine = ham_engine_create(&app_info, nullptr);
 	if(!engine){
 		if(!ham_engine_client_show_message(HAM_LOG_ERROR, "Error in ham_engine_create")){
 			ham::logerror(HAM_ENGINE_CLIENT_API_NAME, "Error in ham_engine_client_show_message: 4LL 1S L05T");

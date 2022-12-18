@@ -33,8 +33,6 @@
 #	define ham_engine_client_api ham_private ham_import
 #endif
 
-#include "vk_mem_alloc.h"
-
 HAM_C_API_BEGIN
 
 ham_engine_client_api bool ham_engine_client_show_message(ham_log_level level, const char *msg);
