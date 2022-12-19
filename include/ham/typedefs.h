@@ -1176,9 +1176,10 @@ namespace ham{
 		public:
 			constexpr static bool is_mutable = std::is_const_v<T>;
 
+			using value_type = T;
 			using pointer = T*;
 
-			basic_pointer_view(pointer ptr) noexcept: m_ptr(ptr){}
+			basic_pointer_view(pointer ptr = nullptr) noexcept: m_ptr(ptr){}
 
 			operator pointer() const noexcept{ return m_ptr; }
 

@@ -59,6 +59,7 @@ set(
 	image.cpp
 	net.cpp
 	audio.cpp
+	physics.cpp
 	renderer.cpp
 	ham.cpp
 )

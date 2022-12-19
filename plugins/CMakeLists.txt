@@ -55,6 +55,12 @@ endif()
 add_subdirectory(audio-oalsoft)
 
 ##
+# Physics plugins
+##
+
+add_subdirectory(physics-bullet3)
+
+##
 # Renderer plugins
 ##
 

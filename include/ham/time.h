@@ -81,6 +81,14 @@ ham_constexpr ham_nothrow static inline ham_duration ham_duration_from_seconds64
 	};
 }
 
+ham_used
+ham_constexpr ham_nothrow static inline ham_duration ham_duration_from_milli64(ham_u64 dt){
+	return (ham_duration){
+		.tv_sec = (time_t)(dt / 1000u),
+		.tv_nsec = (long)(dt % 1000u) * 1000000
+	};
+}
+
 typedef struct ham_ticker{
 	ham_timepoint loop, end;
 	ham_f64 avg_clock_dt;

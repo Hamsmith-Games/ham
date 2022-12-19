@@ -22,6 +22,7 @@
 #include "world_view.hpp"
 #include "graph_editor.hpp"
 #include "source_editor.hpp"
+#include "physics_backend.hpp"
 
 #include <QSettings>
 #include <QResizeEvent>
@@ -99,9 +100,15 @@ editor::main_window::main_window(class project *project_, QWidget *parent)
 		}
 	}
 
-	m_world = ham_world_create(HAM_LIT("ham-editor"));
+	m_phys = new editor::physics_backend(this);
+	if(!m_phys){
+		delete m_engine;
+		throw std::runtime_error("Could not create main window world instance");
+	}
+
+	m_world = ham_world_create(HAM_LIT("ham-editor"), m_phys->get());
 	if(!m_world){
-		ham::logapierror("Error in ham_world_create");
+		delete m_phys;
 		delete m_engine;
 		throw std::runtime_error("Could not create main window world instance");
 	}

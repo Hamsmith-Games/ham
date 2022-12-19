@@ -28,6 +28,8 @@ namespace ham::engine::editor{
 	class world_view;
 	class graph_editor;
 	class source_editor;
+
+	class physics_backend;
 	class engine_instance;
 }
 
@@ -54,6 +56,7 @@ namespace ham::engine::editor{
 
 		private:
 			engine_instance *m_engine;
+			physics_backend *m_phys;
 			ham_world *m_world;
 
 			class project *m_proj;

@@ -43,6 +43,26 @@ typedef enum ham_shape_kind{
 	HAM_SHAPE_KIND_COUNT,
 } ham_shape_kind;
 
+ham_used
+ham_nothrow static inline const char *ham_shape_kind_str(ham_shape_kind kind){
+	switch(kind){
+	#define HAM_CASE(x) case (x): return #x;
+
+		HAM_CASE(HAM_SHAPE_TRIANGLE_MESH)
+
+		HAM_CASE(HAM_SHAPE_QUAD)
+		HAM_CASE(HAM_SHAPE_RECT)
+		HAM_CASE(HAM_SHAPE_SQUARE)
+
+		HAM_CASE(HAM_SHAPE_HEXAHEDRON)
+		HAM_CASE(HAM_SHAPE_CUBOID)
+		HAM_CASE(HAM_SHAPE_CUBE)
+
+	#undef HAM_CASE
+		default: return "INVALID";
+	}
+}
+
 typedef enum ham_vertex_order{
 	HAM_VERTEX_TRIANGLES,
 	HAM_VERTEX_TRIANGLE_FAN,
@@ -50,6 +70,20 @@ typedef enum ham_vertex_order{
 
 	HAM_VERTEX_ORDER_COUNT
 } ham_vertex_order;
+
+ham_used
+ham_nothrow static inline const char *ham_vertex_order_str(ham_vertex_order order){
+	switch(order){
+	#define HAM_CASE(x) case (x): return #x;
+
+		HAM_CASE(HAM_VERTEX_TRIANGLES)
+		HAM_CASE(HAM_VERTEX_TRIANGLE_FAN)
+		HAM_CASE(HAM_VERTEX_TRIANGLE_STRIP)
+
+	#undef HAM_CASE
+		default: return "INVALID";
+	}
+}
 
 typedef struct ham_shape ham_shape;
 

@@ -92,7 +92,7 @@ ham_nothrow static inline bool ham_sem_wait(ham_sem *sem){
  * @returns `1` if the semphore would block, `0` if the semaphore was decremented or `-1` on error
  */
 ham_nonnull_args(1)
-ham_nothrow static inline ham_i32 ham_sem_try_wait(ham_sem *sem){
+ham_used ham_nothrow static inline ham_i32 ham_sem_try_wait(ham_sem *sem){
 	const int res = sem_trywait(&sem->_impl_sem);
 	if(res != 0){
 		if(errno == EAGAIN) return 1;
@@ -128,7 +128,7 @@ typedef struct ham_mutex{
 } ham_mutex;
 
 ham_nonnull_args(1)
-ham_nothrow static inline bool ham_mutex_init(ham_mutex *mut, ham_mutex_kind kind){
+ham_used ham_nothrow static inline bool ham_mutex_init(ham_mutex *mut, ham_mutex_kind kind){
 	pthread_mutexattr_t mut_attr;
 	int res = pthread_mutexattr_init(&mut_attr);
 	if(res != 0){
@@ -180,6 +180,7 @@ ham_nothrow static inline bool ham_mutex_init(ham_mutex *mut, ham_mutex_kind kin
 	return true;
 }
 
+ham_used
 ham_nothrow static inline void ham_mutex_finish(ham_mutex *mut){
 	if(ham_unlikely(!mut)) return;
 
@@ -200,13 +201,18 @@ ham_nothrow static inline bool ham_mutex_lock(ham_mutex *mut){
 	return true;
 }
 
+#define HAM_LOCKED_REGION(mut, block) \
+	{	ham_mutex_lock(mut); \
+		HAM_EXPAND block \
+		ham_mutex_unlock(mut); }
+
 /**
  * Try to lock a mutex.
  * @param mut mutex to try lock
  * @returns `1` if the mutex would block, `0` if the mutex was locked or `-1` on error
  */
 ham_nonnull_args(1)
-ham_nothrow static inline ham_i32 ham_mutex_try_lock(ham_mutex *mut){
+ham_used ham_nothrow static inline ham_i32 ham_mutex_try_lock(ham_mutex *mut){
 	const int res = pthread_mutex_trylock(&mut->_impl_mut);
 
 	switch(res){
@@ -290,7 +296,7 @@ ham_nothrow static inline bool ham_cond_broadcast(ham_cond *cond){
 }
 
 ham_nonnull_args(1)
-ham_nothrow static inline bool ham_cond_wait(ham_cond *cond, ham_mutex *mut){
+ham_used ham_nothrow static inline bool ham_cond_wait(ham_cond *cond, ham_mutex *mut){
 	const int res = pthread_cond_wait(&cond->_impl_cond, &mut->_impl_mut);
 	if(res != 0){
 		ham_logapierrorf("Error in pthread_cond_wait: %s", strerror(res));
@@ -298,6 +304,236 @@ ham_nothrow static inline bool ham_cond_wait(ham_cond *cond, ham_mutex *mut){
 	}
 
 	return true;
+}
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup HAM_ASYNC_RESULT Asynchronous results
+ * @{
+ */
+
+#define HAM_ASYNC_RESULT_PROGRESS_MAX HAM_U32_MAX
+
+typedef struct ham_async_result ham_async_result;
+
+typedef void(*ham_async_result_started_fn)(void *user);
+typedef void(*ham_async_result_finished_fn)(void *user, void *value);
+typedef void(*ham_async_result_progress_fn)(void *user, ham_u32 progress);
+typedef void(*ham_async_result_canceled_fn)(void *user);
+
+struct ham_async_result_fns{
+	ham_async_result_started_fn started_fn;
+	ham_async_result_finished_fn finished_fn;
+	ham_async_result_progress_fn progress_fn;
+	ham_async_result_canceled_fn canceled_fn;
+	void *user;
+};
+
+struct ham_async_result{
+	bool is_valid;
+	bool is_ready;
+
+	ham_mutex mut;
+	ham_cond cond;
+
+	ham_async_result_fns fns;
+	void *value;
+};
+
+ham_nonnull_args(1)
+ham_used static inline bool ham_async_result_init(ham_async_result *result, ham_async_result_fns fns){
+	result->is_valid = true;
+	result->is_ready = false;
+
+	if(!ham_mutex_init(&result->mut, HAM_MUTEX_NORMAL)){
+		ham_logapierrorf("Error in ham_mutex_init");
+		return false;
+	}
+
+	if(!ham_cond_init(&result->cond)){
+		ham_logapierrorf("Error in ham_cond_init");
+		ham_mutex_finish(&result->mut);
+		return false;
+	}
+
+	memcpy(&result->fns, &fns, sizeof(ham_async_result_fns));
+
+	if(result->fns.started_fn){
+		result->fns.started_fn(result->fns.user);
+	}
+
+	if(result->fns.progress_fn){
+		result->fns.progress_fn(result->fns.user, 0);
+	}
+
+	return true;
+}
+
+ham_nonnull_args(1)
+ham_used static inline void ham_async_result_finish(ham_async_result *result){
+	if(!ham_mutex_lock(&result->mut)){
+		ham_logapierrorf("Error in ham_mutex_lock");
+	}
+	else if(result->is_valid && !result->is_ready){
+		result->is_valid = false;
+		if(result->fns.canceled_fn){
+			result->fns.canceled_fn(result->fns.user);
+		}
+
+		ham_mutex_unlock(&result->mut);
+	}
+
+	ham_mutex_finish(&result->mut);
+	ham_cond_finish(&result->cond);
+
+#ifdef HAM_DEBUG
+	memset(result, 0, sizeof(ham_async_result));
+#endif
+}
+
+ham_nonnull_args(1)
+ham_used static inline void ham_async_result_reset(ham_async_result *result, ham_async_result_fns fns){
+	if(result->is_valid){
+		ham_async_result_finish(result);
+	}
+
+	ham_async_result_init(result, fns);
+}
+
+ham_nonnull_args(1)
+ham_used static inline bool ham_async_result_set(ham_async_result *result, void *value){
+	if(!ham_mutex_lock(&result->mut)){
+		ham_logapierrorf("Error in ham_mutex_lock");
+		return false;
+	}
+
+	if(!result->is_valid || result->is_ready){
+		ham_logapierrorf("Result is in invalid state to set value");
+		ham_mutex_unlock(&result->mut);
+		return false;
+	}
+
+	result->is_ready = true;
+	result->value = value;
+
+	if(result->fns.progress_fn){
+		result->fns.progress_fn(result->fns.user, HAM_ASYNC_RESULT_PROGRESS_MAX);
+	}
+
+	if(result->fns.finished_fn){
+		result->fns.finished_fn(result->fns.user, value);
+	}
+
+	ham_cond_broadcast(&result->cond);
+	ham_mutex_unlock(&result->mut);
+	return true;
+}
+
+ham_nonnull_args(1)
+ham_used static inline bool ham_async_result_update_progress(ham_async_result *result, ham_u32 progress){
+	if(!ham_mutex_lock(&result->mut)){
+		ham_logapierrorf("Error in ham_mutex_lock");
+		return false;
+	}
+
+	if(!result->is_valid || result->is_ready){
+		ham_logapierrorf("Result is in invalid state to update progress");
+		ham_mutex_unlock(&result->mut);
+		return false;
+	}
+
+	return true;
+}
+
+ham_nonnull_args(1)
+ham_used static inline bool ham_async_result_get(ham_async_result *result, void **value_ptr){
+	if(!ham_mutex_lock(&result->mut)){
+		ham_logapierrorf("Error in ham_mutex_lock");
+		return false;
+	}
+
+	if(!result->is_valid){
+		ham_logapierrorf("Invalid result passed");
+		ham_mutex_unlock(&result->mut);
+		return false;
+	}
+
+	if(result->is_ready){
+		if(value_ptr) *value_ptr = result->value;
+		ham_mutex_unlock(&result->mut);
+		return true;
+	}
+
+	bool ret = false;
+
+	while((ret = ham_cond_wait(&result->cond, &result->mut)) && !result->is_ready){
+		if(!result->is_valid){
+			ret = false;
+			break;
+		}
+	}
+
+	if(ret && value_ptr){
+		*value_ptr = result->value;
+	}
+
+	ham_mutex_unlock(&result->mut);
+	return ret;
+}
+
+ham_nonnull_args(1)
+ham_used ham_nothrow static inline bool ham_async_result_is_valid(ham_async_result *result){
+	bool ret = false;
+
+	HAM_LOCKED_REGION(&result->mut, (
+		ret = result->is_valid;
+	))
+
+	return ret;
+}
+
+ham_nonnull_args(1)
+ham_used ham_nothrow static inline bool ham_async_result_is_ready(ham_async_result *result){
+	bool ret = false;
+
+	HAM_LOCKED_REGION(&result->mut, (
+		ret = result->is_valid ? result->is_ready : false;
+	))
+
+	return ret;
+}
+
+ham_nonnull_args(1)
+ham_used ham_nothrow static inline bool ham_async_result_wait(ham_async_result *result){
+	if(!ham_mutex_lock(&result->mut)){
+		ham_logapierrorf("Error in ham_mutex_unlock");
+		return false;
+	}
+
+	if(!result->is_valid){
+		ham_logapierrorf("Invalid result passed");
+		ham_mutex_unlock(&result->mut);
+		return false;
+	}
+
+	if(result->is_ready){
+		ham_mutex_unlock(&result->mut);
+		return true;
+	}
+
+	bool ret;
+	while((ret = ham_cond_wait(&result->cond, &result->mut)) && !result->is_ready){
+		if(!result->is_valid){
+			ret = false;
+			break;
+		}
+	}
+
+	ham_mutex_unlock(&result->mut);
+	return ret;
 }
 
 /**

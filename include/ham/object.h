@@ -175,6 +175,23 @@ struct ham_object{
 
 #define ham_derive(base) base HAM_SUPER_NAME;
 
+//! @cond ignore
+ham_used
+static inline ham_object *ham_impl_construct_object(ham_object *obj, const ham_object_vtable *vptr, ham_u32 nargs, ...){
+	va_list va;
+	va_start(va, nargs);
+	ham_object *const ret = vptr->ctor(obj, nargs, va);
+	va_end(va);
+	return ret;
+}
+//! @endcond
+
+#define ham_construct_object(obj_, vptr_, ...) \
+	ham_impl_construct_object((obj_), (vptr_), HAM_NARGS(__VA_ARGS__) __VA_OPT__(,) __VA_ARGS__)
+
+#define ham_destroy_object(obj_) \
+	((obj_)->vptr->dtor((obj_)))
+
 #ifdef __cplusplus
 #	define ham_impl_def_ctor(object_type, nargs_name, va_name) \
 		static inline object_type *object_type##_ctor_user(object_type *self, ham_u32 nargs_name, va_list va_name); \
@@ -656,6 +673,25 @@ namespace ham{
 		private:
 			object_type *m_obj;
 	};
+
+	template<HamObject Object, HamObjectVTable VTable>
+	ham_object *construct_object(Object *obj, const VTable *vptr){
+		if constexpr(requires { ham_super(vptr); }){
+			return construct_object(obj, ham_super(vptr));
+		}
+		else{
+			static_assert(std::is_same_v<VTable, ham_object_vtable>);
+
+			const auto base = detail::ham_get_base<ham_object, Object>::get(obj);
+			return ham_construct_object(base, vptr);
+		}
+	}
+
+	template<HamObject Object>
+	void destroy_object(Object *obj){
+		const auto base = detail::ham_get_base<ham_object, Object>::get(obj);
+		ham_destroy_object(base);
+	}
 }
 
 #endif // __cplusplus

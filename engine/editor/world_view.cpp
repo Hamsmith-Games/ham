@@ -18,6 +18,7 @@
 
 #include "world_view.hpp"
 
+#include "ham/plugin.h"
 #include "ham/engine/model.h"
 
 #include <QSettings>
@@ -78,6 +79,23 @@ editor::world_view::world_view(ham_engine *engine, ham_world *world, QWidget *pa
 {
 	setContentsMargins(0, 0, 0, 0);
 	setContextMenuPolicy(Qt::CustomContextMenu);
+
+	if(!ham_plugin_find(HAM_PHYSICS_BULLET3_PLUGIN_NAME, ham_plugin_default_path(), &m_phys_plug, &m_phys_dso)){
+		ham::logapierror("Failed to find plugin: " HAM_PHYSICS_BULLET3_PLUGIN_NAME);
+		throw std::runtime_error("Failed to find plugin: " HAM_PHYSICS_BULLET3_PLUGIN_NAME);
+	}
+
+	const auto phys_vptr = ham_plugin_object(m_phys_plug, HAM_LIT_UTF8(HAM_PHYSICS_BULLET3_OBJECT_NAME));
+	if(!phys_vptr){
+		ham::logapierror("Failed to get vptr for '" HAM_PHYSICS_BULLET3_OBJECT_NAME "' from plugin: " HAM_PHYSICS_BULLET3_PLUGIN_NAME);
+		throw std::runtime_error("Failed to get vptr for '" HAM_PHYSICS_BULLET3_OBJECT_NAME "' from plugin: " HAM_PHYSICS_BULLET3_PLUGIN_NAME);
+	}
+
+	m_phys = ham_physics_create((ham_physics_vptr)phys_vptr);
+	if(!m_phys){
+		ham::logapierror("Error in ham_physics_create");
+		throw std::runtime_error("Error in ham_physics_create");
+	}
 
 	m_r_widget = new editor::renderer_widget_gl(this);
 	m_r_widget->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
@@ -188,7 +206,11 @@ editor::world_view::world_view(ham_engine *engine, ham_world *world, QWidget *pa
 	connect(this, &QWidget::customContextMenuRequested, this, &world_view::show_context_menu);
 }
 
-editor::world_view::~world_view(){}
+editor::world_view::~world_view(){
+	ham_physics_destroy(m_phys);
+	ham_plugin_unload(m_phys_plug);
+	ham_dso_close(m_phys_dso);
+}
 
 void editor::world_view::show_context_menu(const QPoint &pos){
 	editor::world_context_menu ctx_menu(this);

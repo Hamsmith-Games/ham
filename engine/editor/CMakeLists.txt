@@ -109,8 +109,12 @@ ham_add_executable(
 	templates.qrc
 	models.qrc
 
-	engine_instance.hpp
 	main.cpp
+
+	physics_backend.hpp
+	physics_backend.cpp
+
+	engine_instance.hpp
 
 	util.hpp
 

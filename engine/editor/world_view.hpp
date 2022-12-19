@@ -22,6 +22,9 @@
 #include "ham/engine.h"
 #include "ham/engine/world.h"
 
+#include "ham/plugin.h"
+#include "ham/physics.h"
+
 #include <QWidget>
 #include <QMenu>
 
@@ -111,6 +114,11 @@ namespace ham::engine::editor{
 			QWidget *createOverlay();
 
 			ham_engine *m_engine;
+
+			ham_plugin *m_phys_plug;
+			ham_dso_handle m_phys_dso;
+			ham_physics *m_phys;
+
 			ham_world *m_world;
 			renderer_widget *m_r_widget;
 			QWidget *m_overlay_widget;

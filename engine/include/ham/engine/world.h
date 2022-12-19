@@ -27,6 +27,7 @@
 
 #include "ham/engine/config.h"
 
+#include "ham/physics.h" // IWYU pragma: keep
 #include "ham/net.h" // IWYU pragma: keep
 
 #include "entity.h"
@@ -38,7 +39,7 @@ typedef struct ham_world ham_world;
 //! A single world partition, part of a larger world tree
 typedef struct ham_world_partition ham_world_partition;
 
-ham_engine_api ham_world *ham_world_create(ham_str8 name);
+ham_engine_api ham_world *ham_world_create(ham_str8 name, ham_physics *phys);
 
 ham_engine_api void ham_world_destroy(ham_world *world);
 
@@ -64,14 +65,14 @@ HAM_C_API_END
 #ifdef __cplusplus
 
 namespace ham::engine{
-	template<typename ... Tags>
+	template<bool IsMutable = false>
 	class basic_world_view{
 		public:
-			static constexpr bool is_mutable = ham::meta::type_list_contains_v<meta::type_list<Tags...>, mutable_tag>;
+			static constexpr bool is_mutable = IsMutable;
 
 			using pointer = std::conditional_t<is_mutable, ham_world*, const ham_world*>;
 
-			basic_world_view(pointer ptr_) noexcept
+			basic_world_view(pointer ptr_ = nullptr) noexcept
 				: m_ptr(ptr_){}
 
 			operator pointer() const noexcept{ return m_ptr; }
@@ -82,8 +83,23 @@ namespace ham::engine{
 			pointer m_ptr;
 	};
 
-	using world_view = basic_world_view<mutable_tag>;
-	using const_world_view = basic_world_view<>;
+	using world_view = basic_world_view<true>;
+	using const_world_view = basic_world_view<false>;
+
+	class world{
+		public:
+			world() = default;
+
+			world(str8 name, ham_physics *phys)
+				: m_handle(ham_world_create(name, phys)){}
+
+			operator bool() const noexcept{ return m_handle; }
+
+			ham_world *ptr() const noexcept{ return m_handle.get(); }
+
+		private:
+			unique_handle<ham_world*, ham_world_destroy> m_handle;
+	};
 }
 
 #endif // __cplusplus

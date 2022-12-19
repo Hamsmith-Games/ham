@@ -54,14 +54,16 @@ struct ham_world{
 
 	ham::str_buffer8 name;
 
+	ham_physics_world *phys_world;
+
 	ham::mutex mut;
 	robin_hood::unordered_flat_map<const ham_entity_vtable*, ham_object_manager*> obj_mans;
 
 	ham_world_partition root_partition;
 };
 
-ham_world *ham_world_create(ham_str8 name){
-	if(!ham_check(name.len > 0) || !ham_check(name.ptr != NULL)) return nullptr;
+ham_world *ham_world_create(ham_str8 name, ham_physics *phys){
+	if(!ham_check(name.len > 0) || !ham_check(name.ptr != NULL) || !ham_check(phys != NULL)) return nullptr;
 
 	const auto allocator = ham_current_allocator();
 
@@ -73,7 +75,8 @@ ham_world *ham_world_create(ham_str8 name){
 
 	ret->allocator = allocator;
 
-	ret->name = name;
+	ret->name       = name;
+	ret->phys_world = ham_physics_world_create(phys);
 
 	ret->root_partition.world = ret;
 	ret->root_partition = (ham_world_partition){
@@ -110,6 +113,8 @@ void ham_world_destroy(ham_world *world){
 			ham_object_manager_destroy(obj_man_p.second);
 		}
 	}
+
+	ham_physics_world_destroy(world->phys_world);
 
 	ham_allocator_delete(allocator, world);
 }
